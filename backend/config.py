@@ -1,10 +1,21 @@
 import os
 from datetime import timedelta
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+except ImportError:
+    pass
 
-load_dotenv()
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+def _get_int_env(key: str, default: int) -> int:
+    val = os.getenv(key)
+    if val is None or not val.strip():
+        return default
+    try:
+        return int(val.strip())
+    except (ValueError, TypeError):
+        return default
 
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'change-in-production-super-secret-key')
@@ -28,8 +39,8 @@ class Config:
 
     # JWT Configuration
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=int(os.getenv('JWT_ACCESS_TOKEN_EXPIRY', '900'))) # 15 minutes
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=int(os.getenv('JWT_REFRESH_TOKEN_EXPIRY', '604800'))) # 7 days
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_ACCESS_TOKEN_EXPIRY', 900)) # 15 minutes
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_REFRESH_TOKEN_EXPIRY', 604800)) # 7 days
     
     # Upload & Media Configuration
     UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', os.path.join(os.getcwd(), 'storage', 'photos'))
