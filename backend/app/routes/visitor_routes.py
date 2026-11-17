@@ -88,19 +88,31 @@ def list_visitors():
         elif status == 'COMPLETED':
             query = query.filter(Visitor.check_out_at.isnot(None))
 
+        s_date = None
+        e_date = None
+
         if start_date_str:
             try:
                 s_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-                query = query.filter(Visitor.check_in_at >= s_date)
             except ValueError:
                 pass
 
         if end_date_str:
             try:
                 e_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-                query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
             except ValueError:
                 pass
+
+        if s_date and e_date and e_date < s_date:
+            return jsonify({
+                'success': False,
+                'message': 'Tanggal selesai tidak bisa kurang dari tanggal masuk/mulai.'
+            }), 422
+
+        if s_date:
+            query = query.filter(Visitor.check_in_at >= s_date)
+        if e_date:
+            query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
 
         total = query.count()
         visitors = query.order_by(Visitor.check_in_at.desc()).offset((page - 1) * limit).limit(limit).all()

@@ -24,6 +24,24 @@ export default function ReportsPage() {
   // Date range states
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [dateError, setDateError] = useState('');
+
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    setDateError('');
+    if (endDate && val && endDate < val) {
+      setEndDate(val);
+    }
+  };
+
+  const handleEndDateChange = (val: string) => {
+    if (startDate && val && val < startDate) {
+      setDateError('Tanggal selesai tidak bisa kurang dari tanggal masuk.');
+      return;
+    }
+    setDateError('');
+    setEndDate(val);
+  };
 
   // Photo modal zoom
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
@@ -142,8 +160,8 @@ export default function ReportsPage() {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full text-xs border border-gray-300 rounded-lg p-1.5"
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-1.5 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
                 />
               </div>
               <div className="space-y-1">
@@ -151,16 +169,25 @@ export default function ReportsPage() {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full text-xs border border-gray-300 rounded-lg p-1.5"
+                  min={startDate || undefined}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-1.5 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
                 />
               </div>
+
+              {dateError && (
+                <div className="text-[10px] text-red-600 font-semibold bg-red-50 p-1.5 rounded-lg border border-red-200">
+                  {dateError}
+                </div>
+              )}
+
               <div className="flex justify-end space-x-2 pt-1">
                 <button
                   type="button"
                   onClick={() => {
                     setStartDate('');
                     setEndDate('');
+                    setDateError('');
                     setDateFilterOpen(false);
                   }}
                   className="text-[10px] text-gray-500 hover:text-gray-800 px-2 py-1"
@@ -169,8 +196,9 @@ export default function ReportsPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={Boolean(dateError) || Boolean(startDate && endDate && endDate < startDate)}
                   onClick={() => setDateFilterOpen(false)}
-                  className="text-[10px] bg-[#8A001A] text-white font-bold px-3 py-1 rounded-lg"
+                  className="text-[10px] bg-[#8A001A] text-white font-bold px-3 py-1 rounded-lg disabled:opacity-50"
                 >
                   Terapkan
                 </button>
