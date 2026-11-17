@@ -29,9 +29,10 @@ def create_app(config_name=None, db_url=None):
     Base.metadata.create_all(bind=engine)
 
     # Seed initial roles, users, and passes
+    is_testing = bool(os.getenv('PYTEST_CURRENT_TEST')) or app.config.get('TESTING', False) or config_name == 'testing'
     db = get_db_session()
     try:
-        seed_initial_data(db)
+        seed_initial_data(db, is_testing=is_testing)
     finally:
         db.close()
 

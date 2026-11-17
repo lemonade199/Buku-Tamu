@@ -15,6 +15,9 @@ class PassRepository:
     def get_available(self):
         return self.db.query(Pass).filter(Pass.status == 'AVAILABLE').order_by(Pass.no_pass.asc()).all()
 
+    def count_total(self) -> int:
+        return self.db.query(func.count(Pass.id_pass)).scalar() or 0
+
     def count_by_status(self):
         results = self.db.query(Pass.status, func.count(Pass.id_pass)).group_by(Pass.status).all()
         counts = {'AVAILABLE': 0, 'IN_USE': 0, 'MAINTENANCE': 0, 'LOST': 0}
