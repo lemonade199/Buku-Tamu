@@ -8,10 +8,11 @@ from backend.app.models.base import Base, init_db, get_db_session
 from backend.app.services.seed_service import seed_initial_data
 from backend.app.routes.auth_routes import auth_bp
 from backend.app.routes.dashboard_routes import dashboard_bp
+from backend.app.routes.visitor_routes import visitor_bp
 
 jwt = JWTManager()
 
-def create_app(config_name=None):
+def create_app(config_name=None, db_url=None):
     if config_name is None:
         config_name = os.getenv('FLASK_ENV', 'development')
 
@@ -23,7 +24,7 @@ def create_app(config_name=None):
     jwt.init_app(app)
 
     # Initialize database engine & session
-    engine, _ = init_db()
+    engine, _ = init_db(db_url)
     Base.metadata.create_all(bind=engine)
 
     # Seed initial roles, users, and passes
@@ -36,6 +37,7 @@ def create_app(config_name=None):
     # Register blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(visitor_bp)
 
     # Global error handlers
     @app.errorhandler(404)
