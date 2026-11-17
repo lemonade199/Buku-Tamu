@@ -14,7 +14,7 @@ from backend.app.utils.photo_storage import get_photo_path
 visitor_bp = Blueprint('visitors', __name__, url_prefix='/api/v1/visitors')
 
 @visitor_bp.route('/checkin', methods=['POST'])
-@jwt_required()
+@jwt_required(optional=True)
 def checkin_visitor():
     data = request.get_json() or {}
     try:
@@ -26,7 +26,8 @@ def checkin_visitor():
             'errors': e.errors()
         }), 422
 
-    user_id = int(get_jwt_identity())
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
     ip_addr = request.remote_addr
     user_agent = request.headers.get('User-Agent')
 

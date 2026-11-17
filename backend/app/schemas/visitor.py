@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 class CheckinRequest(BaseModel):
     fullname: str = Field(..., min_length=2, max_length=150, description="Nama lengkap pengunjung")
-    telephone: str = Field(..., min_length=6, max_length=25, description="Nomor telepon / kontak")
+    telephone: Optional[str] = Field(default="-", max_length=25, description="Nomor telepon / kontak")
     institution: Optional[str] = Field(None, max_length=150, description="Asal instansi atau perusahaan")
     representing: Optional[str] = Field(None, max_length=150, description="Pihak atau pejabat yang dikunjungi")
     purpose: Optional[str] = Field(None, max_length=1000, description="Tujuan atau keperluan kunjungan")

@@ -44,7 +44,7 @@ def get_all_passes():
         db.close()
 
 @pass_bp.route('/available', methods=['GET'])
-@jwt_required()
+@jwt_required(optional=True)
 def get_available_passes():
     db = get_db_session()
     try:
