@@ -43,7 +43,12 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_REFRESH_TOKEN_EXPIRY', 604800)) # 7 days
     
     # Upload & Media Configuration
-    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', os.path.join(os.getcwd(), 'storage', 'photos'))
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    _upload_env = os.getenv('UPLOAD_FOLDER', 'storage/photos')
+    if not os.path.isabs(_upload_env):
+        UPLOAD_FOLDER = os.path.abspath(os.path.join(BASE_DIR, _upload_env))
+    else:
+        UPLOAD_FOLDER = os.path.abspath(_upload_env)
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max payload
 
 class DevelopmentConfig(Config):

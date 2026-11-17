@@ -5,6 +5,16 @@ import re
 from datetime import datetime
 from flask import current_app
 
+def get_upload_dir() -> str:
+    upload_dir = current_app.config.get('UPLOAD_FOLDER') if current_app else None
+    if not upload_dir:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+        upload_dir = os.path.join(base_dir, 'storage', 'photos')
+    if not os.path.isabs(upload_dir):
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+        upload_dir = os.path.join(base_dir, upload_dir)
+    return os.path.abspath(upload_dir)
+
 def save_visitor_photo(photo_base64: str) -> str:
     """
     Decodes base64 image string and saves it securely into the storage/photos directory.
@@ -22,10 +32,7 @@ def save_visitor_photo(photo_base64: str) -> str:
         raise ValueError("Data foto tidak valid atau ukuran gambar terlalu kecil.")
 
     # Determine storage directory
-    upload_dir = current_app.config.get('UPLOAD_FOLDER') if current_app else None
-    if not upload_dir:
-        upload_dir = os.path.join(os.getcwd(), 'storage', 'photos')
-    
+    upload_dir = get_upload_dir()
     os.makedirs(upload_dir, exist_ok=True)
 
     date_str = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
@@ -39,7 +46,5 @@ def save_visitor_photo(photo_base64: str) -> str:
     return filename
 
 def get_photo_path(filename: str) -> str:
-    upload_dir = current_app.config.get('UPLOAD_FOLDER') if current_app else None
-    if not upload_dir:
-        upload_dir = os.path.join(os.getcwd(), 'storage', 'photos')
-    return os.path.join(upload_dir, filename)
+    upload_dir = get_upload_dir()
+    return os.path.abspath(os.path.join(upload_dir, filename))

@@ -155,7 +155,7 @@ def get_visitor_photo(id_visitor: int):
         if not visitor or not visitor.capture_id:
             return jsonify({'success': False, 'message': 'Foto tidak ditemukan.'}), 404
 
-        photo_path = get_photo_path(visitor.capture_id)
+        photo_path = os.path.abspath(get_photo_path(visitor.capture_id))
         if not os.path.exists(photo_path):
             return jsonify({'success': False, 'message': 'File foto fisik tidak ditemukan pada server.'}), 404
 

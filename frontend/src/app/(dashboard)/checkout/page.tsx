@@ -279,19 +279,20 @@ export default function CheckoutPage() {
                           {/* Photo Thumbnail */}
                           <div
                             onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`)}
-                            className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden border border-ivory-200 relative group cursor-pointer shrink-0 shadow-sm"
+                            className="w-10 h-10 rounded-xl bg-ivory-100 overflow-hidden border border-ivory-200 relative group cursor-pointer shrink-0 shadow-sm flex items-center justify-center"
                             title="Klik untuk melihat foto lebih besar"
                           >
+                            <User className="w-5 h-5 text-gray-400 absolute" />
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`}
                               alt={visitor.fullname}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform relative z-10"
                               onError={(e) => {
                                 (e.currentTarget as HTMLElement).style.display = 'none';
                               }}
                             />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white z-20">
                               <Eye className="w-3.5 h-3.5" />
                             </div>
                           </div>
@@ -392,12 +393,16 @@ export default function CheckoutPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-black">
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-ivory-100 border border-ivory-200 flex items-center justify-center relative">
+              <User className="w-12 h-12 text-gray-300 absolute" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewPhotoUrl}
-                alt="Zoom Tamu"
-                className="w-full h-full object-cover"
+                alt="Foto Pengunjung"
+                className="w-full h-full object-cover relative z-10"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
               />
             </div>
             <button

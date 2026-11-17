@@ -16,6 +16,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Clock,
+  User,
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -255,14 +256,15 @@ export default function ReportsPage() {
                       <div className="flex items-center space-x-2.5">
                         <div
                           onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 overflow-hidden border border-ivory-200 cursor-pointer shrink-0"
+                          className="w-8 h-8 rounded-lg bg-ivory-100 overflow-hidden border border-ivory-200 cursor-pointer shrink-0 relative flex items-center justify-center group"
                           title="Klik zoom foto"
                         >
+                          <User className="w-4 h-4 text-gray-400 absolute" />
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`}
                             alt={visitor.fullname}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover relative z-10 group-hover:scale-110 transition-transform"
                             onError={(e) => {
                               (e.currentTarget as HTMLElement).style.display = 'none';
                             }}
@@ -384,12 +386,16 @@ export default function ReportsPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-black">
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-ivory-100 border border-ivory-200 flex items-center justify-center relative">
+              <User className="w-12 h-12 text-gray-300 absolute" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewPhotoUrl}
-                alt="Zoom Tamu"
-                className="w-full h-full object-cover"
+                alt="Foto Tamu"
+                className="w-full h-full object-cover relative z-10"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
               />
             </div>
             <button
