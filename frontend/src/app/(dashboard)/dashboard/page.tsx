@@ -13,8 +13,10 @@ import {
   PlusCircle,
   LogOut,
   RefreshCw,
+  BarChart3,
+  TrendingUp,
 } from 'lucide-react';
-import Link from 'next/navigation';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -35,8 +37,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchMetrics();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchMetrics, 30000);
+    // Auto-refresh every 20 seconds from live database
+    const interval = setInterval(fetchMetrics, 20000);
     return () => clearInterval(interval);
   }, []);
 
@@ -49,10 +51,14 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-3">
         <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-charcoal-muted">Memuat data dashboard operasional...</p>
+        <p className="text-xs text-charcoal-muted">Memuat data langsung dari database PostgreSQL...</p>
       </div>
     );
   }
+
+  const totalPass = metrics?.total_pass || 20;
+  const maxHourlyCount = Math.max(...(metrics?.hourly_stats?.map((h) => h.count) || [1]), 1);
+  const maxWeeklyCount = Math.max(...(metrics?.weekly_trend?.map((w) => w.count) || [1]), 1);
 
   return (
     <div className="space-y-6">
@@ -61,7 +67,7 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-xl font-bold text-charcoal tracking-tight">Dashboard Operasional</h2>
           <p className="text-xs text-charcoal-muted mt-0.5">
-            Pemantauan aktivitas kunjungan dan ketersediaan kartu pass hari ini
+            Sinkronisasi data kunjungan dan status kartu pass langsung dari database PostgreSQL
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -73,13 +79,13 @@ export default function DashboardPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-brand-500' : ''}`} />
             <span>Perbarui Data</span>
           </button>
-          <a
+          <Link
             href="/checkin"
             className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg shadow transition-colors"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Check-In Baru</span>
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -101,7 +107,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 text-[11px] text-emerald-400 flex items-center space-x-1">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>Tercatat otomatis di posko</span>
+            <span>Total sepanjang waktu: {metrics?.total_visitors_all_time ?? 0}</span>
           </div>
         </div>
 
@@ -121,7 +127,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 text-[11px] text-amber-400 flex items-center space-x-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
-            <span>Memegang kartu pass aktif</span>
+            <span>Memegang kartu pass fisik</span>
           </div>
         </div>
 
@@ -140,7 +146,7 @@ export default function DashboardPage() {
             <span className="text-xs text-neutral-400">tamu selesai</span>
           </div>
           <div className="mt-2 text-[11px] text-neutral-400">
-            Pass telah dikembalikan
+            Pass telah kembali ke rak
           </div>
         </div>
 
@@ -156,7 +162,7 @@ export default function DashboardPage() {
             <span className="text-3xl font-extrabold text-emerald-400 tracking-tight">
               {metrics?.available_pass ?? 0}
             </span>
-            <span className="text-xs text-neutral-400">kartu di rak</span>
+            <span className="text-xs text-neutral-400">dari {totalPass} kartu</span>
           </div>
           <div className="mt-2 text-[11px] text-emerald-400">
             Siap dialokasikan untuk tamu
@@ -164,15 +170,91 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Middle Section: Quick Actions & Status Summary */}
+      {/* Middle Section: Real-time Charts from Database */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Hourly Distribution Chart */}
+        <div className="bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-charcoal flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4 text-brand-500" />
+              <span>Aktivitas Kunjungan per Jam Hari Ini</span>
+            </h3>
+            <span className="text-[11px] text-charcoal-muted">Jam 08:00 - 17:00 WIB</span>
+          </div>
+
+          <div className="pt-4 h-40 flex items-end justify-between gap-1.5">
+            {metrics?.hourly_stats?.map((h) => {
+              const heightPct = Math.max(8, (h.count / maxHourlyCount) * 100);
+              return (
+                <div key={h.hour} className="flex-1 flex flex-col items-center group relative">
+                  {/* Tooltip on hover */}
+                  <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap z-10">
+                    {h.count} Tamu ({h.hour})
+                  </div>
+                  {/* Bar */}
+                  <div
+                    className={`w-full rounded-t-md transition-all duration-300 ${
+                      h.count > 0 ? 'bg-brand-500 group-hover:bg-brand-600' : 'bg-ivory-100'
+                    }`}
+                    style={{ height: `${heightPct}%` }}
+                  />
+                  {/* Label */}
+                  <span className="text-[9px] text-charcoal-muted mt-2 rotate-[-45deg] sm:rotate-0 font-mono">
+                    {h.hour.slice(0, 2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Weekly Trend Chart */}
+        <div className="bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-charcoal flex items-center space-x-2">
+              <TrendingUp className="w-4 h-4 text-brand-500" />
+              <span>Tren Kunjungan 7 Hari Terakhir</span>
+            </h3>
+            <span className="text-[11px] text-charcoal-muted">Data Riil Database</span>
+          </div>
+
+          <div className="pt-4 h-40 flex items-end justify-between gap-2">
+            {metrics?.weekly_trend?.map((w) => {
+              const heightPct = Math.max(8, (w.count / maxWeeklyCount) * 100);
+              return (
+                <div key={w.date} className="flex-1 flex flex-col items-center group relative">
+                  {/* Tooltip */}
+                  <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap z-10">
+                    {w.count} Tamu ({w.day}, {w.date})
+                  </div>
+                  {/* Bar */}
+                  <div
+                    className={`w-full rounded-t-lg transition-all duration-300 ${
+                      w.count > 0 ? 'bg-amber-500 group-hover:bg-amber-600' : 'bg-ivory-100'
+                    }`}
+                    style={{ height: `${heightPct}%` }}
+                  />
+                  {/* Label */}
+                  <div className="text-center mt-2">
+                    <span className="block text-[10px] font-semibold text-charcoal">{w.day}</span>
+                    <span className="block text-[9px] text-charcoal-muted font-mono">{w.date}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Middle Section: Pass Status & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pass Status Distribution */}
         <div className="bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-charcoal">Status Kartu Pass Fisik</h3>
-            <a href="/pass" className="text-xs font-semibold text-brand-500 hover:text-brand-600">
+            <Link href="/pass" className="text-xs font-semibold text-brand-500 hover:text-brand-600">
               Lihat Rak →
-            </a>
+            </Link>
           </div>
 
           <div className="space-y-3 pt-2">
@@ -182,12 +264,14 @@ export default function DashboardPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
                   Pass Tersedia (Available)
                 </span>
-                <span className="font-bold text-emerald-600">{metrics?.available_pass ?? 0}</span>
+                <span className="font-bold text-emerald-600">
+                  {metrics?.available_pass ?? 0} / {totalPass}
+                </span>
               </div>
               <div className="w-full bg-ivory-100 rounded-full h-2">
                 <div
                   className="bg-emerald-500 h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, ((metrics?.available_pass ?? 0) / 20) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((metrics?.available_pass ?? 0) / totalPass) * 100)}%` }}
                 />
               </div>
             </div>
@@ -203,7 +287,7 @@ export default function DashboardPage() {
               <div className="w-full bg-ivory-100 rounded-full h-2">
                 <div
                   className="bg-amber-500 h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, ((metrics?.in_use_pass ?? 0) / 20) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((metrics?.in_use_pass ?? 0) / totalPass) * 100)}%` }}
                 />
               </div>
             </div>
@@ -219,13 +303,21 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="w-full bg-ivory-100 rounded-full h-2">
-                <div className="bg-red-500 h-2 rounded-full w-0" />
+                <div
+                  className="bg-red-500 h-2 rounded-full"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (((metrics?.pass_stats?.MAINTENANCE ?? 0) + (metrics?.pass_stats?.LOST ?? 0)) / totalPass) * 100
+                    )}%`,
+                  }}
+                />
               </div>
             </div>
           </div>
 
           <div className="p-3 bg-ivory-50 rounded-xl border border-ivory-200 text-[11px] text-charcoal-muted leading-relaxed">
-            ℹ️ Sistem mencegah pass ganda. Pass otomatis kembali berstatus <strong>AVAILABLE</strong> begitu check-out dilakukan.
+            ℹ️ Status pass disinkronkan secara atomik dengan database PostgreSQL saat check-in dan check-out.
           </div>
         </div>
 
@@ -238,7 +330,7 @@ export default function DashboardPage() {
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <a
+              <Link
                 href="/checkin"
                 className="p-4 rounded-xl border border-ivory-200 bg-ivory-50 hover:bg-brand-50 hover:border-brand-200 transition-all flex items-start space-x-3 group"
               >
@@ -253,9 +345,9 @@ export default function DashboardPage() {
                     Ambil foto webcam & serahkan kartu pass
                   </p>
                 </div>
-              </a>
+              </Link>
 
-              <a
+              <Link
                 href="/checkout"
                 className="p-4 rounded-xl border border-ivory-200 bg-ivory-50 hover:bg-amber-50 hover:border-amber-200 transition-all flex items-start space-x-3 group"
               >
@@ -270,7 +362,7 @@ export default function DashboardPage() {
                     Konfirmasi pengembalian pass fisik
                   </p>
                 </div>
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -292,15 +384,15 @@ export default function DashboardPage() {
           <div>
             <h3 className="text-sm font-bold text-charcoal">Aktivitas Kunjungan Terkini</h3>
             <p className="text-xs text-charcoal-muted">
-              Daftar tamu yang baru saja melakukan check-in atau check-out
+              Daftar tamu yang baru saja tercatat di database PostgreSQL
             </p>
           </div>
-          <a
+          <Link
             href="/reports"
             className="text-xs font-semibold text-brand-500 hover:text-brand-600"
           >
             Lihat Semua Riwayat →
-          </a>
+          </Link>
         </div>
 
         <div className="overflow-x-auto">
@@ -320,7 +412,7 @@ export default function DashboardPage() {
                 metrics.recent_visitors.map((visitor) => (
                   <tr key={visitor.id_visitor} className="hover:bg-ivory-50/80 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-brand-900">
-                      {visitor.no_pass || `#${visitor.id_pass}`}
+                      #{visitor.no_pass || visitor.id_pass}
                     </td>
                     <td className="py-3 px-4 font-semibold text-charcoal">
                       {visitor.fullname}
@@ -332,7 +424,7 @@ export default function DashboardPage() {
                       {visitor.representing || '-'}
                     </td>
                     <td className="py-3 px-4 text-charcoal-muted font-mono text-[11px]">
-                      {new Date(visitor.check_in_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(visitor.check_in_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                     </td>
                     <td className="py-3 px-4">
                       {visitor.is_active ? (

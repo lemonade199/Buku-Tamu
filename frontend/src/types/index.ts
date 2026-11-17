@@ -43,10 +43,23 @@ export interface VisitorItem {
   is_active: boolean;
 }
 
+export interface HourlyStat {
+  hour: string;
+  count: number;
+}
+
+export interface WeeklyTrend {
+  date: string;
+  day: string;
+  count: number;
+}
+
 export interface DashboardMetrics {
   total_visitors_today: number;
+  total_visitors_all_time?: number;
   active_visitors: number;
   completed_visitors_today: number;
+  total_pass?: number;
   available_pass: number;
   in_use_pass: number;
   pass_stats: {
@@ -56,4 +69,6 @@ export interface DashboardMetrics {
     LOST: number;
   };
   recent_visitors: VisitorItem[];
+  hourly_stats?: HourlyStat[];
+  weekly_trend?: WeeklyTrend[];
 }
