@@ -6,6 +6,13 @@
 .env.production.local
 backend/.env
 
+# SQLite / Local Databases
+*.db
+*.sqlite3
+*.db-journal
+buku_tamu.db
+backend/buku_tamu.db
+
 # Python / Flask
 __pycache__/
 *.py[cod]
