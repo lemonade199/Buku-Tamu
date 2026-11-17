@@ -2,41 +2,24 @@
 
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { DashboardMetrics, PassItem } from '@/types';
-import VisitorRegistrationForm from '@/components/VisitorRegistrationForm';
-import PassAllocationModal from '@/components/PassAllocationModal';
-import CheckinSuccessModal from '@/components/CheckinSuccessModal';
+import { DashboardMetrics } from '@/types';
 import {
   Users,
   UserCheck,
   UserX,
   CreditCard,
   ArrowUpRight,
+  Clock,
+  PlusCircle,
+  LogOut,
   RefreshCw,
 } from 'lucide-react';
+import Link from 'next/navigation';
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Pass allocation modal state
-  const [availablePasses, setAvailablePasses] = useState<PassItem[]>([]);
-  const [loadingPasses, setLoadingPasses] = useState(false);
-  const [pendingVisitor, setPendingVisitor] = useState<{
-    fullname: string;
-    telephone: string;
-    institution?: string;
-    representing?: string;
-    purpose?: string;
-    photoBase64: string;
-  } | null>(null);
-  const [showPassModal, setShowPassModal] = useState(false);
-  const [submittingCheckin, setSubmittingCheckin] = useState(false);
-
-  // Success modal state
-  const [checkinSuccessData, setCheckinSuccessData] = useState<any>(null);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const fetchMetrics = async () => {
     try {
@@ -50,21 +33,9 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchAvailablePasses = async () => {
-    setLoadingPasses(true);
-    try {
-      const res = await api.get<{ success: boolean; data: PassItem[] }>('/pass/available');
-      setAvailablePasses(res.data.data);
-    } catch (err) {
-      console.error('Error fetching available passes:', err);
-    } finally {
-      setLoadingPasses(false);
-    }
-  };
-
   useEffect(() => {
     fetchMetrics();
-    fetchAvailablePasses();
+    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchMetrics, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -72,70 +43,25 @@ export default function DashboardPage() {
   const handleManualRefresh = () => {
     setRefreshing(true);
     fetchMetrics();
-    fetchAvailablePasses();
-  };
-
-  // Step 1: Visitor completed identity form & photo -> Proceed to Pass Allocation Modal
-  const handleProceedToPass = (visitorData: any) => {
-    setPendingVisitor(visitorData);
-    fetchAvailablePasses();
-    setShowPassModal(true);
-  };
-
-  // Step 2: Confirm physical pass in separate modal -> Send to API
-  const handleConfirmPassAllocation = async (selectedPassNo: string) => {
-    if (!pendingVisitor) return;
-
-    setSubmittingCheckin(true);
-    try {
-      const res = await api.post('/visitors/checkin', {
-        fullname: pendingVisitor.fullname,
-        telephone: pendingVisitor.telephone,
-        institution: pendingVisitor.institution,
-        representing: pendingVisitor.representing,
-        purpose: pendingVisitor.purpose,
-        no_pass: selectedPassNo,
-        photo_base64: pendingVisitor.photoBase64,
-      });
-
-      setShowPassModal(false);
-      setCheckinSuccessData(res.data.data);
-      setShowSuccessModal(true);
-      fetchMetrics();
-      fetchAvailablePasses();
-    } catch (err: any) {
-      console.error('Checkin error:', err);
-      alert(err.response?.data?.message || 'Gagal menyimpan check-in. Silakan coba lagi.');
-    } finally {
-      setSubmittingCheckin(false);
-    }
-  };
-
-  const handleResetAfterSuccess = () => {
-    setShowSuccessModal(false);
-    setCheckinSuccessData(null);
-    setPendingVisitor(null);
-    fetchMetrics();
-    fetchAvailablePasses();
   };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-3">
         <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-charcoal-muted">Memuat data beranda operasional...</p>
+        <p className="text-xs text-charcoal-muted">Memuat data dashboard operasional...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-7 max-w-7xl mx-auto">
-      {/* Top Header */}
+    <div className="space-y-6">
+      {/* Dashboard Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-charcoal tracking-tight">Beranda & Layanan Resepsionis</h2>
+          <h2 className="text-xl font-bold text-charcoal tracking-tight">Dashboard Operasional</h2>
           <p className="text-xs text-charcoal-muted mt-0.5">
-            Pencatatan pengunjung terpadu, pemantauan kunjungan, dan ketersediaan kartu pass
+            Pemantauan aktivitas kunjungan dan ketersediaan kartu pass hari ini
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -147,10 +73,17 @@ export default function DashboardPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-brand-500' : ''}`} />
             <span>Perbarui Data</span>
           </button>
+          <a
+            href="/checkin"
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Check-In Baru</span>
+          </a>
         </div>
       </div>
 
-      {/* 4 Dark Modern KPI Cards */}
+      {/* 4 Dark Modern KPI Cards (sesuai acuan Figma) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1 */}
         <div className="bg-darkcard text-white rounded-2xl p-5 shadow-lg relative overflow-hidden border border-neutral-800">
@@ -168,7 +101,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 text-[11px] text-emerald-400 flex items-center space-x-1">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>Tercatat di sistem</span>
+            <span>Tercatat otomatis di posko</span>
           </div>
         </div>
 
@@ -188,7 +121,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 text-[11px] text-amber-400 flex items-center space-x-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
-            <span>Sedang memegang pass</span>
+            <span>Memegang kartu pass aktif</span>
           </div>
         </div>
 
@@ -226,48 +159,147 @@ export default function DashboardPage() {
             <span className="text-xs text-neutral-400">kartu di rak</span>
           </div>
           <div className="mt-2 text-[11px] text-emerald-400">
-            Siap untuk tamu berikutnya
+            Siap dialokasikan untuk tamu
           </div>
         </div>
       </div>
 
-      {/* Main Feature: Visitor Registration Form directly on Beranda */}
-      <VisitorRegistrationForm
-        onProceedToPassAllocation={handleProceedToPass}
-      />
+      {/* Middle Section: Quick Actions & Status Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pass Status Distribution */}
+        <div className="bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-charcoal">Status Kartu Pass Fisik</h3>
+            <a href="/pass" className="text-xs font-semibold text-brand-500 hover:text-brand-600">
+              Lihat Rak →
+            </a>
+          </div>
 
-      {/* Pass Allocation Modal (Separate step - tidak nyatu dalam registrasi) */}
-      <PassAllocationModal
-        isOpen={showPassModal}
-        onClose={() => setShowPassModal(false)}
-        visitorData={pendingVisitor}
-        availablePasses={availablePasses}
-        loadingPasses={loadingPasses}
-        onConfirm={handleConfirmPassAllocation}
-        submitting={submittingCheckin}
-      />
+          <div className="space-y-3 pt-2">
+            <div>
+              <div className="flex justify-between text-xs font-medium mb-1">
+                <span className="flex items-center text-charcoal">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
+                  Pass Tersedia (Available)
+                </span>
+                <span className="font-bold text-emerald-600">{metrics?.available_pass ?? 0}</span>
+              </div>
+              <div className="w-full bg-ivory-100 rounded-full h-2">
+                <div
+                  className="bg-emerald-500 h-2 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, ((metrics?.available_pass ?? 0) / 20) * 100)}%` }}
+                />
+              </div>
+            </div>
 
-      {/* Success Modal Handover */}
-      <CheckinSuccessModal
-        isOpen={showSuccessModal}
-        result={checkinSuccessData}
-        onReset={handleResetAfterSuccess}
-      />
+            <div>
+              <div className="flex justify-between text-xs font-medium mb-1">
+                <span className="flex items-center text-charcoal">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
+                  Pass Sedang Digunakan (In Use)
+                </span>
+                <span className="font-bold text-amber-600">{metrics?.in_use_pass ?? 0}</span>
+              </div>
+              <div className="w-full bg-ivory-100 rounded-full h-2">
+                <div
+                  className="bg-amber-500 h-2 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, ((metrics?.in_use_pass ?? 0) / 20) * 100)}%` }}
+                />
+              </div>
+            </div>
 
-      {/* Recent Visitors Activity Table */}
+            <div>
+              <div className="flex justify-between text-xs font-medium mb-1">
+                <span className="flex items-center text-charcoal">
+                  <span className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                  Pass Maintenance / Hilang
+                </span>
+                <span className="font-bold text-red-600">
+                  {(metrics?.pass_stats?.MAINTENANCE ?? 0) + (metrics?.pass_stats?.LOST ?? 0)}
+                </span>
+              </div>
+              <div className="w-full bg-ivory-100 rounded-full h-2">
+                <div className="bg-red-500 h-2 rounded-full w-0" />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 bg-ivory-50 rounded-xl border border-ivory-200 text-[11px] text-charcoal-muted leading-relaxed">
+            ℹ️ Sistem mencegah pass ganda. Pass otomatis kembali berstatus <strong>AVAILABLE</strong> begitu check-out dilakukan.
+          </div>
+        </div>
+
+        {/* Quick Operational Shortcuts */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-charcoal mb-1">Aksi Cepat Resepsionis</h3>
+            <p className="text-xs text-charcoal-muted mb-4">
+              Pintasan tugas harian untuk mempercepat alur kedatangan dan kepulangan tamu
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <a
+                href="/checkin"
+                className="p-4 rounded-xl border border-ivory-200 bg-ivory-50 hover:bg-brand-50 hover:border-brand-200 transition-all flex items-start space-x-3 group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-brand-500 text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                  <PlusCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-charcoal group-hover:text-brand-500 transition-colors">
+                    Registrasi Tamu (Check-In)
+                  </h4>
+                  <p className="text-[11px] text-charcoal-muted mt-0.5">
+                    Ambil foto webcam & serahkan kartu pass
+                  </p>
+                </div>
+              </a>
+
+              <a
+                href="/checkout"
+                className="p-4 rounded-xl border border-ivory-200 bg-ivory-50 hover:bg-amber-50 hover:border-amber-200 transition-all flex items-start space-x-3 group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-charcoal group-hover:text-amber-700 transition-colors">
+                    Check-Out Pengunjung
+                  </h4>
+                  <p className="text-[11px] text-charcoal-muted mt-0.5">
+                    Konfirmasi pengembalian pass fisik
+                  </p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-ivory-200 flex items-center justify-between text-xs text-charcoal-muted">
+            <span className="flex items-center space-x-1">
+              <Clock className="w-3.5 h-3.5 text-brand-500" />
+              <span>Jam Operasional: <strong>08:00 - 17:00 WIB</strong></span>
+            </span>
+            <span className="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">
+              POSKO AKTIF
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Section: Recent Visitors Activity Table */}
       <div className="bg-white rounded-2xl border border-ivory-200 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-ivory-200 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-charcoal">Aktivitas Kunjungan Hari Ini</h3>
+            <h3 className="text-sm font-bold text-charcoal">Aktivitas Kunjungan Terkini</h3>
             <p className="text-xs text-charcoal-muted">
               Daftar tamu yang baru saja melakukan check-in atau check-out
             </p>
           </div>
           <a
-            href="/pass"
+            href="/reports"
             className="text-xs font-semibold text-brand-500 hover:text-brand-600"
           >
-            Lihat Ketersediaan Rak Pass →
+            Lihat Semua Riwayat →
           </a>
         </div>
 
@@ -318,7 +350,7 @@ export default function DashboardPage() {
               ) : (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-xs text-charcoal-muted">
-                    Belum ada kunjungan tercatat hari ini. Isi formulir registrasi di atas untuk mendaftarkan tamu pertama.
+                    Belum ada kunjungan tercatat hari ini. Tekan tombol <strong>Check-In Baru</strong> untuk mendaftarkan tamu pertama.
                   </td>
                 </tr>
               )}

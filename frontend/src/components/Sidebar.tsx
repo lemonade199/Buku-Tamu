@@ -22,8 +22,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { name: 'Beranda & Registrasi', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Monitoring Rak Pass', href: '/pass', icon: CreditCard },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Registrasi & Check-In', href: '/checkin', icon: UserPlus },
+  { name: 'Monitoring Pass', href: '/pass', icon: CreditCard },
   { name: 'Check-Out Tamu', href: '/checkout', icon: CheckOutIcon },
   { name: 'Laporan & Riwayat', href: '/reports', icon: FileSpreadsheet },
   { name: 'Pengaturan Sistem', href: '/settings', icon: Settings, adminOnly: true },
