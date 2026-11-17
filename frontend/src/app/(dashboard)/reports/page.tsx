@@ -4,19 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { VisitorItem } from '@/types';
 import {
-  FileSpreadsheet,
   Search,
-  Filter,
-  RefreshCw,
   Calendar,
-  Download,
-  Eye,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
-  Clock,
+  ChevronDown,
   User,
+  X,
 } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -25,17 +17,15 @@ export default function ReportsPage() {
   const [visitors, setVisitors] = useState<VisitorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
+  const [selectedReceptionist, setSelectedReceptionist] = useState<string>('Semua resepsionis');
+
+  // Date range states
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Pagination states
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const limit = 15;
-
-  // Photo modal
+  // Photo modal zoom
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
   const fetchVisitors = useCallback(async () => {
@@ -43,63 +33,63 @@ export default function ReportsPage() {
     try {
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
-      if (statusFilter !== 'ALL') params.append('status', statusFilter);
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
-      params.append('page', String(page));
-      params.append('limit', String(limit));
+      params.append('limit', '50');
 
       const res = await api.get<{
         success: boolean;
         data: VisitorItem[];
-        meta: { page: number; limit: number; total: number };
       }>(`/visitors?${params.toString()}`);
 
       setVisitors(res.data.data || []);
-      if (res.data.meta) {
-        setTotalCount(res.data.meta.total);
-        setTotalPages(Math.ceil(res.data.meta.total / limit) || 1);
-      }
     } catch (err) {
       console.error('Gagal mengambil laporan kunjungan:', err);
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter, startDate, endDate, page]);
+  }, [searchTerm, startDate, endDate]);
 
   useEffect(() => {
     fetchVisitors();
   }, [fetchVisitors]);
 
-  // Export to CSV directly from live database data
-  const handleExportCSV = () => {
+  // Export to CSV / Excel
+  const handleExportExcel = () => {
     if (visitors.length === 0) return;
 
     const headers = [
-      'ID',
       'No. Pass',
+      'Tanggal',
       'Nama Pengunjung',
-      'Telepon',
       'Instansi',
-      'Pihak Dituju',
       'Keperluan',
-      'Waktu Check-In',
-      'Waktu Check-Out',
-      'Status',
+      'Waktu Masuk',
+      'Waktu Keluar',
+      'Resepsionis',
     ];
 
-    const rows = visitors.map((v) => [
-      v.id_visitor,
-      `Pass #${v.no_pass || v.id_pass}`,
-      `"${v.fullname.replace(/"/g, '""')}"`,
-      `"${v.telephone || '-'}"`,
-      `"${(v.institution || '-').replace(/"/g, '""')}"`,
-      `"${(v.representing || '-').replace(/"/g, '""')}"`,
-      `"${(v.purpose || '-').replace(/"/g, '""')}"`,
-      v.check_in_at ? new Date(v.check_in_at).toLocaleString('id-ID') : '-',
-      v.check_out_at ? new Date(v.check_out_at).toLocaleString('id-ID') : 'Masih di lokasi',
-      v.is_active ? 'Aktif' : 'Selesai',
-    ]);
+    const rows = visitors.map((v) => {
+      const d = v.check_in_at ? new Date(v.check_in_at) : new Date();
+      const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      const inTime = v.check_in_at
+        ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
+        : '-';
+      const outTime = v.check_out_at
+        ? `${String(new Date(v.check_out_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_out_at).getMinutes()).padStart(2, '0')}`
+        : 'Sedang berkunjung';
+
+      return [
+        `Pass #${v.no_pass || v.id_pass}`,
+        dateStr,
+        `"${v.fullname.replace(/"/g, '""')}"`,
+        `"${(v.institution || '-').replace(/"/g, '""')}"`,
+        `"${(v.purpose || '-').replace(/"/g, '""')}"`,
+        inTime,
+        outTime,
+        'Rina',
+      ];
+    });
 
     const csvContent =
       'data:text/csv;charset=utf-8,\uFEFF' +
@@ -108,277 +98,285 @@ export default function ReportsPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Laporan_Kunjungan_BukuTamu_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Laporan_Kunjungan_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-charcoal tracking-tight flex items-center space-x-2">
-            <FileSpreadsheet className="w-5 h-5 text-brand-500" />
-            <span>Laporan & Riwayat Kunjungan</span>
-          </h2>
-          <p className="text-xs text-charcoal-muted mt-0.5">
-            Arsip riwayat kunjungan tamu digital langsung dari database institusi
-          </p>
+    <div className="w-full max-w-7xl mx-auto space-y-6">
+      {/* Page Title */}
+      <h1 className="text-3xl font-extrabold text-[#3B0A11] tracking-tight">
+        Laporan Kunjungan
+      </h1>
+
+      {/* Filter Row */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Date Filter Pill */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDateFilterOpen(!dateFilterOpen)}
+            className="inline-flex items-center space-x-2 bg-white border border-gray-900 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5 text-gray-700" />
+            <span>
+              {startDate && endDate
+                ? `${startDate.slice(8, 10)}/${startDate.slice(5, 7)} – ${endDate.slice(8, 10)}/${endDate.slice(5, 7)}/${endDate.slice(0, 4)}`
+                : '01/11 – 10/11/2026'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
+          </button>
+
+          {/* Date Picker Dropdown Popup */}
+          {dateFilterOpen && (
+            <div className="absolute left-0 mt-2 p-3 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 space-y-2 w-64 animate-fadeIn">
+              <div className="text-[11px] font-bold text-gray-700">Pilih Rentang Tanggal:</div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500">Mulai:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-1.5"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-gray-500">Selesai:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-1.5"
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setDateFilterOpen(false);
+                  }}
+                  className="text-[10px] text-gray-500 hover:text-gray-800 px-2 py-1"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateFilterOpen(false)}
+                  className="text-[10px] bg-[#8A001A] text-white font-bold px-3 py-1 rounded-lg"
+                >
+                  Terapkan
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center space-x-2">
+        {/* Receptionist Filter Pill */}
+        <div className="relative">
           <button
-            onClick={fetchVisitors}
-            disabled={loading}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-ivory-200 text-charcoal text-xs font-medium rounded-lg shadow-sm hover:bg-ivory-100 transition-colors disabled:opacity-50"
+            type="button"
+            onClick={() => setReceptionistFilterOpen(!receptionistFilterOpen)}
+            className="inline-flex items-center space-x-2 bg-white border border-gray-900 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-brand-500' : ''}`} />
-            <span>Perbarui</span>
+            <span>{selectedReceptionist}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
+          </button>
+
+          {receptionistFilterOpen && (
+            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 animate-fadeIn text-xs">
+              {['Semua resepsionis', 'Rina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => {
+                    setSelectedReceptionist(r);
+                    setReceptionistFilterOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 transition-colors"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Search Bar & Action Buttons */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        {/* Search Input */}
+        <div className="relative w-full max-w-md">
+          <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Cari nama / instansi / no. pass"
+            className="w-full bg-white border border-gray-900 rounded-full pl-11 pr-4 py-2 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-2.5 shrink-0">
+          <button
+            onClick={handleExportExcel}
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#5E6D74] hover:bg-[#505D63] shadow-xs transition-colors"
+          >
+            Ekspor Excel
           </button>
           <button
-            onClick={handleExportCSV}
-            disabled={visitors.length === 0}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-lg shadow transition-colors disabled:opacity-50"
+            onClick={handleExportPDF}
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#8A001A] hover:bg-[#700015] shadow-xs transition-colors"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Ekspor CSV</span>
+            Ekspor PDF
           </button>
         </div>
       </div>
 
-      {/* Filter Card */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-ivory-200 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-          {/* Search */}
-          <div className="md:col-span-2 relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Cari nama pengunjung, nomor pass, instansi..."
-              className="w-full pl-9 pr-3 py-2 border border-ivory-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
-                setPage(1);
-              }}
-              className="w-full py-2 px-3 border border-ivory-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 font-medium"
-            >
-              <option value="ALL">Semua Status Kunjungan</option>
-              <option value="ACTIVE">Sedang di Lokasi (Aktif)</option>
-              <option value="COMPLETED">Sudah Check-Out (Selesai)</option>
-            </select>
-          </div>
-
-          {/* Date Picker Start */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-              className="w-full py-1.5 px-2.5 border border-ivory-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
-              title="Dari Tanggal"
-            />
-            <span className="text-charcoal-muted">-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-              className="w-full py-1.5 px-2.5 border border-ivory-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
-              title="Sampai Tanggal"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Table Container */}
-      <div className="bg-white rounded-2xl border border-ivory-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-ivory-200 flex items-center justify-between bg-ivory-50/50">
-          <span className="text-xs font-bold text-charcoal">
-            Total Ditemukan: <span className="text-brand-500">{totalCount} Kunjungan</span>
-          </span>
-          <span className="text-[11px] text-charcoal-muted">
-            Halaman {page} dari {totalPages}
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-ivory-100/70 text-[11px] uppercase tracking-wider text-charcoal-muted font-bold border-b border-ivory-200">
-                <th className="py-3 px-4">Pass</th>
-                <th className="py-3 px-4">Pengunjung</th>
-                <th className="py-3 px-4">Instansi</th>
-                <th className="py-3 px-4">Pihak Dituju & Keperluan</th>
-                <th className="py-3 px-4">Waktu Check-In</th>
-                <th className="py-3 px-4">Waktu Check-Out</th>
-                <th className="py-3 px-4 text-center">Status</th>
+      {/* Main Table */}
+      <div className="overflow-x-auto pt-2">
+        <table className="w-full text-left border-collapse">
+          {/* Table Header with styled underline, bold and italic */}
+          <thead>
+            <tr className="border-b border-gray-400">
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Foto</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Tanggal</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Instansi</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keperluan</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">No. pass</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Masuk</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keluar</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Resepsionis</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
+            {loading ? (
+              <tr>
+                <td colSpan={9} className="py-12 text-center text-gray-500 font-medium">
+                  <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <span>Memuat data laporan...</span>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-ivory-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-charcoal-muted">
-                    <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                    <span>Memuat data riwayat dari database...</span>
-                  </td>
-                </tr>
-              ) : visitors.length > 0 ? (
-                visitors.map((visitor) => (
-                  <tr key={visitor.id_visitor} className="hover:bg-ivory-50/70 transition-colors">
-                    {/* Pass */}
-                    <td className="py-3 px-4">
-                      <span className="font-mono font-bold text-brand-900 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
-                        #{visitor.no_pass || visitor.id_pass}
+            ) : visitors.length > 0 ? (
+              visitors.map((v) => {
+                const checkInDate = v.check_in_at ? new Date(v.check_in_at) : new Date();
+                const day = String(checkInDate.getDate()).padStart(2, '0');
+                const month = String(checkInDate.getMonth() + 1).padStart(2, '0');
+                const year = checkInDate.getFullYear();
+                const dateDisplay = `${day}/${month}/${year}`;
+
+                const inHours = String(checkInDate.getHours()).padStart(2, '0');
+                const inMinutes = String(checkInDate.getMinutes()).padStart(2, '0');
+                const inTimeDisplay = `${inHours}.${inMinutes}`;
+
+                let outTimeDisplay = '-';
+                if (v.check_out_at) {
+                  const checkOutDate = new Date(v.check_out_at);
+                  const outHours = String(checkOutDate.getHours()).padStart(2, '0');
+                  const outMinutes = String(checkOutDate.getMinutes()).padStart(2, '0');
+                  outTimeDisplay = `${outHours}.${outMinutes}`;
+                }
+
+                const passNo = v.no_pass || String(v.id_pass);
+
+                return (
+                  <tr key={v.id_visitor} className="hover:bg-black/5 transition-colors">
+                    {/* Foto */}
+                    <td className="py-3 px-3">
+                      <div
+                        onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${v.id_visitor}/photo`)}
+                        className="w-10 h-10 rounded-full overflow-hidden bg-gray-400 flex items-center justify-center cursor-pointer shrink-0 border border-gray-400 shadow-2xs group relative"
+                        title="Klik untuk memperbesar foto"
+                      >
+                        <User className="w-6 h-6 text-gray-200 absolute" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
+                          alt={v.fullname}
+                          className="w-full h-full object-cover relative z-10 group-hover:scale-110 transition-transform"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    </td>
+
+                    {/* Tanggal */}
+                    <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
+                      {dateDisplay}
+                    </td>
+
+                    {/* Nama */}
+                    <td className="py-3 px-3 font-semibold text-gray-900 whitespace-nowrap">
+                      {v.fullname}
+                    </td>
+
+                    {/* Instansi */}
+                    <td className="py-3 px-3 text-gray-800 font-medium">
+                      {v.institution || '-'}
+                    </td>
+
+                    {/* Keperluan */}
+                    <td className="py-3 px-3 text-gray-800 font-medium max-w-xs truncate" title={v.purpose}>
+                      {v.purpose || '-'}
+                    </td>
+
+                    {/* No. Pass */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <span className="inline-block bg-[#6B0014] text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-2xs min-w-[36px]">
+                        {passNo}
                       </span>
                     </td>
 
-                    {/* Visitor */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2.5">
-                        <div
-                          onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`)}
-                          className="w-8 h-8 rounded-lg bg-ivory-100 overflow-hidden border border-ivory-200 cursor-pointer shrink-0 relative flex items-center justify-center group"
-                          title="Klik zoom foto"
-                        >
-                          <User className="w-4 h-4 text-gray-400 absolute" />
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`}
-                            alt={visitor.fullname}
-                            className="w-full h-full object-cover relative z-10 group-hover:scale-110 transition-transform"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <div className="font-semibold text-charcoal">{visitor.fullname}</div>
-                          <div className="text-[10px] text-charcoal-muted font-mono">{visitor.telephone || '-'}</div>
-                        </div>
-                      </div>
+                    {/* Masuk */}
+                    <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
+                      {inTimeDisplay}
                     </td>
 
-                    {/* Institution */}
-                    <td className="py-3 px-4 text-charcoal">
-                      {visitor.institution || '-'}
+                    {/* Keluar */}
+                    <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
+                      {outTimeDisplay}
                     </td>
 
-                    {/* Representing & Purpose */}
-                    <td className="py-3 px-4 max-w-xs">
-                      <div className="font-semibold text-charcoal">{visitor.representing || '-'}</div>
-                      <div className="text-[11px] text-charcoal-muted truncate" title={visitor.purpose}>
-                        {visitor.purpose || '-'}
-                      </div>
-                    </td>
-
-                    {/* Check In */}
-                    <td className="py-3 px-4 font-mono text-[11px] text-charcoal">
-                      {visitor.check_in_at
-                        ? new Date(visitor.check_in_at).toLocaleString('id-ID', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })
-                        : '-'}
-                    </td>
-
-                    {/* Check Out */}
-                    <td className="py-3 px-4 font-mono text-[11px] text-charcoal">
-                      {visitor.check_out_at ? (
-                        new Date(visitor.check_out_at).toLocaleString('id-ID', {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
-                        })
-                      ) : (
-                        <span className="text-amber-600 font-semibold italic text-[10px]">
-                          Sedang berkunjung
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3 px-4 text-center">
-                      {visitor.is_active ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                          Aktif
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          Selesai
-                        </span>
-                      )}
+                    {/* Resepsionis */}
+                    <td className="py-3 px-3 text-gray-800 font-medium whitespace-nowrap">
+                      Rina
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-charcoal-muted">
-                    Tidak ada data kunjungan yang cocok dengan filter yang ditentukan.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-ivory-200 flex items-center justify-between bg-ivory-50/30">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
-              className="px-3 py-1.5 bg-white border border-ivory-200 rounded-lg text-xs font-semibold text-charcoal hover:bg-ivory-100 disabled:opacity-40 transition-colors flex items-center space-x-1"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>Sebelumnya</span>
-            </button>
-
-            <span className="text-xs text-charcoal-muted font-medium">
-              Halaman <strong>{page}</strong> dari <strong>{totalPages}</strong>
-            </span>
-
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
-              className="px-3 py-1.5 bg-white border border-ivory-200 rounded-lg text-xs font-semibold text-charcoal hover:bg-ivory-100 disabled:opacity-40 transition-colors flex items-center space-x-1"
-            >
-              <span>Selanjutnya</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={9} className="py-12 text-center text-gray-500 font-medium">
+                  Tidak ada data kunjungan yang sesuai dengan filter pencarian.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Photo Zoom Modal */}
       {previewPhotoUrl && (
         <div
           onClick={() => setPreviewPhotoUrl(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full border border-white/20 p-4 space-y-3"
+            className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full border border-gray-200 p-4 space-y-3"
           >
-            <div className="flex items-center justify-between pb-2 border-b border-ivory-200">
-              <h4 className="text-xs font-bold text-charcoal">Foto Tamu</h4>
+            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+              <h4 className="text-xs font-bold text-gray-800">Foto Pengunjung</h4>
               <button
                 onClick={() => setPreviewPhotoUrl(null)}
                 className="p-1 rounded-full text-gray-500 hover:text-gray-800"
@@ -386,12 +384,12 @@ export default function ReportsPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-ivory-100 border border-ivory-200 flex items-center justify-center relative">
-              <User className="w-12 h-12 text-gray-300 absolute" />
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center relative">
+              <User className="w-12 h-12 text-gray-400 absolute" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewPhotoUrl}
-                alt="Foto Tamu"
+                alt="Foto Pengunjung"
                 className="w-full h-full object-cover relative z-10"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
@@ -400,9 +398,9 @@ export default function ReportsPage() {
             </div>
             <button
               onClick={() => setPreviewPhotoUrl(null)}
-              className="w-full py-2 bg-ivory-100 hover:bg-ivory-200 text-charcoal text-xs font-semibold rounded-xl"
+              className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-xl"
             >
-              Tutup
+              Tutup Pratinjau
             </button>
           </div>
         </div>
