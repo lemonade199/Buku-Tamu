@@ -28,8 +28,10 @@ export default function KioskCheckinPage() {
   // Camera & Photo states
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -83,34 +85,68 @@ export default function KioskCheckinPage() {
     fetchPasses();
   }, [fetchPasses]);
 
-  // Start Camera
+  // Start Camera with resilient constraints
   const startCamera = async () => {
     setCameraError(null);
     setCapturedPhoto(null);
+    setIsVideoPlaying(false);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Browser tidak mendukung akses kamera.');
       }
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: false,
-      });
+
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+      } catch (e) {
+        // Fallback for laptops/webcams with basic resolutions
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
       setStream(mediaStream);
       setIsCameraOpen(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
-      }
     } catch (err: any) {
       console.error('Kamera error:', err);
-      let msg = 'Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan.';
-      if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'Perangkat kamera tidak ditemukan pada perangkat ini.';
+      let msg = 'Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan pada peramban.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        msg = 'Izin kamera ditolak. Harap klik ikon gembok di address bar dan ubah izin Kamera menjadi Izinkan (Allow).';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        msg = 'Perangkat webcam tidak terdeteksi. Silakan gunakan opsi Unggah Foto.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        msg = 'Kamera sedang digunakan oleh aplikasi lain (seperti Zoom/Meet) atau perangkat keras sibuk.';
       }
       setCameraError(msg);
       setIsCameraOpen(false);
     }
   };
+
+  // Immediate callback ref to attach stream when video mounts into DOM
+  const setVideoElement = useCallback(
+    (node: HTMLVideoElement | null) => {
+      videoRef.current = node;
+      if (node && stream) {
+        node.srcObject = stream;
+        node.play().then(() => setIsVideoPlaying(true)).catch((e) => console.warn('Video play warning:', e));
+      }
+    },
+    [stream]
+  );
+
+  // Fallback effect whenever stream or isCameraOpen updates
+  useEffect(() => {
+    if (isCameraOpen && stream && videoRef.current) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+      videoRef.current.play().then(() => setIsVideoPlaying(true)).catch(console.warn);
+    }
+  }, [isCameraOpen, stream]);
 
   // Stop Camera
   const stopCamera = useCallback(() => {
@@ -122,7 +158,23 @@ export default function KioskCheckinPage() {
       videoRef.current.srcObject = null;
     }
     setIsCameraOpen(false);
+    setIsVideoPlaying(false);
   }, [stream]);
+
+  // Fallback Upload from File
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCapturedPhoto(reader.result);
+        stopCamera();
+        setFormError('');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Auto clean up camera stream on unmount
   useEffect(() => {
@@ -378,14 +430,27 @@ export default function KioskCheckinPage() {
                 ) : isCameraOpen ? (
                   /* View 2: Live Video Stream */
                   <div className="flex flex-col items-center space-y-3 w-full max-w-sm">
-                    <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-black shadow border-2 border-[#650015]">
+                    <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-black shadow border-2 border-[#650015] flex items-center justify-center">
                       <video
-                        ref={videoRef}
+                        ref={setVideoElement}
                         autoPlay
                         playsInline
                         muted
+                        onLoadedMetadata={(e) => {
+                          const v = e.currentTarget;
+                          v.play().then(() => setIsVideoPlaying(true)).catch(console.warn);
+                        }}
                         className="w-full h-full object-cover -scale-x-100"
                       />
+
+                      {/* Loading spinner while first frame buffers */}
+                      {!isVideoPlaying && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white space-y-2 pointer-events-none">
+                          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs font-medium">Menghubungkan webcam...</span>
+                        </div>
+                      )}
+
                       {/* Facial Guide */}
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                         <div className="w-36 h-48 rounded-[50%] border-2 border-dashed border-white/70" />
@@ -403,7 +468,7 @@ export default function KioskCheckinPage() {
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-full py-2 px-4 text-xs font-medium transition-all"
+                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-full py-2 px-4 text-xs font-medium transition-all cursor-pointer"
                       >
                         Batal
                       </button>
@@ -420,20 +485,39 @@ export default function KioskCheckinPage() {
                     </div>
 
                     {cameraError && (
-                      <p className="text-xs text-red-600 bg-red-50 px-3 py-1 rounded-md max-w-xs text-center">
+                      <p className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg max-w-sm text-center leading-relaxed">
                         {cameraError}
                       </p>
                     )}
 
-                    {/* Maroon Button "Ambil Snapshot foto" */}
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2.5 px-8 text-xs sm:text-sm font-medium flex items-center space-x-2 shadow transition-all cursor-pointer"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>Ambil Snapshot foto</span>
-                    </button>
+                    <div className="flex flex-col sm:flex-row items-center gap-2">
+                      {/* Maroon Button "Ambil Snapshot foto" */}
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2.5 px-8 text-xs sm:text-sm font-medium flex items-center space-x-2 shadow transition-all cursor-pointer"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Ambil Snapshot foto</span>
+                      </button>
+
+                      {/* Alternative Upload Button */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-full py-2 px-4 text-xs font-medium transition-all shadow-xs cursor-pointer"
+                        title="Pilih file gambar jika webcam tidak tersedia"
+                      >
+                        Unggah Foto File
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
