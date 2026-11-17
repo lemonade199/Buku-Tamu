@@ -246,6 +246,14 @@ export default function KioskCheckinPage() {
       {/* Top Header without Login Button (Guest Only Kiosk) */}
       <header className="bg-[#8A001A] text-white px-6 py-3 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm overflow-hidden shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/seamolec-logo.jpg"
+              alt="SEAMOLEC Logo"
+              className="w-full h-full object-contain"
+            />
+          </div>
           <span className="text-xl sm:text-2xl font-bold tracking-tight text-white font-sans lowercase">
             seamolec
           </span>
@@ -260,8 +268,19 @@ export default function KioskCheckinPage() {
         </div>
       </header>
 
-      {/* Main Area */}
+      {/* Main Area with Split Background */}
       <main className="flex-1 relative flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
+        {/* Right Half Building Background Image */}
+        <div className="absolute right-0 top-0 bottom-0 w-full md:w-1/2 pointer-events-none select-none z-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/building-bg.jpg"
+            alt="SEAMOLEC Building"
+            className="w-full h-full object-cover object-center opacity-90 md:opacity-100"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#FEF7EC] via-[#FEF7EC]/70 md:via-transparent to-transparent" />
+        </div>
+
         {/* CONDITION 1: TAMPILAN SETELAH ISI FORM (SUCCESS VIEW SESUAI GAMBAR) */}
         {isSuccessView ? (
           <div className="relative z-10 w-full max-w-[640px] flex flex-col items-center animate-fadeIn">
