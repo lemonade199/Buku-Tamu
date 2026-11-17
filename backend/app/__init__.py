@@ -9,6 +9,7 @@ from backend.app.services.seed_service import seed_initial_data
 from backend.app.routes.auth_routes import auth_bp
 from backend.app.routes.dashboard_routes import dashboard_bp
 from backend.app.routes.visitor_routes import visitor_bp
+from backend.app.routes.pass_routes import pass_bp
 
 jwt = JWTManager()
 
@@ -38,6 +39,7 @@ def create_app(config_name=None, db_url=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(visitor_bp)
+    app.register_blueprint(pass_bp)
 
     # Global error handlers
     @app.errorhandler(404)
