@@ -465,7 +465,7 @@ Frontend:
 - Tampilan pengambilan foto.
 - Halaman manajemen pass.
 - Integrasi API pengunjung.
-
+            
 Output:
 - Fitur registrasi pengunjung.
 - Pengambilan foto.

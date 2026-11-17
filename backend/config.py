@@ -1,5 +1,10 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'change-in-production-super-secret-key')
@@ -9,7 +14,7 @@ class Config:
     DB_PORT = os.getenv('DB_PORT', '5432')
     DB_NAME = os.getenv('DB_NAME', 'buku_tamu')
     DB_USER = os.getenv('DB_USER', 'postgres')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', '123')
     
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'DATABASE_URL',
