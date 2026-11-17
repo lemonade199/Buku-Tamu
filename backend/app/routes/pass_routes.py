@@ -149,22 +149,55 @@ def update_pass_status(id_pass: int):
             return jsonify({'success': False, 'message': 'Kartu pass tidak ditemukan.'}), 404
 
         old_status = pass_card.status
-        pass_card.status = req.status
-        pass_card.updated_at = datetime.utcnow()
+        new_status = req.status
+        now = datetime.utcnow()
+
+        # If pass was IN_USE and is changed to AVAILABLE (or other non-IN_USE status),
+        # automatically check out any active visitor holding this pass
+        auto_checked_out_visitor = None
+        if old_status == 'IN_USE' and new_status != 'IN_USE':
+            active_visitor = db.query(Visitor).filter(
+                Visitor.id_pass == pass_card.id_pass,
+                Visitor.check_out_at.is_(None)
+            ).with_for_update().first()
+
+            if active_visitor:
+                active_visitor.check_out_at = now
+                active_visitor.updated_at = now
+                auto_checked_out_visitor = active_visitor.fullname
+
+                checkout_audit = AuditLog(
+                    id_user=user_id,
+                    action='VISITOR_CHECKOUT',
+                    entity='visitors',
+                    entity_id=str(active_visitor.id_visitor),
+                    description=f"Auto check-out tamu {active_visitor.fullname} saat status pass #{pass_card.no_pass} diubah dari {old_status} menjadi {new_status} oleh user ID {user_id}. Catatan: {req.notes or '-'}"
+                )
+                db.add(checkout_audit)
+
+        pass_card.status = new_status
+        if new_status == 'AVAILABLE':
+            pass_card.achieve_id = user_id
+            pass_card.achieve_at = now
+        pass_card.updated_at = now
 
         audit = AuditLog(
             id_user=user_id,
             action='PASS_STATUS_CHANGE',
             entity='pass',
             entity_id=str(pass_card.id_pass),
-            description=f"Ubah status pass #{pass_card.no_pass} dari {old_status} menjadi {req.status}. Catatan: {req.notes or '-'}"
+            description=f"Ubah status pass #{pass_card.no_pass} dari {old_status} menjadi {new_status}. Catatan: {req.notes or '-'}"
         )
         db.add(audit)
         db.commit()
 
+        msg = f"Status kartu pass #{pass_card.no_pass} diperbarui menjadi {new_status}."
+        if auto_checked_out_visitor:
+            msg += f" Tamu ({auto_checked_out_visitor}) telah otomatis di-check-out."
+
         return jsonify({
             'success': True,
-            'message': f"Status kartu pass #{pass_card.no_pass} diperbarui menjadi {req.status}.",
+            'message': msg,
             'data': pass_card.to_dict()
         }), 200
     finally:

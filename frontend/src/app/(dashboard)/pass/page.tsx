@@ -107,13 +107,16 @@ export default function PassManagementPage() {
     setUpdatingStatus(true);
     setFeedbackMessage(null);
     try {
-      await api.put(`/pass/${selectedPass.id_pass}/status`, {
+      const res = await api.put<{ success: boolean; message: string }>(`/pass/${selectedPass.id_pass}/status`, {
         status: newStatus,
         notes: statusNotes.trim() || undefined,
       });
       setSelectedPass(null);
       setStatusNotes('');
-      setFeedbackMessage({ type: 'success', text: `Status kartu pass #${selectedPass.no_pass} berhasil diubah.` });
+      setFeedbackMessage({
+        type: 'success',
+        text: res.data.message || `Status kartu pass #${selectedPass.no_pass} berhasil diubah.`,
+      });
       fetchPasses();
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Gagal memperbarui status pass.';
@@ -503,6 +506,19 @@ export default function PassManagementPage() {
                   <option value="INACTIVE">INACTIVE (Nonaktif Sementara)</option>
                 </select>
               </div>
+
+              {selectedPass.status === 'IN_USE' && newStatus === 'AVAILABLE' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
+                  <div className="font-bold flex items-center space-x-1 mb-0.5">
+                    <span>⚠️ Perhatian Otomatis Check-Out:</span>
+                  </div>
+                  <span>
+                    Kartu ini saat ini sedang dibawa oleh tamu{' '}
+                    <strong>{selectedPass.current_holder?.fullname || 'aktif'}</strong>. Mengubah status menjadi{' '}
+                    <strong>AVAILABLE</strong> akan otomatis memproses <strong>Check-Out</strong> bagi tamu tersebut.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold mb-1">Catatan Tambahan:</label>
