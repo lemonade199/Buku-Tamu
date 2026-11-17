@@ -24,3 +24,8 @@ class VisitorResponse(BaseModel):
     check_out_at: Optional[str] = None
     capture_id: str
     is_active: bool
+
+class CheckoutRequest(BaseModel):
+    id_visitor: Optional[int] = Field(None, description="ID pengunjung yang akan check-out")
+    no_pass: Optional[str] = Field(None, description="Nomor kartu pass yang dikembalikan")
+    notes: Optional[str] = Field(None, max_length=500, description="Catatan kepulangan opsional")

@@ -7,8 +7,9 @@ from sqlalchemy import or_
 
 from backend.app.models.base import get_db_session
 from backend.app.models.entities import Visitor
-from backend.app.schemas.visitor import CheckinRequest
+from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest
 from backend.app.services.checkin_service import CheckinService
+from backend.app.services.checkout_service import CheckoutService
 from backend.app.utils.photo_storage import get_photo_path
 
 visitor_bp = Blueprint('visitors', __name__, url_prefix='/api/v1/visitors')
@@ -159,5 +160,78 @@ def get_visitor_photo(id_visitor: int):
             return jsonify({'success': False, 'message': 'File foto fisik tidak ditemukan pada server.'}), 404
 
         return send_file(photo_path, mimetype='image/jpeg')
+    finally:
+        db.close()
+
+@visitor_bp.route('/<int:id_visitor>/checkout', methods=['POST'])
+@jwt_required(optional=True)
+def checkout_visitor_by_id(id_visitor: int):
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+    data = request.get_json(silent=True) or {}
+    notes = data.get('notes')
+
+    db = get_db_session()
+    try:
+        service = CheckoutService(db)
+        result = service.process_checkout(
+            id_visitor=id_visitor,
+            handled_by_user_id=user_id,
+            notes=notes,
+            ip_address=ip_addr,
+            user_agent=user_agent
+        )
+        return jsonify({
+            'success': True,
+            'message': result['message'],
+            'data': result
+        }), 200
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Terjadi kesalahan saat memproses check-out: {str(e)}"}), 500
+    finally:
+        db.close()
+
+@visitor_bp.route('/checkout', methods=['POST'])
+@jwt_required(optional=True)
+def checkout_visitor_general():
+    data = request.get_json(silent=True) or {}
+    try:
+        req = CheckoutRequest(**data)
+    except ValidationError as e:
+        return jsonify({
+            'success': False,
+            'message': 'Validasi check-out gagal.',
+            'errors': e.errors()
+        }), 422
+
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+
+    db = get_db_session()
+    try:
+        service = CheckoutService(db)
+        result = service.process_checkout(
+            id_visitor=req.id_visitor,
+            no_pass=req.no_pass,
+            handled_by_user_id=user_id,
+            notes=req.notes,
+            ip_address=ip_addr,
+            user_agent=user_agent
+        )
+        return jsonify({
+            'success': True,
+            'message': result['message'],
+            'data': result
+        }), 200
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Terjadi kesalahan saat memproses check-out: {str(e)}"}), 500
     finally:
         db.close()
