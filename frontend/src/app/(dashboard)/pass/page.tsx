@@ -15,7 +15,9 @@ import {
   User,
   ShieldAlert,
   SlidersHorizontal,
+  LogOut,
 } from 'lucide-react';
+import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 interface PassRackItem {
   id_pass: number;
@@ -50,6 +52,11 @@ export default function PassManagementPage() {
   const [newStatus, setNewStatus] = useState<string>('AVAILABLE');
   const [statusNotes, setStatusNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Modal State for checking out visitor from pass rack
+  const [checkoutVisitor, setCheckoutVisitor] = useState<ActiveVisitor | null>(null);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [processingCheckout, setProcessingCheckout] = useState(false);
 
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -113,6 +120,38 @@ export default function PassManagementPage() {
       setFeedbackMessage({ type: 'error', text: msg });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleInitiateCheckout = (passItem: PassRackItem) => {
+    if (!passItem.current_holder) return;
+    setCheckoutVisitor({
+      id_visitor: passItem.current_holder.id_visitor,
+      id_pass: passItem.id_pass,
+      no_pass: passItem.no_pass,
+      fullname: passItem.current_holder.fullname,
+      institution: passItem.current_holder.institution,
+      check_in_at: passItem.current_holder.check_in_at || new Date().toISOString(),
+    });
+    setShowCheckoutModal(true);
+  };
+
+  const handleConfirmCheckoutFromPass = async (visitorId: number, notes?: string) => {
+    setProcessingCheckout(true);
+    try {
+      const res = await api.post(`/visitors/${visitorId}/checkout`, { notes });
+      setShowCheckoutModal(false);
+      setCheckoutVisitor(null);
+      setFeedbackMessage({
+        type: 'success',
+        text: res.data.message || 'Check-out tamu berhasil dan kartu pass telah dikembalikan ke status tersedia.',
+      });
+      fetchPasses();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal memproses check-out pengunjung.';
+      setFeedbackMessage({ type: 'error', text: msg });
+    } finally {
+      setProcessingCheckout(false);
     }
   };
 
@@ -391,15 +430,36 @@ export default function PassManagementPage() {
                         : '-'}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedPass(p);
-                          setNewStatus(p.status);
-                        }}
-                        className="px-2.5 py-1 text-[11px] font-semibold bg-ivory-100 hover:bg-ivory-200 text-brand-900 rounded-lg transition-colors border border-ivory-200"
-                      >
-                        Ubah Status
-                      </button>
+                      {p.status === 'IN_USE' && p.current_holder ? (
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            onClick={() => handleInitiateCheckout(p)}
+                            className="px-2.5 py-1 text-[11px] font-bold bg-brand-500 hover:bg-brand-600 text-white rounded-lg transition-colors flex items-center space-x-1 shadow-sm"
+                          >
+                            <LogOut className="w-3 h-3" />
+                            <span>Check-Out</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedPass(p);
+                              setNewStatus(p.status);
+                            }}
+                            className="px-2 py-1 text-[11px] font-semibold bg-ivory-100 hover:bg-ivory-200 text-charcoal rounded-lg transition-colors border border-ivory-200"
+                          >
+                            Ubah
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSelectedPass(p);
+                            setNewStatus(p.status);
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-semibold bg-ivory-100 hover:bg-ivory-200 text-brand-900 rounded-lg transition-colors border border-ivory-200"
+                        >
+                          Ubah Status
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -533,6 +593,18 @@ export default function PassManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Modal: Check-Out Tamu dari Rak Pass */}
+      <CheckoutConfirmModal
+        isOpen={showCheckoutModal}
+        visitor={checkoutVisitor}
+        onClose={() => {
+          setShowCheckoutModal(false);
+          setCheckoutVisitor(null);
+        }}
+        onConfirm={handleConfirmCheckoutFromPass}
+        loading={processingCheckout}
+      />
     </div>
   );
 }
