@@ -114,8 +114,14 @@ export default function ReportsPage() {
     }
   };
 
+  const filteredVisitors = visitors.filter((v) => {
+    if (selectedReceptionist === 'Semua resepsionis') return true;
+    const repName = v.approved_by || v.rejected_by || 'Petugas Resepsionis';
+    return repName.toLowerCase() === selectedReceptionist.toLowerCase();
+  });
+
   const handleExportExcel = () => {
-    if (visitors.length === 0) return;
+    if (filteredVisitors.length === 0) return;
 
     const headers = [
       'No. Pass',
@@ -128,7 +134,7 @@ export default function ReportsPage() {
       'Resepsionis',
     ];
 
-    const rows = visitors.map((v) => {
+    const rows = filteredVisitors.map((v) => {
       const d = v.check_in_at ? new Date(v.check_in_at) : new Date();
       const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
       const inTime = v.check_in_at
@@ -146,7 +152,7 @@ export default function ReportsPage() {
         `"${(v.purpose || '-').replace(/"/g, '""')}"`,
         inTime,
         outTime,
-        'Rina',
+        `"${(v.approved_by || v.rejected_by || (v.status === 'APPROVED' ? 'Petugas Resepsionis' : '-')).replace(/"/g, '""')}"`,
       ];
     });
 
@@ -362,8 +368,8 @@ export default function ReportsPage() {
                   <span>Memuat data laporan...</span>
                 </td>
               </tr>
-            ) : visitors.length > 0 ? (
-              visitors.map((v) => {
+            ) : filteredVisitors.length > 0 ? (
+              filteredVisitors.map((v) => {
                 const checkInDate = v.check_in_at ? new Date(v.check_in_at) : new Date();
                 const day = String(checkInDate.getDate()).padStart(2, '0');
                 const month = String(checkInDate.getMonth() + 1).padStart(2, '0');
@@ -439,7 +445,7 @@ export default function ReportsPage() {
                     </td>
 
                     <td className="py-3 px-3 text-gray-800 font-medium whitespace-nowrap">
-                      Rina
+                      {v.approved_by || v.rejected_by || (v.status === 'APPROVED' ? 'Petugas Resepsionis' : '-')}
                     </td>
 
                     <td className="py-3 px-3 text-center whitespace-nowrap">
