@@ -13,7 +13,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Monitoring Kartu Pass', href: '/pass' },
+  { name: 'Penerimaan Tamu', href: '/checkin' },
+  { name: 'Pengembalian Akses', href: '/checkout' },
+  { name: 'Kontrol Pass Aktif', href: '/pass' },
   { name: 'Laporan', href: '/reports' },
   { name: 'Master data', href: '/master', adminOnly: true },
   { name: 'Pengaturan', href: '/settings', adminOnly: true },
