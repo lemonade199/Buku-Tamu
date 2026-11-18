@@ -14,7 +14,6 @@ def create_sample_photo(filename: str, color: tuple):
         img.save(full_path, format='JPEG', quality=85)
 
 def seed_initial_data(db: Session, is_testing: bool = False):
-    # 1. Seed Roles
     admin_role = db.query(Role).filter(Role.code == 'ADMIN').first()
     if not admin_role:
         admin_role = Role(
@@ -46,7 +45,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
 
     db.commit()
 
-    # 2. Seed Default Users
     admin_user = db.query(User).filter(User.username == 'admin').first()
     if not admin_user:
         admin_user = User(
@@ -73,7 +71,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         )
         db.add(petugas_user)
 
-    # Akun Admin & Resepsionis Resmi
     tasha_user = db.query(User).filter(User.username == 'tasha').first()
     if not tasha_user:
         tasha_user = User(
@@ -121,7 +118,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         )
         db.add(setting)
 
-    # 4. Seed Initial Passes (01 to 20)
     existing_passes = db.query(Pass).count()
     if existing_passes == 0:
         for i in range(1, 21):
@@ -134,7 +130,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             db.add(new_pass)
         db.commit()
 
-    # 5. Seed Real Initial Visitors if empty (only for non-testing environments)
     if not is_testing:
         existing_visitors = db.query(Visitor).count()
         if existing_visitors == 0:
@@ -146,7 +141,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
 
             now = datetime.now()
 
-            # Visitor 1 (Aktif di lokasi)
             photo1 = "visitor_seed_hendra.jpg"
             create_sample_photo(photo1, (43, 84, 126))
             v1 = Visitor(
@@ -166,7 +160,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
                 pass_01.handled_over_id = petugas_user.id_user if petugas_user else 2
                 pass_01.handled_over_at = now - timedelta(hours=2, minutes=15)
 
-            # Visitor 2 (Aktif di lokasi)
             photo2 = "visitor_seed_dewi.jpg"
             create_sample_photo(photo2, (126, 43, 75))
             v2 = Visitor(
@@ -186,7 +179,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
                 pass_03.handled_over_id = petugas_user.id_user if petugas_user else 2
                 pass_03.handled_over_at = now - timedelta(hours=1, minutes=10)
 
-            # Visitor 3 (Sudah Checkout hari ini)
             photo3 = "visitor_seed_ahmad.jpg"
             create_sample_photo(photo3, (50, 115, 60))
             v3 = Visitor(
@@ -202,7 +194,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             )
             db.add(v3)
 
-            # Visitor 4 (Sudah Checkout hari ini)
             photo4 = "visitor_seed_rina.jpg"
             create_sample_photo(photo4, (140, 100, 30))
             v4 = Visitor(
@@ -218,7 +209,6 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             )
             db.add(v4)
 
-            # Visitor 5 (Kemarin)
             photo5 = "visitor_seed_bambang.jpg"
             create_sample_photo(photo5, (90, 60, 130))
             v5 = Visitor(

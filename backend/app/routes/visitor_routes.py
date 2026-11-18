@@ -12,6 +12,7 @@ from backend.app.services.checkin_service import CheckinService
 from backend.app.services.checkout_service import CheckoutService
 from backend.app.middleware.auth import role_required
 from backend.app.utils.photo_storage import get_photo_path
+from backend.app.utils.export_service import generate_excel, generate_pdf
 
 visitor_bp = Blueprint('visitors', __name__, url_prefix='/api/v1/visitors')
 
@@ -242,6 +243,126 @@ def list_visitors():
                 'total': total
             }
         }), 200
+    finally:
+        db.close()
+
+@visitor_bp.route('/export/excel', methods=['GET'])
+@jwt_required(optional=True)
+def export_visitors_excel():
+    search = request.args.get('search', '').strip()
+    status = request.args.get('status', '').strip().upper()
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    db = get_db_session()
+    try:
+        query = db.query(Visitor)
+
+        if search:
+            query = query.filter(
+                or_(
+                    Visitor.fullname.ilike(f"%{search}%"),
+                    Visitor.telephone.ilike(f"%{search}%"),
+                    Visitor.institution.ilike(f"%{search}%"),
+                    Visitor.representing.ilike(f"%{search}%")
+                )
+            )
+
+        if status == 'ACTIVE':
+            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
+        elif status == 'COMPLETED':
+            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
+        elif status == 'PENDING':
+            query = query.filter(Visitor.status == 'PENDING')
+        elif status == 'REJECTED':
+            query = query.filter(Visitor.status == 'REJECTED')
+        elif status == 'APPROVED':
+            query = query.filter(Visitor.status == 'APPROVED')
+
+        if start_date_str:
+            try:
+                s_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                query = query.filter(Visitor.check_in_at >= s_date)
+            except ValueError:
+                pass
+
+        if end_date_str:
+            try:
+                e_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+                query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
+            except ValueError:
+                pass
+
+        visitors = query.order_by(Visitor.check_in_at.desc()).all()
+        visitor_dicts = [v.to_dict() for v in visitors]
+        buf = generate_excel(visitor_dicts)
+        filename = f"laporan_kunjungan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return send_file(
+            buf,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=filename
+        )
+    finally:
+        db.close()
+
+@visitor_bp.route('/export/pdf', methods=['GET'])
+@jwt_required(optional=True)
+def export_visitors_pdf():
+    search = request.args.get('search', '').strip()
+    status = request.args.get('status', '').strip().upper()
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    db = get_db_session()
+    try:
+        query = db.query(Visitor)
+
+        if search:
+            query = query.filter(
+                or_(
+                    Visitor.fullname.ilike(f"%{search}%"),
+                    Visitor.telephone.ilike(f"%{search}%"),
+                    Visitor.institution.ilike(f"%{search}%"),
+                    Visitor.representing.ilike(f"%{search}%")
+                )
+            )
+
+        if status == 'ACTIVE':
+            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
+        elif status == 'COMPLETED':
+            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
+        elif status == 'PENDING':
+            query = query.filter(Visitor.status == 'PENDING')
+        elif status == 'REJECTED':
+            query = query.filter(Visitor.status == 'REJECTED')
+        elif status == 'APPROVED':
+            query = query.filter(Visitor.status == 'APPROVED')
+
+        if start_date_str:
+            try:
+                s_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                query = query.filter(Visitor.check_in_at >= s_date)
+            except ValueError:
+                pass
+
+        if end_date_str:
+            try:
+                e_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+                query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
+            except ValueError:
+                pass
+
+        visitors = query.order_by(Visitor.check_in_at.desc()).all()
+        visitor_dicts = [v.to_dict() for v in visitors]
+        buf = generate_pdf(visitor_dicts)
+        filename = f"laporan_kunjungan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename
+        )
     finally:
         db.close()
 
