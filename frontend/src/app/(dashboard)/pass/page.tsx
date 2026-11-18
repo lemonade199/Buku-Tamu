@@ -51,6 +51,11 @@ export default function MonitoringPassPage() {
 
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [approveLoadingPassId, setApproveLoadingPassId] = useState<number | null>(null);
+  const [rejectTargetPass, setRejectTargetPass] = useState<PassRackItem | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
   const fetchPasses = useCallback(async () => {
     setLoading(true);
     try {
@@ -114,6 +119,59 @@ export default function MonitoringPassPage() {
       setFeedbackMessage({ type: 'error', text: msg });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleApprovePass = async (pass: PassRackItem) => {
+    setApproveLoadingPassId(pass.id_pass);
+    setFeedbackMessage(null);
+    try {
+      const res = await api.post<{ success: boolean; message: string }>(`/pass/${pass.id_pass}/approve`);
+      setFeedbackMessage({
+        type: 'success',
+        text: res.data.message || `Kartu pass #${pass.no_pass} berhasil disetujui. Status langsung berubah menjadi IN_USE.`,
+      });
+      if (selectedPass?.id_pass === pass.id_pass) {
+        setSelectedPass(null);
+      }
+      fetchPasses();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menyetujui kartu pass.';
+      setFeedbackMessage({ type: 'error', text: msg });
+    } finally {
+      setApproveLoadingPassId(null);
+    }
+  };
+
+  const handleRejectPass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectTargetPass) return;
+    if (!rejectionReason.trim()) {
+      setFeedbackMessage({ type: 'error', text: 'Alasan penolakan wajib diisi.' });
+      return;
+    }
+
+    setRejecting(true);
+    setFeedbackMessage(null);
+    try {
+      const res = await api.post<{ success: boolean; message: string }>(`/pass/${rejectTargetPass.id_pass}/reject`, {
+        rejection_reason: rejectionReason.trim(),
+      });
+      setFeedbackMessage({
+        type: 'success',
+        text: res.data.message || `Permohonan pass #${rejectTargetPass.no_pass} ditolak dan status kembali menjadi AVAILABLE.`,
+      });
+      setRejectTargetPass(null);
+      setRejectionReason('');
+      if (selectedPass?.id_pass === rejectTargetPass.id_pass) {
+        setSelectedPass(null);
+      }
+      fetchPasses();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menolak permohonan kartu pass.';
+      setFeedbackMessage({ type: 'error', text: msg });
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -451,7 +509,22 @@ export default function MonitoringPassPage() {
                       </td>
 
                       <td className="py-3.5 px-4 text-gray-700 font-medium">
-                        {pass.status === 'IN_USE' && pass.current_holder ? (
+                        {pass.status === 'PENDING' ? (
+                          <div className="flex flex-col text-left">
+                            <div className="flex items-center space-x-1.5 text-amber-900 font-bold">
+                              <User className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span>{pass.current_holder?.fullname || 'Pengunjung Pending'}</span>
+                            </div>
+                            {pass.current_holder?.institution && (
+                              <span className="text-[11px] text-gray-600 font-normal">
+                                {pass.current_holder.institution}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-amber-700 font-semibold mt-0.5">
+                              Menunggu konfirmasi persetujuan
+                            </span>
+                          </div>
+                        ) : pass.status === 'IN_USE' && pass.current_holder ? (
                           <div className="flex items-center space-x-1.5 text-gray-900 font-semibold">
                             <User className="w-3.5 h-3.5 text-[#8A001A] shrink-0" />
                             <span>{pass.current_holder.fullname}</span>
@@ -469,15 +542,42 @@ export default function MonitoringPassPage() {
                       </td>
 
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => openStatusModal(pass)}
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
-                          title={`Ubah kondisi status kartu #${pass.no_pass}`}
-                        >
-                          <SlidersHorizontal className="w-3.5 h-3.5 text-[#8A001A]" />
-                          <span>Ubah Kondisi</span>
-                        </button>
+                        {pass.status === 'PENDING' ? (
+                          <div className="flex items-center justify-center space-x-1.5">
+                            <button
+                              type="button"
+                              disabled={approveLoadingPassId === pass.id_pass}
+                              onClick={() => handleApprovePass(pass)}
+                              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                              title={`Setujui permohonan pass #${pass.no_pass} (status langsung berubah menjadi IN_USE)`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{approveLoadingPassId === pass.id_pass ? 'Diproses...' : 'Approved'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectTargetPass(pass);
+                                setRejectionReason('');
+                              }}
+                              className="inline-flex items-center space-x-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-600"
+                              title={`Tolak permohonan pass #${pass.no_pass} (status kembali ke AVAILABLE)`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Rejected</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openStatusModal(pass)}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+                            title={`Ubah kondisi status kartu #${pass.no_pass}`}
+                          >
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-[#8A001A]" />
+                            <span>Ubah Kondisi</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -504,6 +604,45 @@ export default function MonitoringPassPage() {
                 ✕
               </button>
             </div>
+
+            {selectedPass.status === 'PENDING' && (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-amber-900">Keputusan Registrasi Tamu:</span>
+                  <span className="font-extrabold px-2 py-0.5 rounded-full text-[10px] bg-amber-200 text-amber-950">
+                    PENDING
+                  </span>
+                </div>
+                <div className="text-xs text-gray-800">
+                  <p className="font-semibold">{selectedPass.current_holder?.fullname || 'Tamu Menunggu Konfirmasi'}</p>
+                  {selectedPass.current_holder?.institution && (
+                    <p className="text-[11px] text-gray-600">{selectedPass.current_holder.institution}</p>
+                  )}
+                </div>
+                <div className="pt-1 flex space-x-2">
+                  <button
+                    type="button"
+                    disabled={approveLoadingPassId === selectedPass.id_pass}
+                    onClick={() => handleApprovePass(selectedPass)}
+                    className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer flex items-center justify-center space-x-1"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{approveLoadingPassId === selectedPass.id_pass ? 'Memproses...' : 'Approved (IN_USE)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectTargetPass(selectedPass);
+                      setRejectionReason('');
+                    }}
+                    className="flex-1 py-2 px-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer flex items-center justify-center space-x-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Rejected (AVAILABLE)</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleUpdateStatus} className="space-y-3 text-xs">
               <div>
@@ -579,6 +718,74 @@ export default function MonitoringPassPage() {
                   className="flex-1 py-2 bg-[#8A001A] hover:bg-[#700015] text-white font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
                 >
                   {updatingStatus ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {rejectTargetPass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">
+                Tolak Permohonan Pass #{String(rejectTargetPass.no_pass).padStart(2, '0')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRejectTargetPass(null)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+                aria-label="Tutup dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 space-y-1">
+              <p className="font-bold">
+                Tamu: {rejectTargetPass.current_holder?.fullname || 'Pengunjung'}
+              </p>
+              {rejectTargetPass.current_holder?.institution && (
+                <p className="text-[11px] text-gray-600">
+                  Instansi: {rejectTargetPass.current_holder.institution}
+                </p>
+              )}
+              <p className="text-[11px] text-rose-800">
+                Status kartu pass akan otomatis kembali menjadi <strong>AVAILABLE</strong> di rak setelah ditolak.
+              </p>
+            </div>
+
+            <form onSubmit={handleRejectPass} className="space-y-3 text-xs">
+              <div>
+                <label htmlFor="pass-reject-reason" className="block font-semibold text-gray-700 mb-1">
+                  Alasan Penolakan <span className="text-rose-600">*</span>
+                </label>
+                <textarea
+                  id="pass-reject-reason"
+                  rows={3}
+                  required
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Masukkan alasan penolakan kunjungan..."
+                  className="w-full bg-[#FAF7F0] border border-[#E8DFD8] rounded-xl p-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+                />
+              </div>
+
+              <div className="pt-2 flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectTargetPass(null)}
+                  className="flex-1 py-2 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={rejecting || !rejectionReason.trim()}
+                  className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold rounded-xl cursor-pointer"
+                >
+                  {rejecting ? 'Menolak...' : 'Tolak & AVAILABLE'}
                 </button>
               </div>
             </form>
