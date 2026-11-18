@@ -100,7 +100,19 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         )
         db.add(rina_user)
 
-    # 3. Seed Default Setting
+    dina_user = db.query(User).filter(User.username == 'dina').first()
+    if not dina_user:
+        dina_user = User(
+            id_role=petugas_role.id_role,
+            fullname='Dina',
+            username='dina',
+            email='dina@seamolec.org',
+            hash_password=hash_password('Dina123!'),
+            telephone='089876543213',
+            is_active=True
+        )
+        db.add(dina_user)
+
     setting = db.query(Setting).first()
     if not setting:
         setting = Setting(

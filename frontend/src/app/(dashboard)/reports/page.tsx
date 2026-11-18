@@ -289,7 +289,7 @@ export default function ReportsPage() {
 
           {receptionistFilterOpen && (
             <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
-              {['Semua resepsionis', 'Rina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
+              {['Semua resepsionis', 'Rina', 'Dina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
                 <button
                   key={r}
                   type="button"
