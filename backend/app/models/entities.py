@@ -108,11 +108,19 @@ class Visitor(Base):
     purpose = Column(Text, nullable=True)
     check_in_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     check_out_at = Column(DateTime, nullable=True, index=True)
+    status = Column(String(20), nullable=False, default='PENDING', index=True)
+    rejection_reason = Column(Text, nullable=True)
+    approved_by_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey('users.id_user', onupdate='CASCADE', ondelete='SET NULL'), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    rejected_by_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey('users.id_user', onupdate='CASCADE', ondelete='SET NULL'), nullable=True)
+    rejected_at = Column(DateTime, nullable=True)
     capture_id = Column(String(500), nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     pass_card = relationship('Pass', back_populates='visitors')
+    approved_by = relationship('User', foreign_keys=[approved_by_id])
+    rejected_by = relationship('User', foreign_keys=[rejected_by_id])
 
     def to_dict(self):
         return {
@@ -124,10 +132,16 @@ class Visitor(Base):
             'institution': self.institution,
             'representing': self.representing,
             'purpose': self.purpose,
+            'status': self.status,
+            'rejection_reason': self.rejection_reason,
+            'approved_by': self.approved_by.fullname if self.approved_by else None,
+            'approved_at': self.approved_at.isoformat() if self.approved_at else None,
+            'rejected_by': self.rejected_by.fullname if self.rejected_by else None,
+            'rejected_at': self.rejected_at.isoformat() if self.rejected_at else None,
             'check_in_at': self.check_in_at.isoformat() if self.check_in_at else None,
             'check_out_at': self.check_out_at.isoformat() if self.check_out_at else None,
             'capture_id': self.capture_id,
-            'is_active': self.check_out_at is None,
+            'is_active': self.status == 'APPROVED' and self.check_out_at is None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 

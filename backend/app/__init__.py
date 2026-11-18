@@ -24,11 +24,23 @@ def create_app(config_name=None, db_url=None):
     CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
     jwt.init_app(app)
 
-    # Initialize database engine & session
     engine, _ = init_db(db_url)
     Base.metadata.create_all(bind=engine)
 
-    # Seed initial roles, users, and passes
+    if not engine.url.drivername.startswith('sqlite'):
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("""
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS approved_by_id BIGINT REFERENCES users(id_user) ON DELETE SET NULL;
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejected_by_id BIGINT REFERENCES users(id_user) ON DELETE SET NULL;
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP;
+                CREATE INDEX IF NOT EXISTS ix_visitors_status ON visitors(status);
+            """))
+            conn.commit()
+
     is_testing = bool(os.getenv('PYTEST_CURRENT_TEST')) or app.config.get('TESTING', False) or config_name == 'testing'
     db = get_db_session()
     try:
