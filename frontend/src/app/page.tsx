@@ -221,7 +221,6 @@ export default function KioskCheckinPage() {
         fullname: fullname.trim(),
         institution: institution.trim() || undefined,
         purpose: purpose.trim() || undefined,
-        telephone: '-',
         no_pass: selectedPassNo,
         photo_base64: capturedPhoto,
       });
@@ -288,7 +287,6 @@ export default function KioskCheckinPage() {
       <header className="bg-[#8A001A] text-white px-6 py-3 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm overflow-hidden shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/seamolec-logo.jpg"
               alt="SEAMOLEC Logo"
@@ -310,7 +308,6 @@ export default function KioskCheckinPage() {
 
       <main className="flex-1 relative flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-full md:w-1/2 pointer-events-none select-none z-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/building-bg.jpg"
             alt="SEAMOLEC Building"
@@ -500,7 +497,6 @@ export default function KioskCheckinPage() {
                 {capturedPhoto ? (
                   <div className="flex flex-col items-center space-y-3">
                     <div className="relative w-44 h-32 rounded-xl overflow-hidden shadow border-2 border-white">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={capturedPhoto}
                         alt="Snapshot Tamu"

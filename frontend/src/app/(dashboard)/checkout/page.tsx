@@ -2,21 +2,19 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 import {
   LogOut,
   Search,
   RefreshCw,
-  Clock,
-  User,
-  Building,
-  CreditCard,
   CheckCircle2,
   AlertCircle,
+  CreditCard,
+  User,
+  Sparkles,
   Eye,
   X,
-  Sparkles,
 } from 'lucide-react';
+import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -27,15 +25,11 @@ export default function CheckoutPage() {
   const [quickPassNo, setQuickPassNo] = useState('');
   const [quickError, setQuickError] = useState('');
 
-  // Modal confirm checkout
   const [selectedVisitor, setSelectedVisitor] = useState<ActiveVisitor | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
-  // Photo preview modal
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
-
-  // Feedback notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchActiveVisitors = useCallback(async () => {
@@ -52,11 +46,10 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetchActiveVisitors();
-    const interval = setInterval(fetchActiveVisitors, 20000); // Polling setiap 20 detik
+    const interval = setInterval(fetchActiveVisitors, 20000);
     return () => clearInterval(interval);
   }, [fetchActiveVisitors]);
 
-  // Handle Quick Check-Out by Pass Number
   const handleQuickCheckout = (e: React.FormEvent) => {
     e.preventDefault();
     setQuickError('');
@@ -81,7 +74,6 @@ export default function CheckoutPage() {
     setQuickPassNo('');
   };
 
-  // Confirm Check-Out
   const handleConfirmCheckout = async (visitorId: number, notes?: string) => {
     setProcessingCheckout(true);
     try {
@@ -102,7 +94,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // Filter visitors by search
   const filteredVisitors = activeVisitors.filter((v) => {
     const term = searchTerm.toLowerCase();
     const nameMatch = v.fullname.toLowerCase().includes(term);
@@ -114,7 +105,6 @@ export default function CheckoutPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-charcoal tracking-tight flex items-center space-x-2">
@@ -138,7 +128,6 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Feedback Banner */}
       {feedback && (
         <div
           className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-center justify-between shadow-sm animate-fadeIn ${
@@ -164,7 +153,6 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {/* Quick Check-Out Box */}
       <div className="bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -209,9 +197,7 @@ export default function CheckoutPage() {
         )}
       </div>
 
-      {/* Active Visitors Table Container */}
       <div className="bg-white rounded-2xl border border-ivory-200 shadow-sm overflow-hidden">
-        {/* Table Toolbar */}
         <div className="p-4 sm:p-5 border-b border-ivory-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-ivory-50/50">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-bold text-charcoal uppercase tracking-wider">
@@ -234,7 +220,6 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Table Content */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -266,24 +251,20 @@ export default function CheckoutPage() {
 
                   return (
                     <tr key={visitor.id_visitor} className="hover:bg-ivory-50/80 transition-colors">
-                      {/* Pass Column */}
                       <td className="py-3 px-4">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold bg-brand-50 text-brand-900 border border-brand-200 shadow-sm">
                           pass #{visitor.no_pass || visitor.id_pass}
                         </span>
                       </td>
 
-                      {/* Visitor Column */}
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-3">
-                          {/* Photo Thumbnail */}
                           <div
                             onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`)}
                             className="w-10 h-10 rounded-xl bg-ivory-100 overflow-hidden border border-ivory-200 relative group cursor-pointer shrink-0 shadow-sm flex items-center justify-center"
                             title="Klik untuk melihat foto lebih besar"
                           >
                             <User className="w-5 h-5 text-gray-400 absolute" />
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`}
                               alt={visitor.fullname}
@@ -299,17 +280,14 @@ export default function CheckoutPage() {
 
                           <div>
                             <div className="font-bold text-charcoal">{visitor.fullname}</div>
-                            <div className="text-[11px] text-charcoal-muted font-mono">{visitor.telephone || '-'}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Institution Column */}
                       <td className="py-3 px-4 text-charcoal font-medium">
                         {visitor.institution || '-'}
                       </td>
 
-                      {/* Representing & Purpose */}
                       <td className="py-3 px-4 max-w-xs">
                         <div className="text-charcoal font-semibold">{visitor.representing || '-'}</div>
                         <div className="text-[11px] text-charcoal-muted truncate" title={visitor.purpose}>
@@ -317,7 +295,6 @@ export default function CheckoutPage() {
                         </div>
                       </td>
 
-                      {/* Check-in Time & Duration */}
                       <td className="py-3 px-4">
                         <div className="font-mono text-charcoal font-medium">
                           {checkinDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
@@ -327,7 +304,6 @@ export default function CheckoutPage() {
                         </span>
                       </td>
 
-                      {/* Action Button */}
                       <td className="py-3 px-4 text-center">
                         <button
                           type="button"
@@ -362,7 +338,6 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Checkout Confirmation Modal */}
       <CheckoutConfirmModal
         isOpen={isModalOpen}
         visitor={selectedVisitor}
@@ -374,7 +349,6 @@ export default function CheckoutPage() {
         loading={processingCheckout}
       />
 
-      {/* Photo Zoom Modal */}
       {previewPhotoUrl && (
         <div
           onClick={() => setPreviewPhotoUrl(null)}
@@ -395,7 +369,6 @@ export default function CheckoutPage() {
             </div>
             <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-ivory-100 border border-ivory-200 flex items-center justify-center relative">
               <User className="w-12 h-12 text-gray-300 absolute" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewPhotoUrl}
                 alt="Foto Pengunjung"

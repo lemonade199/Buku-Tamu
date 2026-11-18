@@ -10,7 +10,6 @@ import {
   X,
   CreditCard,
   Building,
-  Phone,
   Calendar,
   Clock,
   TrendingUp,
@@ -137,7 +136,6 @@ export default function DashboardPage() {
       id_pass: visitor.id_pass,
       no_pass: visitor.no_pass || String(visitor.id_pass),
       fullname: visitor.fullname,
-      telephone: visitor.telephone,
       institution: visitor.institution,
       representing: visitor.representing,
       purpose: visitor.purpose,
@@ -684,11 +682,6 @@ export default function DashboardPage() {
               </div>
 
               <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5 text-xs">
-                <div className="flex items-center space-x-2 text-gray-700">
-                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="font-semibold">Telepon:</span>
-                  <span>{detailVisitor.telephone || '-'}</span>
-                </div>
                 <div className="flex items-center space-x-2 text-gray-700">
                   <Building className="w-4 h-4 text-gray-400 shrink-0" />
                   <span className="font-semibold">Bertemu dengan:</span>

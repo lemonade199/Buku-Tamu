@@ -86,7 +86,6 @@ export default function ReportsPage() {
       id_pass: visitor.id_pass,
       no_pass: visitor.no_pass || String(visitor.id_pass),
       fullname: visitor.fullname,
-      telephone: visitor.telephone,
       institution: visitor.institution,
       representing: visitor.representing,
       purpose: visitor.purpose,
@@ -416,7 +415,6 @@ export default function ReportsPage() {
                         aria-label={`Perbesar foto ${v.fullname}`}
                       >
                         <User className="w-6 h-6 text-gray-200 absolute" />
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
                           alt={v.fullname}
@@ -523,7 +521,6 @@ export default function ReportsPage() {
             </div>
             <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center relative">
               <User className="w-12 h-12 text-gray-400 absolute" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewPhotoUrl}
                 alt="Foto Pengunjung"

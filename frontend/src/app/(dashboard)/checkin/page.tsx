@@ -11,7 +11,6 @@ import {
   X,
   CreditCard,
   Building,
-  Phone,
   Clock,
   RefreshCw,
 } from 'lucide-react';
@@ -327,11 +326,6 @@ export default function ReceptionGuestIntakePage() {
               </div>
 
               <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5 text-xs">
-                <div className="flex items-center space-x-2 text-gray-700">
-                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="font-semibold">Telepon:</span>
-                  <span>{detailVisitor.telephone || '-'}</span>
-                </div>
                 <div className="flex items-center space-x-2 text-gray-700">
                   <Building className="w-4 h-4 text-gray-400 shrink-0" />
                   <span className="font-semibold">Bertemu dengan:</span>
