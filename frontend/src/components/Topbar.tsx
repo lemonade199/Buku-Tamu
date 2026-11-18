@@ -9,7 +9,6 @@ export default function Topbar() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  // Dynamic live clock matching format: "Selasa, 10 Nov 2026 · 14:30"
   const [timeStr, setTimeStr] = useState<string>('');
 
   useEffect(() => {
@@ -33,11 +32,11 @@ export default function Topbar() {
     return () => clearInterval(interval);
   }, []);
 
-  const adminName = user?.fullname || 'Tasha';
+  const roleLabel = user?.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis';
+  const userName = user?.fullname || 'Pengguna';
 
   return (
     <header className="h-16 bg-[#8A001A] text-white flex items-center justify-between px-6 shadow-md border-b border-black/40 z-30 shrink-0">
-      {/* Brand Logo & Name */}
       <div className="flex items-center space-x-3 cursor-pointer" onClick={() => router.push('/dashboard')}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -50,22 +49,19 @@ export default function Topbar() {
         </span>
       </div>
 
-      {/* Right Controls: Date/Time Pill & Admin Profile */}
       <div className="flex items-center space-x-4">
-        {/* Time Pill */}
         <div className="hidden sm:flex items-center space-x-2 bg-white text-gray-800 text-xs px-4 py-1.5 rounded-full shadow-inner border border-gray-300 font-medium">
           <Clock className="w-3.5 h-3.5 text-gray-600 shrink-0" />
           <span>{timeStr || 'Selasa, 10 Nov 2026 · 14:30'}</span>
         </div>
 
-        {/* Admin Profile */}
         <div className="flex items-center space-x-2.5">
           <div className="w-9 h-9 rounded-full bg-gray-400 flex items-center justify-center text-gray-100 shrink-0 shadow-xs border border-white/20">
             <UserIcon className="w-5 h-5 text-gray-200" />
           </div>
           <div className="text-left text-white leading-tight">
             <div className="text-xs font-bold leading-none mb-1">
-              Admin: {adminName}
+              {roleLabel}: {userName}
             </div>
             <button
               onClick={() => router.push('/settings')}
@@ -75,7 +71,6 @@ export default function Topbar() {
             </button>
           </div>
 
-          {/* Quick Logout Button */}
           <button
             onClick={() => logout()}
             title="Keluar / Logout"

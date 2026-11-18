@@ -30,7 +30,6 @@ export default function Sidebar() {
         {navItems.map((item) => {
           if (item.adminOnly && !isAdmin) return null;
 
-          // Check if current route matches this item
           const isActive =
             pathname === item.href ||
             (item.href === '/reports' && pathname.startsWith('/reports')) ||
