@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { Camera, Clock, RefreshCw, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Camera, Clock, RefreshCw, CheckCircle2, AlertCircle, X, ShieldAlert, Hourglass, UserCheck, UserX } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -13,11 +13,21 @@ interface PassOption {
   status: string;
 }
 
+interface RegistrationStatusData {
+  id_visitor: number;
+  fullname: string;
+  no_pass?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejection_reason?: string;
+  approved_at?: string;
+  rejected_at?: string;
+  check_in_at?: string;
+  is_active?: boolean;
+}
+
 export default function KioskCheckinPage() {
-  // Current time state
   const [currentDateTime, setCurrentDateTime] = useState<string>('');
 
-  // Form states
   const [fullname, setFullname] = useState('');
   const [institution, setInstitution] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -25,7 +35,6 @@ export default function KioskCheckinPage() {
   const [availablePasses, setAvailablePasses] = useState<PassOption[]>([]);
   const [loadingPasses, setLoadingPasses] = useState(true);
 
-  // Camera & Photo states
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -34,14 +43,11 @@ export default function KioskCheckinPage() {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // Submission & Success View states
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [checkinResult, setCheckinResult] = useState<any>(null);
-  const [isSuccessView, setIsSuccessView] = useState(false);
-  const [countdown, setCountdown] = useState(10);
+  const [registrationResult, setRegistrationResult] = useState<RegistrationStatusData | null>(null);
+  const [countdown, setCountdown] = useState(15);
 
-  // Real-time clock formatted in Indonesian
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -63,7 +69,6 @@ export default function KioskCheckinPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch available passes
   const fetchPasses = useCallback(async () => {
     setLoadingPasses(true);
     try {
@@ -72,6 +77,8 @@ export default function KioskCheckinPage() {
       setAvailablePasses(passes);
       if (passes.length > 0) {
         setSelectedPassNo(passes[0].no_pass);
+      } else {
+        setSelectedPassNo('');
       }
     } catch (err) {
       console.error('Gagal mengambil pass tersedia:', err);
@@ -84,7 +91,6 @@ export default function KioskCheckinPage() {
     fetchPasses();
   }, [fetchPasses]);
 
-  // Start Camera with resilient constraints
   const startCamera = async () => {
     setCameraError(null);
     setCapturedPhoto(null);
@@ -98,123 +104,98 @@ export default function KioskCheckinPage() {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
         });
-      } catch (e) {
-        // Fallback for laptops/webcams with basic resolutions
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
+      } catch {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
 
       setStream(mediaStream);
       setIsCameraOpen(true);
     } catch (err: any) {
-      console.error('Kamera error:', err);
-      let msg = 'Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan pada peramban.';
+      console.error('Camera access error:', err);
+      let errorMsg = 'Tidak dapat mengakses kamera. Pastikan izin kamera aktif.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Izin kamera ditolak. Harap klik ikon gembok di address bar dan ubah izin Kamera menjadi Izinkan (Allow).';
+        errorMsg = 'Akses kamera ditolak. Berikan izin webcam pada browser Anda.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'Perangkat webcam tidak terdeteksi. Pastikan kamera terhubung ke perangkat.';
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        msg = 'Kamera sedang digunakan oleh aplikasi lain (seperti Zoom/Meet) atau perangkat keras sibuk.';
+        errorMsg = 'Tidak ditemukan perangkat webcam pada komputer ini.';
       }
-      setCameraError(msg);
+      setCameraError(errorMsg);
       setIsCameraOpen(false);
     }
   };
 
-  // Immediate callback ref to attach stream when video mounts into DOM
-  const setVideoElement = useCallback(
-    (node: HTMLVideoElement | null) => {
-      videoRef.current = node;
-      if (node && stream) {
-        node.srcObject = stream;
-        node.play().then(() => setIsVideoPlaying(true)).catch((e) => console.warn('Video play warning:', e));
-      }
-    },
-    [stream]
-  );
-
-  // Fallback effect whenever stream or isCameraOpen updates
-  useEffect(() => {
-    if (isCameraOpen && stream && videoRef.current) {
-      if (videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-      }
-      videoRef.current.play().then(() => setIsVideoPlaying(true)).catch(console.warn);
-    }
-  }, [isCameraOpen, stream]);
-
-  // Stop Camera
   const stopCamera = useCallback(() => {
     if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach((track) => track.stop());
       setStream(null);
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
     }
     setIsCameraOpen(false);
     setIsVideoPlaying(false);
   }, [stream]);
 
-  // Auto clean up camera stream on unmount
+  const setVideoElement = useCallback(
+    (node: HTMLVideoElement | null) => {
+      videoRef.current = node;
+      if (node && stream) {
+        node.srcObject = stream;
+        node
+          .play()
+          .then(() => setIsVideoPlaying(true))
+          .catch((e) => console.warn('Video auto-play interrupted:', e));
+      }
+    },
+    [stream]
+  );
+
   useEffect(() => {
     return () => {
       if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [stream]);
 
-  // Capture Snapshot
   const captureSnapshot = () => {
-    if (!videoRef.current) return;
     const video = videoRef.current;
-    let canvas = canvasRef.current;
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvasRef.current = canvas;
-    }
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    const width = video.videoWidth || 640;
+    const height = video.videoHeight || 480;
+
+    canvas.width = width;
+    canvas.height = height;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Flip horizontal to match mirrored video preview
-    ctx.translate(canvas.width, 0);
+    ctx.save();
+    ctx.translate(width, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, width, height);
+    ctx.restore();
 
-    const base64 = canvas.toDataURL('image/jpeg', 0.85);
-    setCapturedPhoto(base64);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setCapturedPhoto(dataUrl);
     stopCamera();
-    setFormError('');
   };
 
-  // Retake Photo
   const handleRetake = () => {
     setCapturedPhoto(null);
     startCamera();
   };
 
-  // Reset form for next visitor
   const handleResetForNextVisitor = useCallback(() => {
-    setIsSuccessView(false);
+    setRegistrationResult(null);
     setFullname('');
     setInstitution('');
     setPurpose('');
     setCapturedPhoto(null);
     setFormError('');
-    setCheckinResult(null);
     stopCamera();
     fetchPasses();
   }, [stopCamera, fetchPasses]);
 
-  // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
@@ -225,7 +206,7 @@ export default function KioskCheckinPage() {
     }
 
     if (!capturedPhoto) {
-      setFormError('Foto pengunjung wajib diambil sebelum check-in.');
+      setFormError('Foto pengunjung wajib diambil sebelum mendaftar.');
       return;
     }
 
@@ -245,28 +226,53 @@ export default function KioskCheckinPage() {
         photo_base64: capturedPhoto,
       });
 
-      setCheckinResult(res.data.data);
-      setIsSuccessView(true);
+      setRegistrationResult({
+        id_visitor: res.data.data.id_visitor,
+        fullname: res.data.data.fullname,
+        no_pass: res.data.data.no_pass || selectedPassNo,
+        status: 'PENDING',
+      });
     } catch (err: any) {
-      console.error('Checkin error:', err);
-      const msg = err.response?.data?.message || 'Gagal memproses check in. Silakan coba kembali.';
+      console.error('Registration error:', err);
+      const msg = err.response?.data?.message || 'Gagal memproses registrasi. Silakan coba kembali.';
       setFormError(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Auto-delay 10 seconds timer on success view
+  useEffect(() => {
+    if (!registrationResult || registrationResult.status !== 'PENDING') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get<{ success: boolean; data: RegistrationStatusData }>(
+          `${API_BASE_URL}/visitors/${registrationResult.id_visitor}/status`
+        );
+        if (res.data.success && res.data.data) {
+          const updated = res.data.data;
+          if (updated.status !== 'PENDING') {
+            setRegistrationResult(updated);
+          }
+        }
+      } catch (err) {
+        console.error('Polling status error:', err);
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [registrationResult]);
+
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isSuccessView) {
-      setCountdown(10);
+    if (registrationResult && registrationResult.status === 'APPROVED') {
+      setCountdown(15);
       timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
             handleResetForNextVisitor();
-            return 10;
+            return 15;
           }
           return prev - 1;
         });
@@ -275,11 +281,10 @@ export default function KioskCheckinPage() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isSuccessView, handleResetForNextVisitor]);
+  }, [registrationResult, handleResetForNextVisitor]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FEF7EC]">
-      {/* Top Header without Login Button (Guest Only Kiosk) */}
       <header className="bg-[#8A001A] text-white px-6 py-3 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm overflow-hidden shrink-0">
@@ -296,7 +301,6 @@ export default function KioskCheckinPage() {
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Real-time date time pill */}
           <div className="bg-white text-gray-800 rounded-full px-4 py-1.5 flex items-center text-xs sm:text-sm font-medium shadow-sm space-x-2 border border-gray-100">
             <Clock className="w-4 h-4 text-gray-500" />
             <span>{currentDateTime || 'Memuat waktu...'}</span>
@@ -304,9 +308,7 @@ export default function KioskCheckinPage() {
         </div>
       </header>
 
-      {/* Main Area with Split Background */}
       <main className="flex-1 relative flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
-        {/* Right Half Building Background Image */}
         <div className="absolute right-0 top-0 bottom-0 w-full md:w-1/2 pointer-events-none select-none z-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -317,78 +319,184 @@ export default function KioskCheckinPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-[#FEF7EC] via-[#FEF7EC]/70 md:via-transparent to-transparent" />
         </div>
 
-        {/* CONDITION 1: TAMPILAN SETELAH ISI FORM (SUCCESS VIEW SESUAI GAMBAR) */}
-        {isSuccessView ? (
+        {registrationResult ? (
           <div className="relative z-10 w-full max-w-[640px] flex flex-col items-center animate-fadeIn">
-            {/* 3D Maroon Card */}
-            <div className="relative w-full bg-[#750019] rounded-[26px] border-[3px] border-[#3F000D] shadow-[0_12px_0_0_#3F000D] px-8 py-10 sm:px-14 sm:py-14 text-white text-center">
-              {/* Close Button X (Langsung kembali ke form) */}
-              <button
-                onClick={handleResetForNextVisitor}
-                className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
-                title="Tutup & kembali ke form"
-              >
-                <X className="w-6 h-6 sm:w-7 sm:h-7" />
-              </button>
+            {registrationResult.status === 'PENDING' && (
+              <div className="relative w-full bg-[#750019] rounded-[26px] border-[3px] border-[#3F000D] shadow-[0_12px_0_0_#3F000D] px-8 py-10 sm:px-14 sm:py-12 text-white text-center space-y-5">
+                <button
+                  type="button"
+                  onClick={handleResetForNextVisitor}
+                  className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Tutup & kembali ke form"
+                  aria-label="Tutup dan kembali ke form registrasi"
+                >
+                  <X className="w-6 h-6" />
+                </button>
 
-              {/* Subheading Selamat Datang */}
-              <p className="font-serif italic text-2xl sm:text-3xl text-white/95 mb-6 tracking-wide">
-                Selamat datang!
-              </p>
+                <div className="w-16 h-16 rounded-full bg-amber-400/20 border-2 border-amber-300 mx-auto flex items-center justify-center animate-pulse">
+                  <Hourglass className="w-8 h-8 text-amber-300" />
+                </div>
 
-              {/* Big Title: Nomor pass anda: */}
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-                Nomor pass anda:
-              </h2>
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                    Registrasi Sedang Diproses
+                  </h2>
+                  <p className="font-serif italic text-base sm:text-lg text-amber-200 mt-1">
+                    Menunggu Konfirmasi Resepsionis
+                  </p>
+                </div>
 
-              {/* Big Pass Number */}
-              <div className="text-6xl sm:text-7xl font-extrabold font-sans text-white tracking-wider my-4">
-                {checkinResult?.no_pass || selectedPassNo || '07'}
+                <div className="bg-white/10 rounded-2xl p-4 border border-white/15 text-left text-xs sm:text-sm space-y-2">
+                  <div className="flex justify-between border-b border-white/10 pb-1.5">
+                    <span className="text-white/70">Nama Tamu:</span>
+                    <span className="font-bold text-white">{registrationResult.fullname}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/10 pb-1.5">
+                    <span className="text-white/70">Nomor Kartu Pass:</span>
+                    <span className="font-mono font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded">
+                      #{registrationResult.no_pass}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-0.5">
+                    <span className="text-white/70">Status Kartu:</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-black">
+                      PENDING
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-black/30 rounded-xl border border-white/10 text-xs text-white/90 leading-relaxed text-left flex items-start space-x-2.5">
+                  <ShieldAlert className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
+                  <span>
+                    Kartu pass fisik belum boleh diambil atau digunakan. Mohon tunggu sejenak di dekat meja resepsionis hingga registrasi Anda diverifikasi.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResetForNextVisitor}
+                  className="w-full py-2.5 bg-white/15 hover:bg-white/25 text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Batalkan & Kembali ke Formulir
+                </button>
               </div>
+            )}
 
-              {/* Instruction Text */}
-              <p className="text-base sm:text-lg text-white/90 font-medium mt-6">
-                Silakan menuju resepsionis :)
-              </p>
+            {registrationResult.status === 'APPROVED' && (
+              <div className="relative w-full bg-[#1B5E20] rounded-[26px] border-[3px] border-[#0A3910] shadow-[0_12px_0_0_#0A3910] px-8 py-10 sm:px-14 sm:py-12 text-white text-center space-y-4">
+                <button
+                  type="button"
+                  onClick={handleResetForNextVisitor}
+                  className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Tutup & kembali ke form"
+                  aria-label="Tutup dan kembali ke form registrasi"
+                >
+                  <X className="w-6 h-6" />
+                </button>
 
-              {/* 10-Second Auto Countdown Bar */}
-              <div className="mt-8 pt-4 border-t border-white/20 flex flex-col items-center space-y-2">
-                <span className="text-xs text-white/75">
-                  Kembali ke formulir otomatis dalam <strong className="text-white font-mono">{countdown}</strong> detik...
-                </span>
-                <div className="w-48 bg-white/20 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-white h-full rounded-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${(countdown / 10) * 100}%` }}
-                  />
+                <div className="w-16 h-16 rounded-full bg-emerald-400/20 border-2 border-emerald-300 mx-auto flex items-center justify-center">
+                  <UserCheck className="w-9 h-9 text-emerald-300" />
+                </div>
+
+                <p className="font-serif italic text-2xl sm:text-3xl text-emerald-100 tracking-wide">
+                  Selamat datang!
+                </p>
+
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  Registrasi Disetujui
+                </h2>
+
+                <div className="bg-black/30 rounded-2xl p-4 border border-white/20 inline-block my-2">
+                  <span className="block text-xs uppercase tracking-wider text-emerald-200">Nomor Kartu Pass Anda</span>
+                  <span className="text-5xl sm:text-6xl font-black font-sans text-white tracking-wider block mt-1">
+                    #{registrationResult.no_pass}
+                  </span>
+                </div>
+
+                <p className="text-sm sm:text-base text-white/95 font-medium">
+                  Kartu pass telah disetujui dan aktif (IN_USE). Silakan ambil kartu pass Anda di meja resepsionis dan selamat berkunjung ke SEAMOLEC.
+                </p>
+
+                <div className="pt-4 border-t border-white/20 flex flex-col items-center space-y-2">
+                  <span className="text-xs text-white/80">
+                    Kembali ke formulir otomatis dalam <strong className="font-mono text-white">{countdown}</strong> detik...
+                  </span>
+                  <div className="w-48 bg-white/20 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-white h-full rounded-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${(countdown / 15) * 100}%` }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetForNextVisitor}
+                    className="mt-2 px-6 py-2 bg-white text-[#1B5E20] font-bold text-xs rounded-full shadow hover:bg-emerald-50 transition-colors cursor-pointer"
+                  >
+                    Selesai
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
+
+            {registrationResult.status === 'REJECTED' && (
+              <div className="relative w-full bg-[#8A001A] rounded-[26px] border-[3px] border-[#550010] shadow-[0_12px_0_0_#550010] px-8 py-10 sm:px-14 sm:py-12 text-white text-center space-y-4">
+                <button
+                  type="button"
+                  onClick={handleResetForNextVisitor}
+                  className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Tutup & kembali ke form"
+                  aria-label="Tutup dan kembali ke form registrasi"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="w-16 h-16 rounded-full bg-rose-400/20 border-2 border-rose-300 mx-auto flex items-center justify-center">
+                  <UserX className="w-9 h-9 text-rose-300" />
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  Permohonan Belum Dapat Disetujui
+                </h2>
+
+                <div className="bg-black/35 rounded-2xl p-4 border border-rose-300/30 text-left space-y-2">
+                  <span className="text-xs font-bold text-rose-200 uppercase tracking-wider block">
+                    Alasan Penolakan:
+                  </span>
+                  <p className="text-sm font-semibold text-white bg-black/30 p-3 rounded-xl border border-white/10">
+                    {registrationResult.rejection_reason || 'Mohon maaf, permohonan kunjungan Anda tidak dapat disetujui oleh resepsionis saat ini.'}
+                  </p>
+                  <p className="text-[11px] text-white/80">
+                    Kartu pass nomor #{registrationResult.no_pass} telah dikembalikan ke status tersedia (AVAILABLE).
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleResetForNextVisitor}
+                  className="mt-2 w-full py-3 bg-white text-[#8A001A] font-bold text-xs sm:text-sm rounded-full shadow hover:bg-rose-50 transition-colors cursor-pointer"
+                >
+                  Kembali ke Form Registrasi
+                </button>
+              </div>
+            )}
           </div>
         ) : (
-          /* CONDITION 2: FORM INPUT DATA TAMU */
           <div className="relative z-10 w-full max-w-[880px] flex flex-col items-center space-y-4">
-            {/* Form Card with 3D Maroon Outer Frame */}
             <div className="w-full bg-white rounded-[24px] sm:rounded-[28px] border-[3px] border-[#650015] shadow-[0_10px_0_0_#650015] p-5 sm:p-8 transition-all">
-              {/* Title */}
               <h1 className="text-center font-serif text-2xl sm:text-[28px] text-[#222222] tracking-wide mb-5 lowercase">
                 form input data tamu
               </h1>
 
-              {/* Error Notification */}
               {formError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-700 flex items-center space-x-2">
+                <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-700 flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
                   <span>{formError}</span>
                 </div>
               )}
 
-              {/* Camera / Snapshot Box */}
               <div className="bg-[#D9D9D9] rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center relative overflow-hidden min-h-[220px] mb-6">
-                {/* Hidden canvas for capturing image */}
                 <canvas ref={canvasRef} className="hidden" />
 
-                {/* View 1: Photo Captured */}
                 {capturedPhoto ? (
                   <div className="flex flex-col items-center space-y-3">
                     <div className="relative w-44 h-32 rounded-xl overflow-hidden shadow border-2 border-white">
@@ -405,14 +513,13 @@ export default function KioskCheckinPage() {
                     <button
                       type="button"
                       onClick={handleRetake}
-                      className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2 px-6 text-xs sm:text-sm font-medium flex items-center space-x-2 shadow transition-all cursor-pointer"
+                      className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2 px-6 text-xs sm:text-sm font-medium flex items-center space-x-2 shadow transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#650015]"
                     >
                       <RefreshCw className="w-4 h-4" />
                       <span>Ambil Foto Ulang</span>
                     </button>
                   </div>
                 ) : isCameraOpen ? (
-                  /* View 2: Live Video Stream */
                   <div className="flex flex-col items-center space-y-3 w-full max-w-sm">
                     <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-black shadow border-2 border-[#650015] flex items-center justify-center">
                       <video
@@ -427,7 +534,6 @@ export default function KioskCheckinPage() {
                         className="w-full h-full object-cover -scale-x-100"
                       />
 
-                      {/* Loading spinner while first frame buffers */}
                       {!isVideoPlaying && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white space-y-2 pointer-events-none">
                           <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -435,7 +541,6 @@ export default function KioskCheckinPage() {
                         </div>
                       )}
 
-                      {/* Facial Guide */}
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                         <div className="w-36 h-48 rounded-[50%] border-2 border-dashed border-white/70" />
                       </div>
@@ -444,7 +549,7 @@ export default function KioskCheckinPage() {
                       <button
                         type="button"
                         onClick={captureSnapshot}
-                        className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2 px-6 text-xs sm:text-sm font-semibold flex items-center space-x-2 shadow-md transition-all cursor-pointer"
+                        className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2 px-6 text-xs sm:text-sm font-semibold flex items-center space-x-2 shadow-md transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#650015]"
                       >
                         <Camera className="w-4 h-4" />
                         <span>Jepret Foto Sekarang</span>
@@ -452,138 +557,117 @@ export default function KioskCheckinPage() {
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-full py-2 px-4 text-xs font-medium transition-all cursor-pointer"
+                        className="bg-gray-600 hover:bg-gray-700 text-white rounded-full p-2 text-xs transition-all cursor-pointer"
+                        title="Batal"
+                        aria-label="Batalkan kamera"
                       >
-                        Batal
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 ) : (
-                  /* View 3: Default Placeholder Avatar */
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 text-[#505050] flex items-center justify-center">
-                      <svg viewBox="0 0 100 100" fill="currentColor" className="w-full h-full">
-                        <circle cx="50" cy="34" r="20" />
-                        <path d="M18 86c0-18 14-32 32-32s32 14 32 32v2H18v-2z" />
-                      </svg>
-                    </div>
-
+                  <div className="flex flex-col items-center space-y-3">
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2.5 px-6 text-xs sm:text-sm font-semibold flex items-center space-x-2 shadow-md transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#650015]"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Buka Kamera Webcam</span>
+                    </button>
                     {cameraError && (
-                      <p className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg max-w-sm text-center leading-relaxed">
+                      <p className="text-xs text-red-600 font-medium max-w-xs text-center mt-1">
                         {cameraError}
                       </p>
                     )}
-
-                    <div className="flex items-center justify-center">
-                      {/* Maroon Button "Ambil Snapshot foto" */}
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        className="bg-[#650015] hover:bg-[#80001B] text-white rounded-full py-2.5 px-8 text-xs sm:text-sm font-medium flex items-center space-x-2 shadow transition-all cursor-pointer"
-                      >
-                        <Camera className="w-4 h-4" />
-                        <span>Ambil Snapshot foto</span>
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Form Fields: Two Columns */}
-              <form id="checkin-form" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Left Column */}
-                  <div className="space-y-3.5">
-                    {/* Pass ID Selection */}
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-800 mb-1">
-                        No. pass ID:
-                      </label>
-                      {loadingPasses ? (
-                        <div className="w-full border border-gray-300 rounded-xl px-4 py-2.5 bg-gray-50 text-xs text-gray-500">
-                          Memuat nomor pass...
-                        </div>
-                      ) : availablePasses.length > 0 ? (
-                        <select
-                          value={selectedPassNo}
-                          onChange={(e) => setSelectedPassNo(e.target.value)}
-                          className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all font-mono"
-                        >
-                          {availablePasses.map((p) => (
-                            <option key={p.id_pass} value={p.no_pass}>
-                              pass #{p.no_pass} {p.slot ? `(Slot: ${p.slot})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="w-full border border-red-300 rounded-xl px-4 py-2 bg-red-50 text-xs text-red-600">
-                          Semua kartu pass sedang digunakan
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Guest Full Name */}
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-800 mb-1">
-                        Nama Tamu:
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={fullname}
-                        onChange={(e) => setFullname(e.target.value)}
-                        placeholder="contoh: AHMAD"
-                        className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
-                      />
-                    </div>
-
-                    {/* Institution */}
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-800 mb-1">
-                        Instansi/perusahaan:
-                      </label>
-                      <input
-                        type="text"
-                        value={institution}
-                        onChange={(e) => setInstitution(e.target.value)}
-                        placeholder="contoh: PT Jaya"
-                        className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
-                      />
-                    </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="guest-fullname" className="block font-serif italic text-sm text-[#222222] mb-1">
+                      Nama Tamu <span className="text-[#650015]">*</span>
+                    </label>
+                    <input
+                      id="guest-fullname"
+                      type="text"
+                      required
+                      value={fullname}
+                      onChange={(e) => setFullname(e.target.value)}
+                      placeholder="Masukkan nama lengkap Anda..."
+                      className="w-full bg-[#FAF7F0] border border-[#D5CEC5] rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#650015]/20 focus:border-[#650015]"
+                    />
                   </div>
 
-                  {/* Right Column: Purpose */}
-                  <div className="flex flex-col">
-                    <label className="block text-xs sm:text-sm font-medium text-gray-800 mb-1">
-                      Keperluan/tujuan kedatangan:
+                  <div>
+                    <label htmlFor="guest-institution" className="block font-serif italic text-sm text-[#222222] mb-1">
+                      Instansi / Sekolah
                     </label>
-                    <textarea
-                      value={purpose}
-                      onChange={(e) => setPurpose(e.target.value)}
-                      placeholder="contoh: meeting"
-                      className="w-full flex-1 min-h-[140px] md:min-h-[170px] border border-gray-300 rounded-xl p-3.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all resize-none"
+                    <input
+                      id="guest-institution"
+                      type="text"
+                      value={institution}
+                      onChange={(e) => setInstitution(e.target.value)}
+                      placeholder="Nama instansi atau institusi..."
+                      className="w-full bg-[#FAF7F0] border border-[#D5CEC5] rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#650015]/20 focus:border-[#650015]"
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="guest-purpose" className="block font-serif italic text-sm text-[#222222] mb-1">
+                      Keperluan Kunjungan
+                    </label>
+                    <input
+                      id="guest-purpose"
+                      type="text"
+                      value={purpose}
+                      onChange={(e) => setPurpose(e.target.value)}
+                      placeholder="Tujuan kunjungan Anda..."
+                      className="w-full bg-[#FAF7F0] border border-[#D5CEC5] rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#650015]/20 focus:border-[#650015]"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="guest-pass" className="block font-serif italic text-sm text-[#222222] mb-1">
+                      Pilih Kartu Pass Tersedia (AVAILABLE) <span className="text-[#650015]">*</span>
+                    </label>
+                    <select
+                      id="guest-pass"
+                      value={selectedPassNo}
+                      onChange={(e) => setSelectedPassNo(e.target.value)}
+                      disabled={loadingPasses || availablePasses.length === 0}
+                      className="w-full bg-[#FAF7F0] border border-[#D5CEC5] rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#650015]/20 focus:border-[#650015] cursor-pointer disabled:opacity-50"
+                    >
+                      {loadingPasses ? (
+                        <option value="">Memuat kartu pass tersedia...</option>
+                      ) : availablePasses.length === 0 ? (
+                        <option value="">Tidak ada kartu pass yang tersedia saat ini</option>
+                      ) : (
+                        availablePasses.map((pass) => (
+                          <option key={pass.id_pass} value={pass.no_pass}>
+                            Pass #{pass.no_pass} {pass.slot ? `(${pass.slot})` : ''} - Status: AVAILABLE
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={submitting || availablePasses.length === 0}
+                    className="w-full sm:w-auto px-8 py-3 bg-[#650015] hover:bg-[#80001B] text-white font-bold text-sm rounded-full shadow-[0_4px_0_0_#3F000D] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#650015]"
+                  >
+                    {submitting ? 'Mengirim Registrasi...' : 'Kirim Permohonan Registrasi'}
+                  </button>
+                </div>
               </form>
             </div>
-
-            {/* Wide Rounded Maroon Action Button below Card */}
-            <button
-              type="submit"
-              form="checkin-form"
-              disabled={submitting || availablePasses.length === 0}
-              className="w-full max-w-[880px] bg-[#8A001A] hover:bg-[#650015] active:scale-[0.99] text-white font-medium py-3.5 px-6 rounded-full text-sm sm:text-base tracking-wide shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              {submitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Memproses Check In...</span>
-                </>
-              ) : (
-                <span>Check in & ambil kartu pass</span>
-              )}
-            </button>
           </div>
         )}
       </main>
