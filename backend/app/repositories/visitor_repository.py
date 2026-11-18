@@ -88,3 +88,63 @@ class VisitorRepository:
             })
 
         return results
+
+    def count_this_month(self) -> int:
+        now = datetime.utcnow()
+        month_start = datetime(now.year, now.month, 1)
+        return self.db.query(func.count(Visitor.id_visitor)).filter(
+            Visitor.status == 'APPROVED',
+            Visitor.check_in_at >= month_start
+        ).scalar() or 0
+
+    def get_monthly_stats(self) -> list:
+        now = datetime.utcnow()
+        year = now.year
+        months_label = ['Jan', 'Feb', 'Mart', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+        result = []
+        for m in range(1, 13):
+            start_m = datetime(year, m, 1)
+            if m == 12:
+                end_m = datetime(year + 1, 1, 1)
+            else:
+                end_m = datetime(year, m + 1, 1)
+
+            count = self.db.query(func.count(Visitor.id_visitor)).filter(
+                Visitor.status == 'APPROVED',
+                Visitor.check_in_at >= start_m,
+                Visitor.check_in_at < end_m
+            ).scalar() or 0
+
+            result.append({
+                "month": months_label[m - 1],
+                "count": count
+            })
+        return result
+
+    def get_top_institutions(self, limit: int = 5) -> list:
+        rows = self.db.query(
+            Visitor.institution,
+            func.count(Visitor.id_visitor).label('total')
+        ).filter(
+            Visitor.status == 'APPROVED',
+            Visitor.institution.isnot(None),
+            Visitor.institution != ''
+        ).group_by(Visitor.institution).order_by(func.count(Visitor.id_visitor).desc()).limit(limit).all()
+
+        return [{"name": r[0], "count": r[1]} for r in rows]
+
+    def get_recent_activities(self, limit: int = 8) -> list:
+        from backend.app.models.entities import AuditLog
+        logs = self.db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
+        days_id = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+        result = []
+        for l in logs:
+            dt = l.created_at
+            day_name = days_id[dt.weekday()]
+            result.append({
+                "id": l.id_log,
+                "date": f"{day_name}, {dt.strftime('%d/%m/%Y')}",
+                "time": dt.strftime('%H.%M'),
+                "description": l.description or l.action
+            })
+        return result

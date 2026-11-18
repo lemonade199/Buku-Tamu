@@ -67,9 +67,27 @@ export interface WeeklyTrend {
   count: number;
 }
 
+export interface MonthlyStat {
+  month: string;
+  count: number;
+}
+
+export interface TopInstitution {
+  name: string;
+  count: number;
+}
+
+export interface RecentActivity {
+  id: number;
+  date: string;
+  time: string;
+  description: string;
+}
+
 export interface DashboardMetrics {
   total_visitors_today: number;
   total_visitors_all_time?: number;
+  visitors_this_month?: number;
   active_visitors: number;
   pending_registrations_count: number;
   completed_visitors_today: number;
@@ -88,4 +106,7 @@ export interface DashboardMetrics {
   recent_visitors: VisitorItem[];
   hourly_stats?: HourlyStat[];
   weekly_trend?: WeeklyTrend[];
+  monthly_stats?: MonthlyStat[];
+  top_institutions?: TopInstitution[];
+  recent_activities?: RecentActivity[];
 }

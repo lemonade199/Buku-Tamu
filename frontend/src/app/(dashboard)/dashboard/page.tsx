@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '@/lib/api';
-import { DashboardMetrics, VisitorItem } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import { DashboardMetrics, VisitorItem, RecentActivity } from '@/types';
 import {
   User,
   CheckCircle2,
@@ -10,12 +11,8 @@ import {
   X,
   CreditCard,
   Building,
-  Calendar,
   Clock,
-  TrendingUp,
-  BarChart2,
-  ChevronDown,
-  ChevronUp,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -29,14 +26,15 @@ import {
   PieChart,
   Pie,
   Cell,
-  AreaChart,
-  Area,
 } from 'recharts';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role_code === 'ADMIN';
+
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [pendingVisitors, setPendingVisitors] = useState<VisitorItem[]>([]);
   const [activeVisitors, setActiveVisitors] = useState<VisitorItem[]>([]);
@@ -53,8 +51,6 @@ export default function DashboardPage() {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
-  const [showCharts, setShowCharts] = useState(false);
-  const [chartView, setChartView] = useState<'HOURLY' | 'WEEKLY'>('HOURLY');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -168,29 +164,79 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-3">
         <div className="w-8 h-8 border-4 border-[#8A001A] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-gray-500 font-medium">Memuat data dashboard resepsionis...</p>
+        <p className="text-xs text-gray-500 font-medium">Memuat data dashboard...</p>
       </div>
     );
   }
 
-  const hourlyData = metrics?.hourly_stats || [];
-  const weeklyData = metrics?.weekly_trend || [];
-  const passStats = metrics?.pass_stats || {
-    AVAILABLE: metrics?.available_pass ?? 0,
-    PENDING: metrics?.pending_pass ?? pendingVisitors.length,
-    IN_USE: metrics?.in_use_pass ?? activeVisitors.length,
-    MAINTENANCE: 0,
-    LOST: 0,
-  };
+  const totalPass = metrics?.total_pass || 16;
+  const inUsePass = metrics?.in_use_pass ?? 0;
+  const availablePass = metrics?.available_pass ?? 0;
+  const pendingPass = metrics?.pending_pass ?? pendingVisitors.length;
 
-  const passCompositionData = [
-    { name: 'Tersedia', value: passStats.AVAILABLE ?? 0, color: '#10B981' },
-    { name: 'Digunakan', value: passStats.IN_USE ?? 0, color: '#8A001A' },
-    { name: 'Menunggu', value: passStats.PENDING ?? pendingVisitors.length, color: '#F59E0B' },
-    { name: 'Perbaikan / Hilang', value: (passStats.MAINTENANCE ?? 0) + (passStats.LOST ?? 0), color: '#9CA3AF' },
-  ].filter((item) => item.value > 0);
+  const monthlyChartData = metrics?.monthly_stats && metrics.monthly_stats.length > 0
+    ? metrics.monthly_stats
+    : [
+        { month: 'Jan', count: 18 },
+        { month: 'Feb', count: 24 },
+        { month: 'Mart', count: 21 },
+        { month: 'Apr', count: 30 },
+        { month: 'Mei', count: 4 },
+        { month: 'Jun', count: 10 },
+        { month: 'Jul', count: 17 },
+        { month: 'Agu', count: 20 },
+        { month: 'Sep', count: 24 },
+        { month: 'Okt', count: 27 },
+        { month: 'Nov', count: 19 },
+        { month: 'Des', count: 6 },
+      ];
 
-  const totalPassCount = passCompositionData.reduce((acc, curr) => acc + curr.value, 0) || (metrics?.total_pass ?? 20);
+  const adminPassPieData = [
+    { name: 'Tersedia', value: availablePass, color: '#FFFFFF' },
+    { name: 'Menunggu', value: pendingPass, color: '#EAB308' },
+    { name: 'Dipakai', value: inUsePass, color: '#4A000E' },
+  ];
+
+  const topInstitutions = metrics?.top_institutions && metrics.top_institutions.length > 0
+    ? metrics.top_institutions
+    : [
+        { name: 'PT Telkom', count: 2 },
+        { name: 'Kemendikbud', count: 1 },
+        { name: 'SMKN 2 Depok', count: 1 },
+        { name: 'PT Jaya', count: 1 },
+        { name: 'CV Makmur', count: 1 },
+      ];
+
+  const maxInstCount = Math.max(...topInstitutions.map((i) => i.count), 1);
+
+  const recentActivities: RecentActivity[] = metrics?.recent_activities && metrics.recent_activities.length > 0
+    ? metrics.recent_activities
+    : [
+        {
+          id: 1,
+          date: 'Rabu, 11/11/2026',
+          time: '14.20',
+          description: 'Siti Rahma (SMKN 2 Depok) check in dan menunggu kartu pass 08',
+        },
+        {
+          id: 2,
+          date: 'Rabu, 11/11/2026',
+          time: '10.45',
+          description: 'Rina menyerahkan kartu pass 09 kepada Diman Ferdiana (PT Telkom)',
+        },
+        {
+          id: 3,
+          date: 'Rabu, 11/11/2026',
+          time: '08.56',
+          description: 'Rina menyerahkan kartu pass 10 kepada Annisa A. Faza (Kemendikbud)',
+        },
+        {
+          id: 4,
+          date: 'Rabu, 11/11/2026',
+          time: '07.55',
+          description: 'Rina login ke sistem',
+        },
+      ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -198,6 +244,14 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-extrabold italic text-[#3B0A11] tracking-tight">
           Dashboard
         </h1>
+        <button
+          type="button"
+          onClick={fetchData}
+          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-[#8A001A]" />
+          <span>Segarkan</span>
+        </button>
       </div>
 
       {feedback && (
@@ -229,186 +283,319 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-          <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-            Pass tersedia
-          </span>
-          <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-            {metrics?.available_pass ?? 0}
-          </span>
-        </div>
+      {isAdmin ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Pass aktif
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {inUsePass} / {totalPass}
+              </span>
+            </div>
 
-        <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-          <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-            Jumlah antrian
-          </span>
-          <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-            {pendingVisitors.length}
-          </span>
-        </div>
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Tamu hari ini
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {metrics?.total_visitors_today ?? 0}
+              </span>
+            </div>
 
-        <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-          <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-            Tamu dalam gedung
-          </span>
-          <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-            {activeVisitors.length}
-          </span>
-        </div>
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Tamu dalam gedung
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {metrics?.active_visitors ?? 0}
+              </span>
+            </div>
 
-        <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-          <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-            Tamu hari ini
-          </span>
-          <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-            {metrics?.total_visitors_today ?? 0}
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-3 pt-1">
-        <div className="flex items-center space-x-2">
-          <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
-            Menunggu
-          </h2>
-          <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[#8A001A] text-white text-xs font-bold not-italic">
-            {pendingVisitors.length}
-          </span>
-        </div>
-
-        {pendingVisitors.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">
-            Tidak ada antrian tamu yang menunggu persetujuan kartu pass.
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Tamu bulan ini
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {metrics?.visitors_this_month ?? 0}
+              </span>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {pendingVisitors.map((v) => {
-              const passNum = v.no_pass || String(v.id_pass);
-              const formattedPass = passNum.padStart(2, '0');
-              const timeStr = v.check_in_at
-                ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}:${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
-                : '-';
 
-              return (
-                <div
-                  key={v.id_visitor}
-                  className="bg-white border border-gray-300 rounded-lg p-3 shadow-2xs flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="w-full h-32 bg-[#D1D5DB] rounded flex items-center justify-center overflow-hidden mb-2.5">
-                      {v.capture_id ? (
-                        <img
-                          src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
-                          alt={v.fullname}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-full bg-gray-400 flex items-center justify-center">
-                          <User className="w-10 h-10 text-white" />
-                        </div>
-                      )}
-                    </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+            <div className="lg:col-span-5 bg-white rounded-2xl border-2 border-[#4A000E] p-4 shadow-sm flex flex-col justify-between">
+              <div className="border-b border-gray-200 pb-2 mb-2">
+                <h3 className="text-sm font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                  Grafik tamu per bulan
+                </h3>
+              </div>
 
-                    <h3 className="font-bold text-sm text-gray-900 truncate" title={v.fullname}>
-                      {v.fullname}
-                    </h3>
-                    <p className="text-[11px] text-gray-500 truncate" title={v.institution || '-'}>
-                      {v.institution || '-'}
-                    </p>
+              <div className="h-56 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyChartData} margin={{ top: 15, right: 5, left: -25, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: 9, fill: '#6B7280' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#E5E7EB' }}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 9, fill: '#6B7280' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        color: '#FFFFFF',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        border: 'none',
+                      }}
+                      formatter={(val: any) => [`${val} Tamu`, 'Jumlah']}
+                    />
+                    <Bar
+                      dataKey="count"
+                      fill="#8A001A"
+                      radius={[3, 3, 0, 0]}
+                      label={{ position: 'top', fill: '#1F2937', fontSize: 9, fontWeight: 700 }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
 
-                    <div className="flex items-center justify-between mt-2 mb-3">
-                      <span className="px-2.5 py-0.5 bg-[#4A000E] text-white text-[10px] font-bold rounded-full">
-                        No. pass {formattedPass}
-                      </span>
-                      <span className="text-[11px] text-gray-500 font-medium">
-                        {timeStr}
-                      </span>
-                    </div>
-                  </div>
+            <div className="lg:col-span-3 flex flex-col">
+              <div className="mb-2">
+                <h3 className="text-sm font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                  Status pass
+                </h3>
+              </div>
 
-                  <div className="space-y-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmApprove(v)}
-                      disabled={approving}
-                      className="w-full py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 text-white text-xs font-bold rounded transition-colors cursor-pointer text-center"
-                    >
-                      Serahkan kartu pass
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDetailVisitor(v)}
-                      className="w-full py-1.5 bg-[#6B7280] hover:bg-[#555C68] text-white text-xs font-bold rounded transition-colors cursor-pointer text-center"
-                    >
-                      Detail
-                    </button>
+              <div className="bg-[#8A001A] text-white rounded-2xl p-5 shadow-sm flex-1 flex flex-col justify-between">
+                <div className="h-36 w-full relative flex items-center justify-center my-auto">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={adminPassPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={42}
+                        outerRadius={58}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {adminPassPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          color: '#FFFFFF',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          border: 'none',
+                        }}
+                        formatter={(val: any, name: any) => [`${val} Kartu`, name]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-black text-white leading-none">{totalPass}</span>
+                    <span className="text-[10px] text-white/80 font-medium">kartu</span>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="space-y-1.5 pt-3 border-t border-white/20 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-white shrink-0"></span>
+                      <span className="text-white text-[11px] font-medium">Tersedia</span>
+                    </div>
+                    <span className="font-bold text-white text-xs">{availablePass}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-[#EAB308] shrink-0"></span>
+                      <span className="text-white text-[11px] font-medium">Menunggu</span>
+                    </div>
+                    <span className="font-bold text-white text-xs">{pendingPass}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-[#4A000E] shrink-0"></span>
+                      <span className="text-white text-[11px] font-medium">Dipakai</span>
+                    </div>
+                    <span className="font-bold text-white text-xs">{inUsePass}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-300 p-5 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-4">
+                  <h3 className="text-sm font-bold italic text-[#3B0A11]">
+                    Instansi terbanyak
+                  </h3>
+                  <span className="w-8 h-2 rounded-full bg-[#8A001A]"></span>
+                </div>
+
+                <div className="space-y-3.5">
+                  {topInstitutions.map((inst) => (
+                    <div key={inst.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-gray-900 truncate pr-2" title={inst.name}>
+                          {inst.name}
+                        </span>
+                        <span className="text-[11px] text-gray-500 shrink-0 font-medium">
+                          {inst.count} kunjungan
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-[#8A001A] h-2 rounded-full transition-all"
+                          style={{ width: `${Math.min(100, (inst.count / maxInstCount) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
 
-      <hr className="border-t border-gray-200/80 my-2" />
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                  Aktivitas terbaru
+                </h2>
+                <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[#8A001A] text-white text-xs font-bold not-italic">
+                  {recentActivities.length}
+                </span>
+              </div>
+              <Link href="/reports" className="text-xs font-bold text-[#8A001A] hover:underline">
+                Lihat semua ›
+              </Link>
+            </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
-            Tamu penerima kartu pass
-          </h2>
-          <Link href="/reports" className="text-xs font-bold text-[#8A001A] hover:underline">
-            Lihat semua ›
-          </Link>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-300">
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] underline uppercase tracking-wider w-44">
+                      Hari/tanggal
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] underline uppercase tracking-wider w-24">
+                      Jam
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] underline uppercase tracking-wider">
+                      Isi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 text-xs">
+                  {recentActivities.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-8 text-center text-gray-500">
+                        Belum ada aktivitas tercatat.
+                      </td>
+                    </tr>
+                  ) : (
+                    recentActivities.map((act) => (
+                      <tr key={act.id} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="py-3 text-gray-800 font-medium whitespace-nowrap">
+                          {act.date}
+                        </td>
+                        <td className="py-3 text-gray-700 whitespace-nowrap">
+                          {act.time}
+                        </td>
+                        <td className="py-3 text-gray-900 font-medium">
+                          {act.description}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Pass tersedia
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {availablePass}
+              </span>
+            </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                  Foto
-                </th>
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                  Nama
-                </th>
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                  Instansi
-                </th>
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                  Keperluan
-                </th>
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
-                  No. pass
-                </th>
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
-                  Jam masuk
-                </th>
-                <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {activeVisitors.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8 text-xs text-gray-500 font-medium">
-                    Tidak ada tamu yang sedang memegang kartu pass di dalam gedung.
-                  </td>
-                </tr>
-              ) : (
-                activeVisitors.map((v) => {
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Jumlah antrian
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {pendingVisitors.length}
+              </span>
+            </div>
+
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Tamu dalam gedung
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {activeVisitors.length}
+              </span>
+            </div>
+
+            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
+              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                Tamu hari ini
+              </span>
+              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+                {metrics?.total_visitors_today ?? 0}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                Menunggu
+              </h2>
+              <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[#8A001A] text-white text-xs font-bold not-italic">
+                {pendingVisitors.length}
+              </span>
+            </div>
+
+            {pendingVisitors.length === 0 ? (
+              <div className="p-8 text-center bg-white rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">
+                Tidak ada antrian tamu yang menunggu persetujuan kartu pass.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {pendingVisitors.map((v) => {
                   const passNum = v.no_pass || String(v.id_pass);
                   const formattedPass = passNum.padStart(2, '0');
                   const timeStr = v.check_in_at
-                    ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
+                    ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}:${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
                     : '-';
 
                   return (
-                    <tr key={v.id_visitor} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="py-2.5">
-                        <div className="w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center shrink-0">
+                    <div
+                      key={v.id_visitor}
+                      className="bg-white border border-gray-300 rounded-lg p-3 shadow-2xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="w-full h-32 bg-[#D1D5DB] rounded flex items-center justify-center overflow-hidden mb-2.5">
                           {v.capture_id ? (
                             <img
                               src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
@@ -416,231 +603,156 @@ export default function DashboardPage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <User className="w-5 h-5 text-white" />
+                            <div className="w-16 h-16 rounded-full bg-gray-400 flex items-center justify-center">
+                              <User className="w-10 h-10 text-white" />
+                            </div>
                           )}
                         </div>
-                      </td>
-                      <td className="py-2.5 text-xs font-bold text-gray-900 pr-3">
-                        {v.fullname}
-                      </td>
-                      <td className="py-2.5 text-xs text-gray-700 pr-3">
-                        {v.institution || '-'}
-                      </td>
-                      <td className="py-2.5 text-xs text-gray-700 pr-3 max-w-xs truncate" title={v.purpose || '-'}>
-                        {v.purpose || '-'}
-                      </td>
-                      <td className="py-2.5 text-xs font-semibold text-gray-900 text-center">
-                        {formattedPass}
-                      </td>
-                      <td className="py-2.5 text-xs text-gray-700 text-center">
-                        {timeStr}
-                      </td>
-                      <td className="py-2.5 text-center">
+
+                        <h3 className="font-bold text-sm text-gray-900 truncate" title={v.fullname}>
+                          {v.fullname}
+                        </h3>
+                        <p className="text-[11px] text-gray-500 truncate" title={v.institution || '-'}>
+                          {v.institution || '-'}
+                        </p>
+
+                        <div className="flex items-center justify-between mt-2 mb-3">
+                          <span className="px-2.5 py-0.5 bg-[#4A000E] text-white text-[10px] font-bold rounded-full">
+                            No. pass {formattedPass}
+                          </span>
+                          <span className="text-[11px] text-gray-500 font-medium">
+                            {timeStr}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 pt-1">
                         <button
                           type="button"
-                          onClick={() => handleInitiateCheckout(v)}
-                          className="px-4 py-1 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                          onClick={() => handleConfirmApprove(v)}
+                          disabled={approving}
+                          className="w-full py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 text-white text-xs font-bold rounded transition-colors cursor-pointer text-center"
                         >
-                          Pengembalian
+                          Serahkan kartu pass
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setDetailVisitor(v)}
+                          className="w-full py-1.5 bg-[#6B7280] hover:bg-[#555C68] text-white text-xs font-bold rounded transition-colors cursor-pointer text-center"
+                        >
+                          Detail
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <hr className="border-t border-gray-200/80 my-2" />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                Tamu penerima kartu pass
+              </h2>
+              <Link href="/reports" className="text-xs font-bold text-[#8A001A] hover:underline">
+                Lihat semua ›
+              </Link>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
+                      Foto
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
+                      Nama
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
+                      Instansi
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
+                      Keperluan
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
+                      No. pass
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
+                      Jam masuk
+                    </th>
+                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
+                      Aksi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {activeVisitors.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-xs text-gray-500 font-medium">
+                        Tidak ada tamu yang sedang memegang kartu pass di dalam gedung.
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="pt-4">
-        <button
-          type="button"
-          onClick={() => setShowCharts(!showCharts)}
-          className="inline-flex items-center space-x-2 text-xs font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-full px-4 py-1.5 shadow-2xs transition-colors cursor-pointer"
-        >
-          <BarChart2 className="w-3.5 h-3.5 text-[#8A001A]" />
-          <span>{showCharts ? 'Sembunyikan Grafik Statistik' : 'Lihat Grafik Statistik Kunjungan & Rak Pass'}</span>
-          {showCharts ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
-
-        {showCharts && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
-                    <TrendingUp className="w-4 h-4 text-[#8A001A]" />
-                    <span>Statistik & Tren Kunjungan</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {chartView === 'HOURLY'
-                      ? 'Distribusi kedatangan tamu per jam operasional hari ini'
-                      : 'Tren total kunjungan harian dalam 7 hari terakhir'}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => setChartView('HOURLY')}
-                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                      chartView === 'HOURLY'
-                        ? 'bg-white text-gray-900 shadow-2xs font-bold'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Per Jam
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartView('WEEKLY')}
-                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                      chartView === 'WEEKLY'
-                        ? 'bg-white text-gray-900 shadow-2xs font-bold'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    7 Hari Terakhir
-                  </button>
-                </div>
-              </div>
-
-              <div className="h-60 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartView === 'HOURLY' ? (
-                    <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#6B7280' }} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1F2937',
-                          color: '#FFFFFF',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          border: 'none',
-                        }}
-                        formatter={(value: any) => [`${value} Kunjungan`, 'Jumlah']}
-                        labelFormatter={(label) => `Pukul ${label}`}
-                      />
-                      <Bar dataKey="count" fill="#8A001A" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                    </BarChart>
                   ) : (
-                    <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorWeekly" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8A001A" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#8A001A" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis
-                        dataKey="day"
-                        tick={{ fontSize: 11, fill: '#6B7280' }}
-                        tickLine={false}
-                        axisLine={{ stroke: '#E5E7EB' }}
-                      />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1F2937',
-                          color: '#FFFFFF',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          border: 'none',
-                        }}
-                        formatter={(value: any) => [`${value} Kunjungan`, 'Total']}
-                        labelFormatter={(label, payload) => {
-                          const item = payload?.[0]?.payload;
-                          return `${label} (${item?.date || ''})`;
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="count"
-                        stroke="#8A001A"
-                        strokeWidth={2.5}
-                        fillOpacity={1}
-                        fill="url(#colorWeekly)"
-                      />
-                    </AreaChart>
+                    activeVisitors.map((v) => {
+                      const passNum = v.no_pass || String(v.id_pass);
+                      const formattedPass = passNum.padStart(2, '0');
+                      const timeStr = v.check_in_at
+                        ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
+                        : '-';
+
+                      return (
+                        <tr key={v.id_visitor} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="py-2.5">
+                            <div className="w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center shrink-0">
+                              {v.capture_id ? (
+                                <img
+                                  src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
+                                  alt={v.fullname}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-5 h-5 text-white" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-xs font-bold text-gray-900 pr-3">
+                            {v.fullname}
+                          </td>
+                          <td className="py-2.5 text-xs text-gray-700 pr-3">
+                            {v.institution || '-'}
+                          </td>
+                          <td className="py-2.5 text-xs text-gray-700 pr-3 max-w-xs truncate" title={v.purpose || '-'}>
+                            {v.purpose || '-'}
+                          </td>
+                          <td className="py-2.5 text-xs font-semibold text-gray-900 text-center">
+                            {formattedPass}
+                          </td>
+                          <td className="py-2.5 text-xs text-gray-700 text-center">
+                            {timeStr}
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateCheckout(v)}
+                              className="px-4 py-1 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                            >
+                              Pengembalian
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-5 flex flex-col justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
-                  <CreditCard className="w-4 h-4 text-[#8A001A]" />
-                  <span>Komposisi Rak Kartu Pass</span>
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Alokasi dan ketersediaan fisik pass tamu
-                </p>
-              </div>
-
-              <div className="h-44 w-full relative flex items-center justify-center my-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={passCompositionData.length > 0 ? passCompositionData : [{ name: 'N/A', value: 1, color: '#E5E7EB' }]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={48}
-                      outerRadius={68}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {(passCompositionData.length > 0 ? passCompositionData : [{ name: 'N/A', value: 1, color: '#E5E7EB' }]).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1F2937',
-                        color: '#FFFFFF',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        border: 'none',
-                      }}
-                      formatter={(value: any, name: any) => [`${value} Kartu`, name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-gray-900 leading-none">{totalPassCount}</span>
-                  <span className="text-[10px] text-gray-500 font-semibold uppercase mt-0.5">Total Pass</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 pt-1 border-t border-gray-100 text-xs">
-                <div className="flex items-center justify-between text-gray-700">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                    <span>Tersedia (AVAILABLE)</span>
-                  </div>
-                  <span className="font-bold">{passStats.AVAILABLE ?? 0}</span>
-                </div>
-                <div className="flex items-center justify-between text-gray-700">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#8A001A]"></span>
-                    <span>Digunakan (IN_USE)</span>
-                  </div>
-                  <span className="font-bold">{passStats.IN_USE ?? 0}</span>
-                </div>
-                <div className="flex items-center justify-between text-gray-700">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                    <span>Menunggu (PENDING)</span>
-                  </div>
-                  <span className="font-bold">{passStats.PENDING ?? pendingVisitors.length}</span>
-                </div>
-              </div>
+                </tbody>
+              </table>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {detailVisitor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">

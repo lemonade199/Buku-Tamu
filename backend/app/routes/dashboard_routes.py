@@ -23,6 +23,7 @@ def get_dashboard_metrics():
         data = {
             'total_visitors_today': visitor_repo.count_today(),
             'total_visitors_all_time': visitor_repo.count_total(),
+            'visitors_this_month': visitor_repo.count_this_month(),
             'active_visitors': visitor_repo.count_active(),
             'pending_registrations_count': visitor_repo.count_pending(),
             'completed_visitors_today': visitor_repo.count_completed_today(),
@@ -35,6 +36,9 @@ def get_dashboard_metrics():
             'recent_visitors': [v.to_dict() for v in recent_visitors],
             'hourly_stats': visitor_repo.get_hourly_stats_today(),
             'weekly_trend': visitor_repo.get_weekly_trend(),
+            'monthly_stats': visitor_repo.get_monthly_stats(),
+            'top_institutions': visitor_repo.get_top_institutions(),
+            'recent_activities': visitor_repo.get_recent_activities(),
         }
 
         return jsonify({
