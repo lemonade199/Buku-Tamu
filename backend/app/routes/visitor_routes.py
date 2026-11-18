@@ -7,9 +7,10 @@ from sqlalchemy import or_
 
 from backend.app.models.base import get_db_session
 from backend.app.models.entities import Visitor
-from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest
+from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest, RejectRegistrationRequest
 from backend.app.services.checkin_service import CheckinService
 from backend.app.services.checkout_service import CheckoutService
+from backend.app.middleware.auth import role_required
 from backend.app.utils.photo_storage import get_photo_path
 
 visitor_bp = Blueprint('visitors', __name__, url_prefix='/api/v1/visitors')
@@ -59,11 +60,120 @@ def checkin_visitor():
     finally:
         db.close()
 
+@visitor_bp.route('/pending', methods=['GET'])
+@role_required('ADMIN', 'PETUGAS')
+def list_pending_registrations():
+    db = get_db_session()
+    try:
+        visitors = db.query(Visitor).filter(
+            Visitor.status == 'PENDING'
+        ).order_by(Visitor.check_in_at.asc()).all()
+
+        return jsonify({
+            'success': True,
+            'data': [v.to_dict() for v in visitors],
+            'total': len(visitors)
+        }), 200
+    finally:
+        db.close()
+
+@visitor_bp.route('/<int:id_visitor>/approve', methods=['POST'])
+@role_required('ADMIN', 'PETUGAS')
+def approve_visitor_registration(id_visitor: int):
+    user_id = int(get_jwt_identity())
+    ip_addr = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+
+    db = get_db_session()
+    try:
+        service = CheckinService(db)
+        result = service.approve_registration(
+            id_visitor=id_visitor,
+            approved_by_user_id=user_id,
+            ip_address=ip_addr,
+            user_agent=user_agent
+        )
+        return jsonify({
+            'success': True,
+            'message': result['message'],
+            'data': result
+        }), 200
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Gagal menyetujui registrasi: {str(e)}"}), 500
+    finally:
+        db.close()
+
+@visitor_bp.route('/<int:id_visitor>/reject', methods=['POST'])
+@role_required('ADMIN', 'PETUGAS')
+def reject_visitor_registration(id_visitor: int):
+    data = request.get_json(silent=True) or {}
+    try:
+        req = RejectRegistrationRequest(**data)
+    except ValidationError as e:
+        return jsonify({
+            'success': False,
+            'message': 'Alasan penolakan registrasi wajib diisi.',
+            'errors': e.errors()
+        }), 422
+
+    user_id = int(get_jwt_identity())
+    ip_addr = request.remote_addr
+    user_agent = request.headers.get('User-Agent')
+
+    db = get_db_session()
+    try:
+        service = CheckinService(db)
+        result = service.reject_registration(
+            id_visitor=id_visitor,
+            rejected_by_user_id=user_id,
+            reason=req.reason,
+            ip_address=ip_addr,
+            user_agent=user_agent
+        )
+        return jsonify({
+            'success': True,
+            'message': result['message'],
+            'data': result
+        }), 200
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Gagal menolak registrasi: {str(e)}"}), 500
+    finally:
+        db.close()
+
+@visitor_bp.route('/<int:id_visitor>/status', methods=['GET'])
+def get_visitor_status_public(id_visitor: int):
+    db = get_db_session()
+    try:
+        visitor = db.query(Visitor).filter(Visitor.id_visitor == id_visitor).first()
+        if not visitor:
+            return jsonify({'success': False, 'message': 'Data pengunjung tidak ditemukan.'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'id_visitor': visitor.id_visitor,
+                'fullname': visitor.fullname,
+                'no_pass': visitor.pass_card.no_pass if visitor.pass_card else None,
+                'status': visitor.status,
+                'rejection_reason': visitor.rejection_reason,
+                'approved_at': visitor.approved_at.isoformat() if visitor.approved_at else None,
+                'rejected_at': visitor.rejected_at.isoformat() if visitor.rejected_at else None,
+                'check_in_at': visitor.check_in_at.isoformat() if visitor.check_in_at else None,
+                'is_active': visitor.status == 'APPROVED' and visitor.check_out_at is None
+            }
+        }), 200
+    finally:
+        db.close()
+
 @visitor_bp.route('', methods=['GET'])
 @jwt_required()
 def list_visitors():
     search = request.args.get('search', '').strip()
-    status = request.args.get('status', '').strip().upper() # ALL, ACTIVE, COMPLETED
+    status = request.args.get('status', '').strip().upper()
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     page = int(request.args.get('page', 1))
@@ -84,9 +194,15 @@ def list_visitors():
             )
 
         if status == 'ACTIVE':
-            query = query.filter(Visitor.check_out_at.is_(None))
+            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
         elif status == 'COMPLETED':
-            query = query.filter(Visitor.check_out_at.isnot(None))
+            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
+        elif status == 'PENDING':
+            query = query.filter(Visitor.status == 'PENDING')
+        elif status == 'REJECTED':
+            query = query.filter(Visitor.status == 'REJECTED')
+        elif status == 'APPROVED':
+            query = query.filter(Visitor.status == 'APPROVED')
 
         s_date = None
         e_date = None
@@ -135,6 +251,7 @@ def list_active_visitors():
     db = get_db_session()
     try:
         visitors = db.query(Visitor).filter(
+            Visitor.status == 'APPROVED',
             Visitor.check_out_at.is_(None)
         ).order_by(Visitor.check_in_at.desc()).all()
 
@@ -160,7 +277,6 @@ def get_visitor_detail(id_visitor: int):
 
 @visitor_bp.route('/<int:id_visitor>/photo', methods=['GET'])
 def get_visitor_photo(id_visitor: int):
-    # Safe photo viewer route
     db = get_db_session()
     try:
         visitor = db.query(Visitor).filter(Visitor.id_visitor == id_visitor).first()

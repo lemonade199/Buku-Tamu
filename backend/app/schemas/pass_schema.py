@@ -6,7 +6,7 @@ class PassCreateRequest(BaseModel):
     slot: Optional[str] = Field(None, max_length=50, description="Posisi slot rak fisik")
 
 class PassStatusUpdateRequest(BaseModel):
-    status: Literal['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'LOST', 'INACTIVE'] = Field(
+    status: Literal['AVAILABLE', 'PENDING', 'IN_USE', 'MAINTENANCE', 'LOST', 'INACTIVE'] = Field(
         ..., description="Status kondisi kartu pass"
     )
     notes: Optional[str] = Field(None, max_length=500, description="Catatan perubahan status")

@@ -23,6 +23,8 @@ class CheckoutService:
             ).with_for_update().first()
             if not visitor:
                 raise ValueError("Data pengunjung tidak ditemukan.")
+            if visitor.status != 'APPROVED':
+                raise ValueError(f"Tamu {visitor.fullname} belum disetujui (status: {visitor.status}) sehingga tidak dapat diproses check-out.")
             if visitor.check_out_at is not None:
                 raise ValueError(f"Pengunjung {visitor.fullname} sudah check-out sebelumnya pada {visitor.check_out_at.strftime('%d/%m/%Y %H:%M')}.")
         elif no_pass:
@@ -35,6 +37,7 @@ class CheckoutService:
 
             visitor = self.db.query(Visitor).filter(
                 Visitor.id_pass == pass_card.id_pass,
+                Visitor.status == 'APPROVED',
                 Visitor.check_out_at.is_(None)
             ).with_for_update().first()
 

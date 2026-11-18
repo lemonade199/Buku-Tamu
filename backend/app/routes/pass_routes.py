@@ -16,19 +16,28 @@ def get_all_passes():
     db = get_db_session()
     try:
         passes = db.query(Pass).order_by(Pass.no_pass.asc()).all()
-        # Find active visitors holding any pass
-        active_visitors = db.query(Visitor).filter(Visitor.check_out_at.is_(None)).all()
+
+        active_visitors = db.query(Visitor).filter(
+            Visitor.status == 'APPROVED',
+            Visitor.check_out_at.is_(None)
+        ).all()
         active_holder_map = {v.id_pass: v for v in active_visitors}
+
+        pending_visitors = db.query(Visitor).filter(
+            Visitor.status == 'PENDING'
+        ).all()
+        pending_holder_map = {v.id_pass: v for v in pending_visitors}
 
         results = []
         for p in passes:
             item = p.to_dict()
-            holder = active_holder_map.get(p.id_pass)
+            holder = active_holder_map.get(p.id_pass) or pending_holder_map.get(p.id_pass)
             if holder:
                 item['current_holder'] = {
                     'id_visitor': holder.id_visitor,
                     'fullname': holder.fullname,
                     'institution': holder.institution,
+                    'status': holder.status,
                     'check_in_at': holder.check_in_at.isoformat() if holder.check_in_at else None,
                 }
             else:
@@ -63,24 +72,34 @@ def get_pass_rack_view():
     db = get_db_session()
     try:
         passes = db.query(Pass).order_by(Pass.no_pass.asc()).all()
-        active_visitors = db.query(Visitor).filter(Visitor.check_out_at.is_(None)).all()
-        holder_map = {v.id_pass: v for v in active_visitors}
+        active_visitors = db.query(Visitor).filter(
+            Visitor.status == 'APPROVED',
+            Visitor.check_out_at.is_(None)
+        ).all()
+        active_map = {v.id_pass: v for v in active_visitors}
+
+        pending_visitors = db.query(Visitor).filter(
+            Visitor.status == 'PENDING'
+        ).all()
+        pending_map = {v.id_pass: v for v in pending_visitors}
 
         rack_slots = []
-        counts = {'AVAILABLE': 0, 'IN_USE': 0, 'MAINTENANCE': 0, 'LOST': 0, 'TOTAL': len(passes)}
+        counts = {'AVAILABLE': 0, 'PENDING': 0, 'IN_USE': 0, 'MAINTENANCE': 0, 'LOST': 0, 'TOTAL': len(passes)}
 
         for p in passes:
             counts[p.status] = counts.get(p.status, 0) + 1
-            holder = holder_map.get(p.id_pass)
+            holder = active_map.get(p.id_pass) or pending_map.get(p.id_pass)
             rack_slots.append({
                 'id_pass': p.id_pass,
                 'no_pass': p.no_pass,
                 'slot': p.slot or f"Slot {p.no_pass}",
                 'status': p.status,
                 'holder': {
+                    'id_visitor': holder.id_visitor,
                     'fullname': holder.fullname,
                     'institution': holder.institution,
-                    'check_in_at': holder.check_in_at.isoformat()
+                    'status': holder.status,
+                    'check_in_at': holder.check_in_at.isoformat() if holder.check_in_at else None
                 } if holder else None
             })
 
@@ -99,34 +118,25 @@ def create_pass():
     try:
         req = PassCreateRequest(**data)
     except ValidationError as e:
-        return jsonify({'success': False, 'message': 'Validasi gagal.', 'errors': e.errors()}), 422
+        return jsonify({'success': False, 'message': 'Validasi kartu pass gagal.', 'errors': e.errors()}), 422
 
-    user_id = int(get_jwt_identity())
     db = get_db_session()
     try:
         existing = db.query(Pass).filter(Pass.no_pass == req.no_pass.strip()).first()
         if existing:
-            return jsonify({'success': False, 'message': f'Nomor pass {req.no_pass} sudah terdaftar.'}), 400
+            return jsonify({'success': False, 'message': f"Kartu pass dengan nomor '{req.no_pass}' sudah terdaftar."}), 400
 
         new_pass = Pass(
             no_pass=req.no_pass.strip(),
-            status='AVAILABLE',
-            slot=req.slot.strip() if req.slot else None
+            slot=req.slot.strip() if req.slot else None,
+            status='AVAILABLE'
         )
         db.add(new_pass)
-
-        audit = AuditLog(
-            id_user=user_id,
-            action='PASS_CREATE',
-            entity='pass',
-            description=f"Admin menambahkan kartu pass baru #{new_pass.no_pass}"
-        )
-        db.add(audit)
         db.commit()
 
         return jsonify({
             'success': True,
-            'message': f'Kartu pass #{new_pass.no_pass} berhasil ditambahkan.',
+            'message': f"Kartu pass nomor {new_pass.no_pass} berhasil ditambahkan.",
             'data': new_pass.to_dict()
         }), 201
     finally:
@@ -152,19 +162,19 @@ def update_pass_status(id_pass: int):
         new_status = req.status
         now = datetime.utcnow()
 
-        # If pass was IN_USE and is changed to AVAILABLE (or other non-IN_USE status),
-        # automatically check out any active visitor holding this pass
-        auto_checked_out_visitor = None
+        auto_action_message = None
+
         if old_status == 'IN_USE' and new_status != 'IN_USE':
             active_visitor = db.query(Visitor).filter(
                 Visitor.id_pass == pass_card.id_pass,
+                Visitor.status == 'APPROVED',
                 Visitor.check_out_at.is_(None)
             ).with_for_update().first()
 
             if active_visitor:
                 active_visitor.check_out_at = now
                 active_visitor.updated_at = now
-                auto_checked_out_visitor = active_visitor.fullname
+                auto_action_message = f"Tamu ({active_visitor.fullname}) telah otomatis di-check-out."
 
                 checkout_audit = AuditLog(
                     id_user=user_id,
@@ -174,6 +184,29 @@ def update_pass_status(id_pass: int):
                     description=f"Auto check-out tamu {active_visitor.fullname} saat status pass #{pass_card.no_pass} diubah dari {old_status} menjadi {new_status} oleh user ID {user_id}. Catatan: {req.notes or '-'}"
                 )
                 db.add(checkout_audit)
+
+        if old_status == 'PENDING' and new_status == 'AVAILABLE':
+            pending_visitor = db.query(Visitor).filter(
+                Visitor.id_pass == pass_card.id_pass,
+                Visitor.status == 'PENDING'
+            ).with_for_update().first()
+
+            if pending_visitor:
+                pending_visitor.status = 'REJECTED'
+                pending_visitor.rejection_reason = req.notes or 'Dibatalkan melalui perubahan status kartu pass oleh petugas.'
+                pending_visitor.rejected_by_id = user_id
+                pending_visitor.rejected_at = now
+                pending_visitor.updated_at = now
+                auto_action_message = f"Permohonan registrasi pending tamu ({pending_visitor.fullname}) telah otomatis dibatalkan/ditolak."
+
+                reject_audit = AuditLog(
+                    id_user=user_id,
+                    action='VISITOR_REGISTRATION_REJECTED',
+                    entity='visitors',
+                    entity_id=str(pending_visitor.id_visitor),
+                    description=f"Auto reject permohonan tamu {pending_visitor.fullname} saat status pass #{pass_card.no_pass} diubah dari PENDING ke AVAILABLE."
+                )
+                db.add(reject_audit)
 
         pass_card.status = new_status
         if new_status == 'AVAILABLE':
@@ -192,8 +225,8 @@ def update_pass_status(id_pass: int):
         db.commit()
 
         msg = f"Status kartu pass #{pass_card.no_pass} diperbarui menjadi {new_status}."
-        if auto_checked_out_visitor:
-            msg += f" Tamu ({auto_checked_out_visitor}) telah otomatis di-check-out."
+        if auto_action_message:
+            msg += f" {auto_action_message}"
 
         return jsonify({
             'success': True,

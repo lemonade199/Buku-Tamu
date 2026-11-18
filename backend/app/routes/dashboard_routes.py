@@ -17,17 +17,21 @@ def get_dashboard_metrics():
 
         pass_counts = pass_repo.count_by_status()
         recent_visitors = visitor_repo.get_recent(8)
+        pending_visitors = visitor_repo.get_pending()
         total_pass_count = pass_repo.count_total()
 
         data = {
             'total_visitors_today': visitor_repo.count_today(),
             'total_visitors_all_time': visitor_repo.count_total(),
             'active_visitors': visitor_repo.count_active(),
+            'pending_registrations_count': visitor_repo.count_pending(),
             'completed_visitors_today': visitor_repo.count_completed_today(),
             'total_pass': total_pass_count,
             'available_pass': pass_counts.get('AVAILABLE', 0),
+            'pending_pass': pass_counts.get('PENDING', 0),
             'in_use_pass': pass_counts.get('IN_USE', 0),
             'pass_stats': pass_counts,
+            'pending_visitors': [v.to_dict() for v in pending_visitors],
             'recent_visitors': [v.to_dict() for v in recent_visitors],
             'hourly_stats': visitor_repo.get_hourly_stats_today(),
             'weekly_trend': visitor_repo.get_weekly_trend(),

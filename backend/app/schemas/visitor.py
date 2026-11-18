@@ -29,3 +29,7 @@ class CheckoutRequest(BaseModel):
     id_visitor: Optional[int] = Field(None, description="ID pengunjung yang akan check-out")
     no_pass: Optional[str] = Field(None, description="Nomor kartu pass yang dikembalikan")
     notes: Optional[str] = Field(None, max_length=500, description="Catatan kepulangan opsional")
+
+class RejectRegistrationRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500, description="Alasan penolakan registrasi")
+
