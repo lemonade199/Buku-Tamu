@@ -73,6 +73,33 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         )
         db.add(petugas_user)
 
+    # Akun Admin & Resepsionis Resmi
+    tasha_user = db.query(User).filter(User.username == 'tasha').first()
+    if not tasha_user:
+        tasha_user = User(
+            id_role=admin_role.id_role,
+            fullname='Tasha',
+            username='tasha',
+            email='tasha@seamolec.org',
+            hash_password=hash_password('Tasha123!'),
+            telephone='081234567891',
+            is_active=True
+        )
+        db.add(tasha_user)
+
+    rina_user = db.query(User).filter(User.username == 'rina').first()
+    if not rina_user:
+        rina_user = User(
+            id_role=petugas_role.id_role,
+            fullname='Rina',
+            username='rina',
+            email='rina@seamolec.org',
+            hash_password=hash_password('Rina123!'),
+            telephone='089876543212',
+            is_active=True
+        )
+        db.add(rina_user)
+
     # 3. Seed Default Setting
     setting = db.query(Setting).first()
     if not setting:

@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { User, Lock, Eye, EyeOff, Building2, AlertCircle } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('Admin123!');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -19,7 +19,7 @@ export default function LoginPage() {
     try {
       await login(username, password);
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Gagal masuk. Periksa kembali username dan password Anda.';
+      const msg = err.response?.data?.message || 'Gagal masuk. Periksa kembali username dan kata sandi Anda.';
       setErrorMessage(msg);
     } finally {
       setLoading(false);
@@ -27,22 +27,27 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-ivory-100 px-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#FAF7F0] px-4">
       {/* Blurred background decoration */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-brand-950/15 via-ivory-50/70 to-brand-500/10 backdrop-blur-[2px] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-[#8A001A]/10 via-[#FAF7F0] to-[#8A001A]/5 pointer-events-none" />
 
       {/* Main Login Card */}
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-ivory-200 p-8 z-10">
+      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-200 p-8 z-10">
         {/* Top Header */}
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-14 h-14 rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-md mb-3">
-            <Building2 className="w-8 h-8" />
+          <div className="w-16 h-16 rounded-full bg-white p-1 border-2 border-[#8A001A] shadow-md mb-3 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/seamolec-logo.jpg"
+              alt="SEAMOLEC Logo"
+              className="w-full h-full object-contain rounded-full"
+            />
           </div>
-          <h2 className="text-xl font-bold text-charcoal tracking-tight">
+          <h2 className="text-xl font-extrabold text-[#3B0A11] tracking-tight">
             Sistem Buku Tamu Digital
           </h2>
-          <p className="text-xs text-charcoal-muted mt-1">
-            Masuk untuk mengakses layanan resepsionis & operasional
+          <p className="text-xs text-gray-500 mt-1">
+            Masuk untuk mengakses portal resepsionis & operasional
           </p>
         </div>
 
@@ -57,41 +62,41 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Username Input */}
           <div>
-            <label className="block text-xs font-semibold text-charcoal mb-1.5">
+            <label className="block text-xs font-semibold text-gray-800 mb-1.5">
               Username atau Email
             </label>
             <div className="relative">
-              <User className="w-4 h-4 text-charcoal-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Masukkan username atau email"
-                className="w-full bg-ivory-50/50 border border-ivory-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+                className="w-full bg-gray-50/50 border border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all font-medium"
               />
             </div>
           </div>
 
           {/* Password Input */}
           <div>
-            <label className="block text-xs font-semibold text-charcoal mb-1.5">
+            <label className="block text-xs font-semibold text-gray-800 mb-1.5">
               Kata Sandi
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-charcoal-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan kata sandi"
-                className="w-full bg-ivory-50/50 border border-ivory-200 rounded-xl pl-10 pr-10 py-2.5 text-xs text-charcoal focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
+                className="w-full bg-gray-50/50 border border-gray-300 rounded-xl pl-10 pr-10 py-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all font-medium"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-charcoal-muted hover:text-charcoal"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -102,7 +107,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            className="w-full mt-2 py-3 px-4 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
             {loading ? (
               <>
@@ -114,29 +119,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Quick Demo Credentials Helper */}
-        <div className="mt-6 pt-5 border-t border-ivory-200 text-center">
-          <p className="text-[11px] font-medium text-charcoal-muted mb-2">
-            Akun Bawaan Sistem (Demo):
-          </p>
-          <div className="flex justify-center space-x-2">
-            <button
-              type="button"
-              onClick={() => { setUsername('admin'); setPassword('Admin123!'); }}
-              className="px-2.5 py-1 bg-ivory-100 hover:bg-ivory-200 text-[11px] text-brand-900 rounded-lg font-medium transition-colors"
-            >
-              Admin (<span className="font-mono">admin</span>)
-            </button>
-            <button
-              type="button"
-              onClick={() => { setUsername('petugas'); setPassword('Petugas123!'); }}
-              className="px-2.5 py-1 bg-ivory-100 hover:bg-ivory-200 text-[11px] text-brand-900 rounded-lg font-medium transition-colors"
-            >
-              Petugas (<span className="font-mono">petugas</span>)
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
