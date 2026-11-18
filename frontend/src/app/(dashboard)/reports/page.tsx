@@ -30,6 +30,7 @@ export default function ReportsPage() {
   const [dateError, setDateError] = useState('');
 
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [downloadingExport, setDownloadingExport] = useState<'excel' | 'pdf' | null>(null);
 
   const [checkoutVisitor, setCheckoutVisitor] = useState<ActiveVisitor | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -120,57 +121,68 @@ export default function ReportsPage() {
     return repName.toLowerCase() === selectedReceptionist.toLowerCase();
   });
 
-  const handleExportExcel = () => {
-    if (filteredVisitors.length === 0) return;
+  const handleExportExcel = async () => {
+    setDownloadingExport('excel');
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
 
-    const headers = [
-      'No. Pass',
-      'Tanggal',
-      'Nama Pengunjung',
-      'Instansi',
-      'Keperluan',
-      'Waktu Masuk',
-      'Waktu Keluar',
-      'Resepsionis',
-    ];
-
-    const rows = filteredVisitors.map((v) => {
-      const d = v.check_in_at ? new Date(v.check_in_at) : new Date();
-      const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-      const inTime = v.check_in_at
-        ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
-        : '-';
-      const outTime = v.check_out_at
-        ? `${String(new Date(v.check_out_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_out_at).getMinutes()).padStart(2, '0')}`
-        : 'Sedang berkunjung';
-
-      return [
-        `Pass #${v.no_pass || v.id_pass}`,
-        dateStr,
-        `"${v.fullname.replace(/"/g, '""')}"`,
-        `"${(v.institution || '-').replace(/"/g, '""')}"`,
-        `"${(v.purpose || '-').replace(/"/g, '""')}"`,
-        inTime,
-        outTime,
-        `"${(v.approved_by || v.rejected_by || (v.status === 'APPROVED' ? 'Petugas Resepsionis' : '-')).replace(/"/g, '""')}"`,
-      ];
-    });
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Laporan_Kunjungan_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const res = await api.get(`/visitors/export/excel?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Laporan_Kunjungan_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setFeedback({
+        type: 'error',
+        text: 'Gagal mengunduh berkas Excel. Silakan coba kembali.',
+      });
+    } finally {
+      setDownloadingExport(null);
+    }
   };
 
-  const handleExportPDF = () => {
-    window.print();
+  const handleExportPDF = async () => {
+    setDownloadingExport('pdf');
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+
+      const res = await api.get(`/visitors/export/pdf?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], {
+        type: 'application/pdf',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Laporan_Kunjungan_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setFeedback({
+        type: 'error',
+        text: 'Gagal mengunduh berkas PDF. Silakan coba kembali.',
+      });
+    } finally {
+      setDownloadingExport(null);
+    }
   };
 
   return (
@@ -330,16 +342,18 @@ export default function ReportsPage() {
           <button
             type="button"
             onClick={handleExportExcel}
-            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#5E6D74] hover:bg-[#505D63] shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#5E6D74]"
+            disabled={downloadingExport !== null}
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#5E6D74] hover:bg-[#505D63] disabled:opacity-60 shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#5E6D74]"
           >
-            Ekspor Excel
+            {downloadingExport === 'excel' ? 'Mengunduh...' : 'Ekspor Excel'}
           </button>
           <button
             type="button"
             onClick={handleExportPDF}
-            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#8A001A] hover:bg-[#700015] shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
+            disabled={downloadingExport !== null}
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#8A001A] hover:bg-[#700015] disabled:opacity-60 shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
           >
-            Ekspor PDF
+            {downloadingExport === 'pdf' ? 'Mengunduh...' : 'Ekspor PDF'}
           </button>
         </div>
       </div>

@@ -38,7 +38,6 @@ export default function Topbar() {
   return (
     <header className="h-16 bg-[#8A001A] text-white flex items-center justify-between px-6 shadow-md border-b border-black/40 z-30 shrink-0">
       <div className="flex items-center space-x-3 cursor-pointer" onClick={() => router.push('/dashboard')}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/seamolec-logo.jpg"
           alt="SEAMOLEC Logo"

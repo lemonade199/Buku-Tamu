@@ -21,6 +21,20 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+} from 'recharts';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -29,6 +43,7 @@ export default function DashboardPage() {
   const [pendingVisitors, setPendingVisitors] = useState<VisitorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [chartView, setChartView] = useState<'HOURLY' | 'WEEKLY'>('HOURLY');
 
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
 
@@ -130,6 +145,26 @@ export default function DashboardPage() {
 
   const totalPass = metrics?.total_pass || 20;
   const pendingCount = pendingVisitors.length;
+
+  const hourlyData = metrics?.hourly_stats || [];
+  const weeklyData = metrics?.weekly_trend || [];
+
+  const passStats = metrics?.pass_stats || {
+    AVAILABLE: metrics?.available_pass ?? 0,
+    PENDING: metrics?.pending_pass ?? 0,
+    IN_USE: metrics?.in_use_pass ?? 0,
+    MAINTENANCE: 0,
+    LOST: 0,
+  };
+
+  const passCompositionData = [
+    { name: 'Tersedia', value: passStats.AVAILABLE ?? 0, color: '#10B981' },
+    { name: 'Digunakan', value: passStats.IN_USE ?? 0, color: '#8A001A' },
+    { name: 'Menunggu', value: passStats.PENDING ?? pendingCount ?? 0, color: '#F59E0B' },
+    { name: 'Perbaikan / Hilang', value: (passStats.MAINTENANCE ?? 0) + (passStats.LOST ?? 0), color: '#9CA3AF' },
+  ].filter((item) => item.value > 0);
+
+  const totalPassCount = passCompositionData.reduce((acc, curr) => acc + curr.value, 0) || totalPass;
 
   return (
     <div className="space-y-6">
@@ -265,6 +300,181 @@ export default function DashboardPage() {
           <div className="mt-2">
             <p className="text-3xl font-black tracking-tight text-white">{metrics?.total_visitors_today ?? 0}</p>
             <p className="text-[11px] text-gray-400 mt-1">Total kunjungan disetujui</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
+                <TrendingUp className="w-4 h-4 text-[#8A001A]" />
+                <span>Statistik & Tren Kunjungan</span>
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {chartView === 'HOURLY'
+                  ? 'Distribusi kedatangan tamu per jam operasional hari ini'
+                  : 'Tren total kunjungan harian dalam 7 hari terakhir'}
+              </p>
+            </div>
+            <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setChartView('HOURLY')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  chartView === 'HOURLY'
+                    ? 'bg-white text-gray-900 shadow-2xs font-bold'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Per Jam
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartView('WEEKLY')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  chartView === 'WEEKLY'
+                    ? 'bg-white text-gray-900 shadow-2xs font-bold'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                7 Hari Terakhir
+              </button>
+            </div>
+          </div>
+
+          <div className="h-60 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              {chartView === 'HOURLY' ? (
+                <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#6B7280' }} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1F2937',
+                      color: '#FFFFFF',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      border: 'none',
+                    }}
+                    formatter={(value: any) => [`${value} Kunjungan`, 'Jumlah']}
+                    labelFormatter={(label) => `Pukul ${label}`}
+                  />
+                  <Bar dataKey="count" fill="#8A001A" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                </BarChart>
+              ) : (
+                <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorWeekly" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8A001A" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#8A001A" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#E5E7EB' }}
+                  />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7280' }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1F2937',
+                      color: '#FFFFFF',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      border: 'none',
+                    }}
+                    formatter={(value: any) => [`${value} Kunjungan`, 'Total']}
+                    labelFormatter={(label, payload) => {
+                      const item = payload?.[0]?.payload;
+                      return `${label} (${item?.date || ''})`;
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#8A001A"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#colorWeekly)"
+                  />
+                </AreaChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-5 flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
+              <CreditCard className="w-4 h-4 text-[#8A001A]" />
+              <span>Komposisi Rak Kartu Pass</span>
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Alokasi dan ketersediaan fisik pass tamu
+            </p>
+          </div>
+
+          <div className="h-44 w-full relative flex items-center justify-center my-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={passCompositionData.length > 0 ? passCompositionData : [{ name: 'N/A', value: 1, color: '#E5E7EB' }]}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={48}
+                  outerRadius={68}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {(passCompositionData.length > 0 ? passCompositionData : [{ name: 'N/A', value: 1, color: '#E5E7EB' }]).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1F2937',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    border: 'none',
+                  }}
+                  formatter={(value: any, name: any) => [`${value} Kartu`, name]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-2xl font-black text-gray-900 leading-none">{totalPassCount}</span>
+              <span className="text-[10px] text-gray-500 font-semibold uppercase mt-0.5">Total Pass</span>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 pt-1 border-t border-gray-100 text-xs">
+            <div className="flex items-center justify-between text-gray-700">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>Tersedia (AVAILABLE)</span>
+              </div>
+              <span className="font-bold">{passStats.AVAILABLE ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between text-gray-700">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#8A001A]"></span>
+                <span>Digunakan (IN_USE)</span>
+              </div>
+              <span className="font-bold">{passStats.IN_USE ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between text-gray-700">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span>Menunggu (PENDING)</span>
+              </div>
+              <span className="font-bold">{passStats.PENDING ?? pendingCount ?? 0}</span>
+            </div>
           </div>
         </div>
       </div>
