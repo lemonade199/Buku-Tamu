@@ -197,18 +197,6 @@ export default function DashboardPage() {
     { name: 'Dipakai', value: inUsePass, color: '#4A000E' },
   ];
 
-  const topInstitutions = metrics?.top_institutions && metrics.top_institutions.length > 0
-    ? metrics.top_institutions
-    : [
-        { name: 'PT Telkom', count: 2 },
-        { name: 'Kemendikbud', count: 1 },
-        { name: 'SMKN 2 Depok', count: 1 },
-        { name: 'PT Jaya', count: 1 },
-        { name: 'CV Makmur', count: 1 },
-      ];
-
-  const maxInstCount = Math.max(...topInstitutions.map((i) => i.count), 1);
-
   const recentActivities: RecentActivity[] = metrics?.recent_activities && metrics.recent_activities.length > 0
     ? metrics.recent_activities
     : [
@@ -324,26 +312,26 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-            <div className="lg:col-span-5 bg-white rounded-2xl border-2 border-[#4A000E] p-4 shadow-sm flex flex-col justify-between">
+            <div className="lg:col-span-8 bg-white rounded-2xl border-2 border-[#4A000E] p-5 shadow-sm flex flex-col justify-between">
               <div className="border-b border-gray-200 pb-2 mb-2">
                 <h3 className="text-sm font-bold italic underline decoration-gray-400 text-[#3B0A11]">
                   Grafik tamu per bulan
                 </h3>
               </div>
 
-              <div className="h-56 w-full pt-2">
+              <div className="h-64 w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyChartData} margin={{ top: 15, right: 5, left: -25, bottom: 0 }}>
+                  <BarChart data={monthlyChartData} margin={{ top: 15, right: 15, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis
                       dataKey="month"
-                      tick={{ fontSize: 9, fill: '#6B7280' }}
+                      tick={{ fontSize: 10, fill: '#6B7280' }}
                       tickLine={false}
                       axisLine={{ stroke: '#E5E7EB' }}
                     />
                     <YAxis
                       allowDecimals={false}
-                      tick={{ fontSize: 9, fill: '#6B7280' }}
+                      tick={{ fontSize: 10, fill: '#6B7280' }}
                       tickLine={false}
                       axisLine={false}
                     />
@@ -360,15 +348,15 @@ export default function DashboardPage() {
                     <Bar
                       dataKey="count"
                       fill="#8A001A"
-                      radius={[3, 3, 0, 0]}
-                      label={{ position: 'top', fill: '#1F2937', fontSize: 9, fontWeight: 700 }}
+                      radius={[4, 4, 0, 0]}
+                      label={{ position: 'top', fill: '#1F2937', fontSize: 10, fontWeight: 700 }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="lg:col-span-3 flex flex-col">
+            <div className="lg:col-span-4 flex flex-col">
               <div className="mb-2">
                 <h3 className="text-sm font-bold italic underline decoration-gray-400 text-[#3B0A11]">
                   Status pass
@@ -376,15 +364,15 @@ export default function DashboardPage() {
               </div>
 
               <div className="bg-[#8A001A] text-white rounded-2xl p-5 shadow-sm flex-1 flex flex-col justify-between">
-                <div className="h-36 w-full relative flex items-center justify-center my-auto">
+                <div className="h-44 w-full relative flex items-center justify-center my-auto">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={adminPassPieData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={42}
-                        outerRadius={58}
+                        innerRadius={48}
+                        outerRadius={68}
                         paddingAngle={3}
                         dataKey="value"
                       >
@@ -410,7 +398,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-3 border-t border-white/20 text-xs">
+                <div className="space-y-2 pt-3 border-t border-white/20 text-xs">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className="w-2.5 h-2.5 rounded-xs bg-white shrink-0"></span>
@@ -432,38 +420,6 @@ export default function DashboardPage() {
                     </div>
                     <span className="font-bold text-white text-xs">{inUsePass}</span>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-300 p-5 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-4">
-                  <h3 className="text-sm font-bold italic text-[#3B0A11]">
-                    Instansi terbanyak
-                  </h3>
-                  <span className="w-8 h-2 rounded-full bg-[#8A001A]"></span>
-                </div>
-
-                <div className="space-y-3.5">
-                  {topInstitutions.map((inst) => (
-                    <div key={inst.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-gray-900 truncate pr-2" title={inst.name}>
-                          {inst.name}
-                        </span>
-                        <span className="text-[11px] text-gray-500 shrink-0 font-medium">
-                          {inst.count} kunjungan
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-[#8A001A] h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(100, (inst.count / maxInstCount) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
