@@ -28,7 +28,6 @@ export default function KioskCheckinPage() {
   // Camera & Photo states
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -117,7 +116,7 @@ export default function KioskCheckinPage() {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         msg = 'Izin kamera ditolak. Harap klik ikon gembok di address bar dan ubah izin Kamera menjadi Izinkan (Allow).';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'Perangkat webcam tidak terdeteksi. Silakan gunakan opsi Unggah Foto.';
+        msg = 'Perangkat webcam tidak terdeteksi. Pastikan kamera terhubung ke perangkat.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         msg = 'Kamera sedang digunakan oleh aplikasi lain (seperti Zoom/Meet) atau perangkat keras sibuk.';
       }
@@ -160,21 +159,6 @@ export default function KioskCheckinPage() {
     setIsCameraOpen(false);
     setIsVideoPlaying(false);
   }, [stream]);
-
-  // Fallback Upload from File
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setCapturedPhoto(reader.result);
-        stopCamera();
-        setFormError('');
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   // Auto clean up camera stream on unmount
   useEffect(() => {
@@ -490,7 +474,7 @@ export default function KioskCheckinPage() {
                       </p>
                     )}
 
-                    <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <div className="flex items-center justify-center">
                       {/* Maroon Button "Ambil Snapshot foto" */}
                       <button
                         type="button"
@@ -500,23 +484,6 @@ export default function KioskCheckinPage() {
                         <Camera className="w-4 h-4" />
                         <span>Ambil Snapshot foto</span>
                       </button>
-
-                      {/* Alternative Upload Button */}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-full py-2 px-4 text-xs font-medium transition-all shadow-xs cursor-pointer"
-                        title="Pilih file gambar jika webcam tidak tersedia"
-                      >
-                        Unggah Foto File
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
                     </div>
                   </div>
                 )}
