@@ -185,6 +185,31 @@ def update_pass_status(id_pass: int):
                 )
                 db.add(checkout_audit)
 
+        if old_status == 'PENDING' and new_status == 'IN_USE':
+            pending_visitor = db.query(Visitor).filter(
+                Visitor.id_pass == pass_card.id_pass,
+                Visitor.status == 'PENDING'
+            ).with_for_update().first()
+
+            if pending_visitor:
+                pending_visitor.status = 'APPROVED'
+                pending_visitor.approved_by_id = user_id
+                pending_visitor.approved_at = now
+                pending_visitor.updated_at = now
+                auto_action_message = f"Permohonan registrasi tamu ({pending_visitor.fullname}) telah disetujui."
+
+                approve_audit = AuditLog(
+                    id_user=user_id,
+                    action='VISITOR_REGISTRATION_APPROVED',
+                    entity='visitors',
+                    entity_id=str(pending_visitor.id_visitor),
+                    description=f"Auto approve permohonan tamu {pending_visitor.fullname} saat status pass #{pass_card.no_pass} diubah dari PENDING ke IN_USE."
+                )
+                db.add(approve_audit)
+
+            pass_card.handled_over_id = user_id
+            pass_card.handled_over_at = now
+
         if old_status == 'PENDING' and new_status == 'AVAILABLE':
             pending_visitor = db.query(Visitor).filter(
                 Visitor.id_pass == pass_card.id_pass,
@@ -227,6 +252,139 @@ def update_pass_status(id_pass: int):
         msg = f"Status kartu pass #{pass_card.no_pass} diperbarui menjadi {new_status}."
         if auto_action_message:
             msg += f" {auto_action_message}"
+
+        return jsonify({
+            'success': True,
+            'message': msg,
+            'data': pass_card.to_dict()
+        }), 200
+    finally:
+        db.close()
+
+@pass_bp.route('/<int:id_pass>/approve', methods=['POST'])
+@jwt_required()
+def approve_pass(id_pass: int):
+    user_id = int(get_jwt_identity())
+    db = get_db_session()
+    try:
+        pass_card = db.query(Pass).filter(Pass.id_pass == id_pass).with_for_update().first()
+        if not pass_card:
+            return jsonify({'success': False, 'message': 'Kartu pass tidak ditemukan.'}), 404
+
+        if pass_card.status != 'PENDING':
+            return jsonify({'success': False, 'message': f'Kartu pass #{pass_card.no_pass} tidak dalam status PENDING (status saat ini: {pass_card.status}).'}), 400
+
+        now = datetime.utcnow()
+        pending_visitor = db.query(Visitor).filter(
+            Visitor.id_pass == pass_card.id_pass,
+            Visitor.status == 'PENDING'
+        ).with_for_update().first()
+
+        visitor_name = None
+        if pending_visitor:
+            pending_visitor.status = 'APPROVED'
+            pending_visitor.approved_by_id = user_id
+            pending_visitor.approved_at = now
+            pending_visitor.updated_at = now
+            visitor_name = pending_visitor.fullname
+
+            audit_vis = AuditLog(
+                id_user=user_id,
+                action='VISITOR_REGISTRATION_APPROVED',
+                entity='visitors',
+                entity_id=str(pending_visitor.id_visitor),
+                description=f"Petugas ID {user_id} menyetujui registrasi tamu {pending_visitor.fullname} via monitoring pass."
+            )
+            db.add(audit_vis)
+
+        pass_card.status = 'IN_USE'
+        pass_card.handled_over_id = user_id
+        pass_card.handled_over_at = now
+        pass_card.updated_at = now
+
+        audit_pass = AuditLog(
+            id_user=user_id,
+            action='PASS_STATUS_CHANGE',
+            entity='pass',
+            entity_id=str(pass_card.id_pass),
+            description=f"Kartu pass #{pass_card.no_pass} disetujui menjadi IN_USE oleh user ID {user_id}."
+        )
+        db.add(audit_pass)
+        db.commit()
+
+        msg = f"Kartu pass #{pass_card.no_pass} berhasil disetujui menjadi IN_USE."
+        if visitor_name:
+            msg += f" Registrasi tamu {visitor_name} telah APPROVED."
+
+        return jsonify({
+            'success': True,
+            'message': msg,
+            'data': pass_card.to_dict()
+        }), 200
+    finally:
+        db.close()
+
+@pass_bp.route('/<int:id_pass>/reject', methods=['POST'])
+@jwt_required()
+def reject_pass(id_pass: int):
+    user_id = int(get_jwt_identity())
+    data = request.get_json() or {}
+    rejection_reason = (data.get('rejection_reason') or data.get('reason') or '').strip()
+
+    if not rejection_reason:
+        return jsonify({'success': False, 'message': 'Alasan penolakan wajib diisi.'}), 422
+
+    db = get_db_session()
+    try:
+        pass_card = db.query(Pass).filter(Pass.id_pass == id_pass).with_for_update().first()
+        if not pass_card:
+            return jsonify({'success': False, 'message': 'Kartu pass tidak ditemukan.'}), 404
+
+        if pass_card.status != 'PENDING':
+            return jsonify({'success': False, 'message': f'Kartu pass #{pass_card.no_pass} tidak dalam status PENDING (status saat ini: {pass_card.status}).'}), 400
+
+        now = datetime.utcnow()
+        pending_visitor = db.query(Visitor).filter(
+            Visitor.id_pass == pass_card.id_pass,
+            Visitor.status == 'PENDING'
+        ).with_for_update().first()
+
+        visitor_name = None
+        if pending_visitor:
+            pending_visitor.status = 'REJECTED'
+            pending_visitor.rejection_reason = rejection_reason
+            pending_visitor.rejected_by_id = user_id
+            pending_visitor.rejected_at = now
+            pending_visitor.updated_at = now
+            visitor_name = pending_visitor.fullname
+
+            audit_vis = AuditLog(
+                id_user=user_id,
+                action='VISITOR_REGISTRATION_REJECTED',
+                entity='visitors',
+                entity_id=str(pending_visitor.id_visitor),
+                description=f"Petugas ID {user_id} menolak registrasi tamu {pending_visitor.fullname}. Alasan: {rejection_reason}"
+            )
+            db.add(audit_vis)
+
+        pass_card.status = 'AVAILABLE'
+        pass_card.achieve_id = user_id
+        pass_card.achieve_at = now
+        pass_card.updated_at = now
+
+        audit_pass = AuditLog(
+            id_user=user_id,
+            action='PASS_STATUS_CHANGE',
+            entity='pass',
+            entity_id=str(pass_card.id_pass),
+            description=f"Kartu pass #{pass_card.no_pass} ditolak dan dikembalikan menjadi AVAILABLE oleh user ID {user_id}. Alasan: {rejection_reason}"
+        )
+        db.add(audit_pass)
+        db.commit()
+
+        msg = f"Kartu pass #{pass_card.no_pass} berhasil ditolak dan kembali AVAILABLE."
+        if visitor_name:
+            msg += f" Registrasi tamu {visitor_name} telah REJECTED."
 
         return jsonify({
             'success': True,
