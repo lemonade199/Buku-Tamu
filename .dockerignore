@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+node_modules
+.next
+backend/storage/photos/*
+!backend/storage/photos/.gitkeep
+frontend/.next
+frontend/node_modules

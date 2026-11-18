@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: buku_tamu_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: buku_tamu
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d buku_tamu"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: buku_tamu_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FLASK_ENV: production
+      PORT: 5000
+      SECRET_KEY: super-secret-key-buku-tamu-jwt-prod
+      JWT_SECRET_KEY: super-secret-key-buku-tamu-jwt-prod
+      DATABASE_URL: postgresql+psycopg2://postgres:postgrespassword@db:5432/buku_tamu
+      UPLOAD_FOLDER: storage/photos
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_storage:/app/storage
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+    container_name: buku_tamu_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  backend_storage:
