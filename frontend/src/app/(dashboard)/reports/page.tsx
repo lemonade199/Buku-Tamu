@@ -9,7 +9,11 @@ import {
   ChevronDown,
   User,
   X,
+  LogOut,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
+import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -25,6 +29,15 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [dateError, setDateError] = useState('');
+
+  // Photo modal zoom
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+
+  // Check-Out modal & feedback states
+  const [checkoutVisitor, setCheckoutVisitor] = useState<ActiveVisitor | null>(null);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [processingCheckout, setProcessingCheckout] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -42,9 +55,6 @@ export default function ReportsPage() {
     setDateError('');
     setEndDate(val);
   };
-
-  // Photo modal zoom
-  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
   const fetchVisitors = useCallback(async () => {
     setLoading(true);
@@ -71,6 +81,43 @@ export default function ReportsPage() {
   useEffect(() => {
     fetchVisitors();
   }, [fetchVisitors]);
+
+  // Initiate Check-Out from Laporan Table
+  const handleInitiateCheckout = (visitor: VisitorItem) => {
+    setCheckoutVisitor({
+      id_visitor: visitor.id_visitor,
+      id_pass: visitor.id_pass,
+      no_pass: visitor.no_pass || String(visitor.id_pass),
+      fullname: visitor.fullname,
+      telephone: visitor.telephone,
+      institution: visitor.institution,
+      representing: visitor.representing,
+      purpose: visitor.purpose,
+      check_in_at: visitor.check_in_at || new Date().toISOString(),
+      capture_id: visitor.capture_id,
+    });
+    setShowCheckoutModal(true);
+  };
+
+  // Confirm Check-Out
+  const handleConfirmCheckout = async (visitorId: number, notes?: string) => {
+    setProcessingCheckout(true);
+    try {
+      const res = await api.post(`/visitors/${visitorId}/checkout`, { notes });
+      setShowCheckoutModal(false);
+      setCheckoutVisitor(null);
+      setFeedback({
+        type: 'success',
+        text: res.data.message || 'Check-out tamu berhasil dan kartu pass telah dikembalikan ke status tersedia.',
+      });
+      fetchVisitors();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal memproses check-out pengunjung.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setProcessingCheckout(false);
+    }
+  };
 
   // Export to CSV / Excel
   const handleExportExcel = () => {
@@ -132,6 +179,32 @@ export default function ReportsPage() {
       <h1 className="text-3xl font-extrabold text-[#3B0A11] tracking-tight">
         Laporan Kunjungan
       </h1>
+
+      {/* Feedback Banner */}
+      {feedback && (
+        <div
+          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-center justify-between shadow-xs animate-fadeIn ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+              : 'bg-red-50 border-red-300 text-red-800'
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            )}
+            <span className="font-semibold">{feedback.text}</span>
+          </div>
+          <button
+            onClick={() => setFeedback(null)}
+            className="text-xs font-bold text-gray-500 hover:text-gray-800 px-2 py-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Filter Row */}
       <div className="flex flex-wrap items-center gap-3">
@@ -272,7 +345,6 @@ export default function ReportsPage() {
       {/* Main Table */}
       <div className="overflow-x-auto pt-2">
         <table className="w-full text-left border-collapse">
-          {/* Table Header with styled underline, bold and italic */}
           <thead>
             <tr className="border-b border-gray-400">
               <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Foto</th>
@@ -284,12 +356,13 @@ export default function ReportsPage() {
               <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Masuk</th>
               <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keluar</th>
               <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Resepsionis</th>
+              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-gray-500 font-medium">
+                <td colSpan={10} className="py-12 text-center text-gray-500 font-medium">
                   <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   <span>Memuat data laporan...</span>
                 </td>
@@ -315,6 +388,7 @@ export default function ReportsPage() {
                 }
 
                 const passNo = v.no_pass || String(v.id_pass);
+                const isCurrentlyActive = !v.check_out_at;
 
                 return (
                   <tr key={v.id_visitor} className="hover:bg-black/5 transition-colors">
@@ -379,12 +453,31 @@ export default function ReportsPage() {
                     <td className="py-3 px-3 text-gray-800 font-medium whitespace-nowrap">
                       Rina
                     </td>
+
+                    {/* Aksi Check-Out */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      {isCurrentlyActive ? (
+                        <button
+                          type="button"
+                          onClick={() => handleInitiateCheckout(v)}
+                          className="inline-flex items-center space-x-1.5 bg-[#8A001A] hover:bg-[#700015] text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-xs transition-colors cursor-pointer"
+                          title="Proses check-out dan kembalikan kartu pass"
+                        >
+                          <LogOut className="w-3 h-3" />
+                          <span>Check-Out</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 font-medium text-xs italic">
+                          Selesai
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-gray-500 font-medium">
+                <td colSpan={10} className="py-12 text-center text-gray-500 font-medium">
                   Tidak ada data kunjungan yang sesuai dengan filter pencarian.
                 </td>
               </tr>
@@ -433,6 +526,18 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Check-Out Konfirmasi */}
+      <CheckoutConfirmModal
+        isOpen={showCheckoutModal}
+        visitor={checkoutVisitor}
+        onClose={() => {
+          setShowCheckoutModal(false);
+          setCheckoutVisitor(null);
+        }}
+        onConfirm={handleConfirmCheckout}
+        loading={processingCheckout}
+      />
     </div>
   );
 }
