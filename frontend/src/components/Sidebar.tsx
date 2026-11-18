@@ -15,8 +15,8 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard' },
   { name: 'Monitoring Kartu Pass', href: '/pass' },
   { name: 'Laporan', href: '/reports' },
-  { name: 'Master data', href: '/master' },
-  { name: 'Pengaturan', href: '/settings' },
+  { name: 'Master data', href: '/master', adminOnly: true },
+  { name: 'Pengaturan', href: '/settings', adminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -34,6 +34,8 @@ export default function Sidebar() {
             pathname === item.href ||
             (item.href === '/reports' && pathname.startsWith('/reports')) ||
             (item.href === '/pass' && pathname.startsWith('/pass')) ||
+            (item.href === '/master' && pathname.startsWith('/master')) ||
+            (item.href === '/settings' && pathname.startsWith('/settings')) ||
             (item.href === '/dashboard' && pathname === '/dashboard');
 
           return (
