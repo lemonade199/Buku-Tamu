@@ -25,15 +25,12 @@ export default function ReportsPage() {
   const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
   const [selectedReceptionist, setSelectedReceptionist] = useState<string>('Semua resepsionis');
 
-  // Date range states
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [dateError, setDateError] = useState('');
 
-  // Photo modal zoom
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
-  // Check-Out modal & feedback states
   const [checkoutVisitor, setCheckoutVisitor] = useState<ActiveVisitor | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [processingCheckout, setProcessingCheckout] = useState(false);
@@ -82,7 +79,6 @@ export default function ReportsPage() {
     fetchVisitors();
   }, [fetchVisitors]);
 
-  // Initiate Check-Out from Laporan Table
   const handleInitiateCheckout = (visitor: VisitorItem) => {
     setCheckoutVisitor({
       id_visitor: visitor.id_visitor,
@@ -99,7 +95,6 @@ export default function ReportsPage() {
     setShowCheckoutModal(true);
   };
 
-  // Confirm Check-Out
   const handleConfirmCheckout = async (visitorId: number, notes?: string) => {
     setProcessingCheckout(true);
     try {
@@ -119,7 +114,6 @@ export default function ReportsPage() {
     }
   };
 
-  // Export to CSV / Excel
   const handleExportExcel = () => {
     if (visitors.length === 0) return;
 
@@ -175,15 +169,15 @@ export default function ReportsPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
-      {/* Page Title */}
       <h1 className="text-3xl font-extrabold text-[#3B0A11] tracking-tight">
         Laporan Kunjungan
       </h1>
 
-      {/* Feedback Banner */}
       {feedback && (
         <div
-          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-center justify-between shadow-xs animate-fadeIn ${
+          role="status"
+          aria-live="polite"
+          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-center justify-between shadow-xs ${
             feedback.type === 'success'
               ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
               : 'bg-red-50 border-red-300 text-red-800'
@@ -198,22 +192,23 @@ export default function ReportsPage() {
             <span className="font-semibold">{feedback.text}</span>
           </div>
           <button
+            type="button"
             onClick={() => setFeedback(null)}
-            className="text-xs font-bold text-gray-500 hover:text-gray-800 px-2 py-1"
+            className="text-xs font-bold text-gray-500 hover:text-gray-800 px-2 py-1 cursor-pointer"
+            aria-label="Tutup notifikasi"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Filter Row */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Date Filter Pill */}
         <div className="relative">
           <button
             type="button"
             onClick={() => setDateFilterOpen(!dateFilterOpen)}
-            className="inline-flex items-center space-x-2 bg-white border border-gray-900 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center space-x-2 bg-white border border-gray-900 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+            aria-expanded={dateFilterOpen}
           >
             <Calendar className="w-3.5 h-3.5 text-gray-700" />
             <span>
@@ -224,13 +219,13 @@ export default function ReportsPage() {
             <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
           </button>
 
-          {/* Date Picker Dropdown Popup */}
           {dateFilterOpen && (
-            <div className="absolute left-0 mt-2 p-3 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 space-y-2 w-64 animate-fadeIn">
+            <div className="absolute left-0 mt-2 p-3 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 space-y-2 w-64">
               <div className="text-[11px] font-bold text-gray-700">Pilih Rentang Tanggal:</div>
               <div className="space-y-1">
-                <label className="text-[10px] text-gray-500">Mulai:</label>
+                <label htmlFor="filter-start-date" className="text-[10px] text-gray-500">Mulai:</label>
                 <input
+                  id="filter-start-date"
                   type="date"
                   value={startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
@@ -238,8 +233,9 @@ export default function ReportsPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-gray-500">Selesai:</label>
+                <label htmlFor="filter-end-date" className="text-[10px] text-gray-500">Selesai:</label>
                 <input
+                  id="filter-end-date"
                   type="date"
                   value={endDate}
                   min={startDate || undefined}
@@ -249,7 +245,7 @@ export default function ReportsPage() {
               </div>
 
               {dateError && (
-                <div className="text-[10px] text-red-600 font-semibold bg-red-50 p-1.5 rounded-lg border border-red-200">
+                <div role="alert" className="text-[10px] text-red-600 font-semibold bg-red-50 p-1.5 rounded-lg border border-red-200">
                   {dateError}
                 </div>
               )}
@@ -263,7 +259,7 @@ export default function ReportsPage() {
                     setDateError('');
                     setDateFilterOpen(false);
                   }}
-                  className="text-[10px] text-gray-500 hover:text-gray-800 px-2 py-1"
+                  className="text-[10px] text-gray-500 hover:text-gray-800 px-2 py-1 cursor-pointer"
                 >
                   Reset
                 </button>
@@ -271,7 +267,7 @@ export default function ReportsPage() {
                   type="button"
                   disabled={Boolean(dateError) || Boolean(startDate && endDate && endDate < startDate)}
                   onClick={() => setDateFilterOpen(false)}
-                  className="text-[10px] bg-[#8A001A] text-white font-bold px-3 py-1 rounded-lg disabled:opacity-50"
+                  className="text-[10px] bg-[#8A001A] text-white font-bold px-3 py-1 rounded-lg disabled:opacity-50 cursor-pointer"
                 >
                   Terapkan
                 </button>
@@ -280,19 +276,19 @@ export default function ReportsPage() {
           )}
         </div>
 
-        {/* Receptionist Filter Pill */}
         <div className="relative">
           <button
             type="button"
             onClick={() => setReceptionistFilterOpen(!receptionistFilterOpen)}
-            className="inline-flex items-center space-x-2 bg-white border border-gray-900 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center space-x-2 bg-white border border-gray-900 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+            aria-expanded={receptionistFilterOpen}
           >
             <span>{selectedReceptionist}</span>
             <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
           </button>
 
           {receptionistFilterOpen && (
-            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 animate-fadeIn text-xs">
+            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
               {['Semua resepsionis', 'Rina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
                 <button
                   key={r}
@@ -301,7 +297,7 @@ export default function ReportsPage() {
                     setSelectedReceptionist(r);
                     setReceptionistFilterOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 transition-colors"
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 transition-colors cursor-pointer"
                 >
                   {r}
                 </button>
@@ -311,9 +307,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Search Bar & Action Buttons */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        {/* Search Input */}
         <div className="relative w-full max-w-md">
           <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
@@ -321,42 +315,43 @@ export default function ReportsPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Cari nama / instansi / no. pass"
+            aria-label="Cari nama, instansi, atau nomor pass tamu"
             className="w-full bg-white border border-gray-900 rounded-full pl-11 pr-4 py-2 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
           />
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center space-x-2.5 shrink-0">
           <button
+            type="button"
             onClick={handleExportExcel}
-            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#5E6D74] hover:bg-[#505D63] shadow-xs transition-colors"
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#5E6D74] hover:bg-[#505D63] shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#5E6D74]"
           >
             Ekspor Excel
           </button>
           <button
+            type="button"
             onClick={handleExportPDF}
-            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#8A001A] hover:bg-[#700015] shadow-xs transition-colors"
+            className="px-5 py-2 rounded-full text-xs font-bold text-white bg-[#8A001A] hover:bg-[#700015] shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
           >
             Ekspor PDF
           </button>
         </div>
       </div>
 
-      {/* Main Table */}
       <div className="overflow-x-auto pt-2">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-400">
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Foto</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Tanggal</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Instansi</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keperluan</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">No. pass</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Masuk</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keluar</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Resepsionis</th>
-              <th className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Foto</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Tanggal</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Instansi</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keperluan</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">No. pass</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Masuk</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Keluar</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Resepsionis</th>
+              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
@@ -392,12 +387,13 @@ export default function ReportsPage() {
 
                 return (
                   <tr key={v.id_visitor} className="hover:bg-black/5 transition-colors">
-                    {/* Foto */}
                     <td className="py-3 px-3">
-                      <div
+                      <button
+                        type="button"
                         onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${v.id_visitor}/photo`)}
-                        className="w-10 h-10 rounded-full overflow-hidden bg-gray-400 flex items-center justify-center cursor-pointer shrink-0 border border-gray-400 shadow-2xs group relative"
-                        title="Klik untuk memperbesar foto"
+                        className="w-10 h-10 rounded-full overflow-hidden bg-gray-400 flex items-center justify-center cursor-pointer shrink-0 border border-gray-400 shadow-2xs group relative focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+                        title={`Lihat foto ${v.fullname}`}
+                        aria-label={`Perbesar foto ${v.fullname}`}
                       >
                         <User className="w-6 h-6 text-gray-200 absolute" />
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -409,65 +405,56 @@ export default function ReportsPage() {
                             (e.currentTarget as HTMLElement).style.display = 'none';
                           }}
                         />
-                      </div>
+                      </button>
                     </td>
 
-                    {/* Tanggal */}
                     <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
                       {dateDisplay}
                     </td>
 
-                    {/* Nama */}
                     <td className="py-3 px-3 font-semibold text-gray-900 whitespace-nowrap">
                       {v.fullname}
                     </td>
 
-                    {/* Instansi */}
                     <td className="py-3 px-3 text-gray-800 font-medium">
                       {v.institution || '-'}
                     </td>
 
-                    {/* Keperluan */}
                     <td className="py-3 px-3 text-gray-800 font-medium max-w-xs truncate" title={v.purpose}>
                       {v.purpose || '-'}
                     </td>
 
-                    {/* No. Pass */}
                     <td className="py-3 px-3 text-center whitespace-nowrap">
                       <span className="inline-block bg-[#6B0014] text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-2xs min-w-[36px]">
                         {passNo}
                       </span>
                     </td>
 
-                    {/* Masuk */}
                     <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
                       {inTimeDisplay}
                     </td>
 
-                    {/* Keluar */}
                     <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
                       {outTimeDisplay}
                     </td>
 
-                    {/* Resepsionis */}
                     <td className="py-3 px-3 text-gray-800 font-medium whitespace-nowrap">
                       Rina
                     </td>
 
-                    {/* Aksi Check-Out */}
                     <td className="py-3 px-3 text-center whitespace-nowrap">
                       {isCurrentlyActive ? (
                         <button
                           type="button"
                           onClick={() => handleInitiateCheckout(v)}
-                          className="inline-flex items-center space-x-1.5 bg-[#8A001A] hover:bg-[#700015] text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-xs transition-colors cursor-pointer"
+                          className="inline-flex items-center space-x-1.5 bg-[#8A001A] hover:bg-[#700015] text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
                           title="Proses check-out dan kembalikan kartu pass"
                         >
                           <LogOut className="w-3 h-3" />
                           <span>Check-Out</span>
                         </button>
                       ) : (
-                        <span className="text-gray-400 font-medium text-xs italic">
+                        <span className="text-gray-500 font-medium text-xs italic">
                           Selesai
                         </span>
                       )}
@@ -486,21 +473,22 @@ export default function ReportsPage() {
         </table>
       </div>
 
-      {/* Photo Zoom Modal */}
       {previewPhotoUrl && (
         <div
           onClick={() => setPreviewPhotoUrl(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
         >
           <div
             onClick={(e) => e.stopPropagation()}
             className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full border border-gray-200 p-4 space-y-3"
           >
             <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-              <h4 className="text-xs font-bold text-gray-800">Foto Pengunjung</h4>
+              <h2 className="text-xs font-bold text-gray-800">Foto Pengunjung</h2>
               <button
+                type="button"
                 onClick={() => setPreviewPhotoUrl(null)}
-                className="p-1 rounded-full text-gray-500 hover:text-gray-800"
+                className="p-1 rounded-full text-gray-500 hover:text-gray-800 cursor-pointer"
+                aria-label="Tutup pratinjau foto"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -518,8 +506,9 @@ export default function ReportsPage() {
               />
             </div>
             <button
+              type="button"
               onClick={() => setPreviewPhotoUrl(null)}
-              className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-xl"
+              className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-xl cursor-pointer"
             >
               Tutup Pratinjau
             </button>
@@ -527,7 +516,6 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Modal Check-Out Konfirmasi */}
       <CheckoutConfirmModal
         isOpen={showCheckoutModal}
         visitor={checkoutVisitor}

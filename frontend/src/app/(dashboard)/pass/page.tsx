@@ -10,10 +10,8 @@ import {
   Search,
   Filter,
   CheckCircle2,
-  Clock,
   AlertTriangle,
   User,
-  ShieldAlert,
   SlidersHorizontal,
   X,
 } from 'lucide-react';
@@ -40,13 +38,11 @@ export default function MonitoringPassPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  // Modal State for adding pass
   const [showAddModal, setShowAddModal] = useState(false);
   const [newNoPass, setNewNoPass] = useState('');
   const [newSlot, setNewSlot] = useState('');
   const [addingPass, setAddingPass] = useState(false);
 
-  // Modal State for updating pass status
   const [selectedPass, setSelectedPass] = useState<PassRackItem | null>(null);
   const [newStatus, setNewStatus] = useState<string>('AVAILABLE');
   const [statusNotes, setStatusNotes] = useState('');
@@ -126,7 +122,6 @@ export default function MonitoringPassPage() {
     setStatusNotes('');
   };
 
-  // Filtered passes
   const filteredPasses = passes.filter((p) => {
     const matchesSearch =
       p.no_pass.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -137,7 +132,6 @@ export default function MonitoringPassPage() {
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate statistics
   const countAvailable = passes.filter((p) => p.status === 'AVAILABLE').length;
   const countInUse = passes.filter((p) => p.status === 'IN_USE').length;
   const countMaintenance = passes.filter((p) => p.status === 'MAINTENANCE' || p.status === 'LOST').length;
@@ -185,7 +179,6 @@ export default function MonitoringPassPage() {
 
   return (
     <div className="space-y-6">
-      {/* Title & Top Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">Monitoring Kartu Pass</h1>
@@ -196,17 +189,20 @@ export default function MonitoringPassPage() {
 
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={() => fetchPasses()}
-            className="p-2 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 shadow-2xs transition-colors flex items-center justify-center cursor-pointer"
+            className="p-2 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 shadow-2xs transition-colors flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
             title="Muat Ulang"
+            aria-label="Muat ulang data pass"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#8A001A]' : ''}`} />
           </button>
 
           {isAdmin && (
             <button
+              type="button"
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Tambah Pass</span>
@@ -215,10 +211,11 @@ export default function MonitoringPassPage() {
         </div>
       </div>
 
-      {/* Feedback Banner */}
       {feedbackMessage && (
         <div
-          className={`p-3.5 rounded-xl border text-xs font-medium flex items-center justify-between animate-fadeIn ${
+          role="status"
+          aria-live="polite"
+          className={`p-3.5 rounded-xl border text-xs font-medium flex items-center justify-between ${
             feedbackMessage.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
               : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -233,21 +230,21 @@ export default function MonitoringPassPage() {
             <span>{feedbackMessage.text}</span>
           </div>
           <button
+            type="button"
             onClick={() => setFeedbackMessage(null)}
-            className="text-gray-400 hover:text-gray-600 cursor-pointer"
+            className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+            aria-label="Tutup notifikasi"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Stats Cards (Hitam Solid sesuai desain figma) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Tersedia */}
         <div className="bg-black text-white p-5 rounded-2xl shadow-sm flex items-center justify-between border-l-4 border-emerald-500">
           <div>
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Tersedia</p>
-            <h3 className="text-3xl font-black mt-1 tracking-tight text-white">{countAvailable}</h3>
+            <p className="text-3xl font-black mt-1 tracking-tight text-white">{countAvailable}</p>
             <p className="text-[11px] text-gray-400 mt-1">Siap diserahkan ke tamu</p>
           </div>
           <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
@@ -255,11 +252,10 @@ export default function MonitoringPassPage() {
           </div>
         </div>
 
-        {/* Dipakai */}
         <div className="bg-black text-white p-5 rounded-2xl shadow-sm flex items-center justify-between border-l-4 border-[#8A001A]">
           <div>
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Dipakai</p>
-            <h3 className="text-3xl font-black mt-1 tracking-tight text-white">{countInUse}</h3>
+            <p className="text-3xl font-black mt-1 tracking-tight text-white">{countInUse}</p>
             <p className="text-[11px] text-gray-400 mt-1">Sedang dibawa pengunjung</p>
           </div>
           <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
@@ -267,11 +263,10 @@ export default function MonitoringPassPage() {
           </div>
         </div>
 
-        {/* Perlu Perbaikan / Hilang */}
         <div className="bg-black text-white p-5 rounded-2xl shadow-sm flex items-center justify-between border-l-4 border-amber-500">
           <div>
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Perlu Perbaikan / Hilang</p>
-            <h3 className="text-3xl font-black mt-1 tracking-tight text-white">{countMaintenance}</h3>
+            <p className="text-3xl font-black mt-1 tracking-tight text-white">{countMaintenance}</p>
             <p className="text-[11px] text-gray-400 mt-1">Kartu tidak dapat dipinjamkan</p>
           </div>
           <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
@@ -280,7 +275,6 @@ export default function MonitoringPassPage() {
         </div>
       </div>
 
-      {/* Visual Rak Gantungan Kartu (Pass Rack Grid) */}
       <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-2xs">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
@@ -304,9 +298,9 @@ export default function MonitoringPassPage() {
         </div>
 
         {loading ? (
-          <div className="py-8 text-center text-xs text-gray-400">Memuat status rak kartu pass...</div>
+          <div className="py-8 text-center text-xs text-gray-500">Memuat status rak kartu pass...</div>
         ) : passes.length === 0 ? (
-          <div className="py-8 text-center text-xs text-gray-400">Belum ada kartu pass yang terdaftar.</div>
+          <div className="py-8 text-center text-xs text-gray-500">Belum ada kartu pass yang terdaftar.</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-10 gap-3">
             {passes.map((pass) => {
@@ -325,11 +319,13 @@ export default function MonitoringPassPage() {
               }
 
               return (
-                <div
+                <button
+                  type="button"
                   key={pass.id_pass}
                   onClick={() => openStatusModal(pass)}
-                  className={`border rounded-xl p-2.5 flex flex-col items-center justify-between text-center transition-all cursor-pointer hover:shadow-sm ${bgStyle}`}
-                  title={`Klik untuk ubah kondisi Pass #${pass.no_pass}`}
+                  className={`border rounded-xl p-2.5 flex flex-col items-center justify-between text-center transition-all cursor-pointer hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A] ${bgStyle}`}
+                  title={`Ubah kondisi Pass #${pass.no_pass}`}
+                  aria-label={`Kartu pass nomor ${pass.no_pass}, status ${pass.status}`}
                 >
                   <span className={`text-[11px] font-black px-2 py-0.5 rounded-full shadow-2xs ${badgeColor}`}>
                     #{pass.no_pass}
@@ -337,17 +333,16 @@ export default function MonitoringPassPage() {
                   <span className="text-[10px] font-semibold mt-1 truncate max-w-full">
                     {pass.slot || `Slot ${pass.no_pass}`}
                   </span>
-                  <span className="text-[9px] text-gray-500 mt-0.5 truncate max-w-full">
+                  <span className="text-[9px] text-gray-600 mt-0.5 truncate max-w-full">
                     {pass.status === 'IN_USE' ? pass.current_holder?.fullname || 'Dipakai' : pass.status}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -356,12 +351,15 @@ export default function MonitoringPassPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Cari nomor kartu pass / slot..."
-            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#8A001A]/20 focus:border-[#8A001A]"
+            aria-label="Cari nomor kartu pass atau slot rak"
+            className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#8A001A]/20 focus:border-[#8A001A]"
           />
           {searchTerm && (
             <button
+              type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+              aria-label="Hapus pencarian"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -369,11 +367,12 @@ export default function MonitoringPassPage() {
         </div>
 
         <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <div className="flex items-center space-x-1.5 text-xs text-gray-600">
+          <label htmlFor="pass-status-filter" className="flex items-center space-x-1.5 text-xs text-gray-600 cursor-pointer">
             <Filter className="w-3.5 h-3.5 text-gray-500" />
             <span className="font-semibold">Filter:</span>
-          </div>
+          </label>
           <select
+            id="pass-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/20 focus:border-[#8A001A] cursor-pointer"
@@ -388,12 +387,11 @@ export default function MonitoringPassPage() {
         </div>
       </div>
 
-      {/* Tabel Monitoring Kartu Pass (Fokus Nomor Kartu dan Aksi Ubah Kondisi) */}
       <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-900">Daftar Kartu Pass</h2>
-          <span className="text-xs text-gray-500 font-medium">
-            Total {filteredPasses.length} kartu ditampilkan
+          <span className="text-xs text-gray-600 font-medium">
+            Total {filteredPasses.length} kartu
           </span>
         </div>
 
@@ -401,24 +399,24 @@ export default function MonitoringPassPage() {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4 w-28 text-center">Nomor Kartu</th>
-                <th className="py-3 px-4">Posisi Slot Rak</th>
-                <th className="py-3 px-4 text-center">Status Kondisi</th>
-                <th className="py-3 px-4">Keterangan / Pemegang</th>
-                <th className="py-3 px-4 text-center w-36">Aksi</th>
+                <th scope="col" className="py-3 px-4 w-28 text-center">Nomor Kartu</th>
+                <th scope="col" className="py-3 px-4">Posisi Slot Rak</th>
+                <th scope="col" className="py-3 px-4 text-center">Status Kondisi</th>
+                <th scope="col" className="py-3 px-4">Keterangan / Pemegang</th>
+                <th scope="col" className="py-3 px-4 text-center w-36">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-gray-400 font-medium">
+                  <td colSpan={5} className="py-8 text-center text-gray-500 font-medium">
                     Memuat data kartu pass...
                   </td>
                 </tr>
               ) : filteredPasses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-gray-400 font-medium">
-                    Tidak ada kartu pass yang cocok dengan pencarian / filter.
+                  <td colSpan={5} className="py-8 text-center text-gray-500 font-medium">
+                    Tidak ada kartu pass yang cocok dengan pencarian atau filter.
                   </td>
                 </tr>
               ) : (
@@ -427,31 +425,27 @@ export default function MonitoringPassPage() {
 
                   return (
                     <tr key={pass.id_pass} className="hover:bg-gray-50/70 transition-colors">
-                      {/* Nomor Kartu */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span className="inline-block bg-[#6B0014] text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-2xs min-w-[38px]">
                           {passNo}
                         </span>
                       </td>
 
-                      {/* Posisi Slot Rak */}
                       <td className="py-3.5 px-4 font-semibold text-gray-800 whitespace-nowrap">
                         {pass.slot || `Slot ${passNo}`}
                       </td>
 
-                      {/* Status Kondisi */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {getStatusBadge(pass.status)}
                       </td>
 
-                      {/* Keterangan / Pemegang */}
                       <td className="py-3.5 px-4 text-gray-700 font-medium">
                         {pass.status === 'IN_USE' && pass.current_holder ? (
                           <div className="flex items-center space-x-1.5 text-gray-900 font-semibold">
                             <User className="w-3.5 h-3.5 text-[#8A001A] shrink-0" />
                             <span>{pass.current_holder.fullname}</span>
                             {pass.current_holder.institution && (
-                              <span className="text-gray-500 font-normal">
+                              <span className="text-gray-600 font-normal">
                                 ({pass.current_holder.institution})
                               </span>
                             )}
@@ -459,16 +453,15 @@ export default function MonitoringPassPage() {
                         ) : pass.status === 'AVAILABLE' ? (
                           <span className="text-emerald-700 font-medium">Tersedia di rak resepsionis</span>
                         ) : (
-                          <span className="text-gray-400 italic">Tidak tersedia untuk tamu</span>
+                          <span className="text-gray-500 italic">Tidak tersedia untuk tamu</span>
                         )}
                       </td>
 
-                      {/* Aksi: Ubah Kondisi (Tanpa Tombol Checkout) */}
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => openStatusModal(pass)}
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer"
+                          className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
                           title={`Ubah kondisi status kartu #${pass.no_pass}`}
                         >
                           <SlidersHorizontal className="w-3.5 h-3.5 text-[#8A001A]" />
@@ -484,17 +477,18 @@ export default function MonitoringPassPage() {
         </div>
       </div>
 
-      {/* Modal: Ubah Kondisi Pass (Sesuai Gambar Desain User) */}
       {selectedPass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-5 space-y-4 animate-scaleUp">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-5 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-sm font-bold text-gray-900">
                 Ubah Kondisi Pass #{String(selectedPass.no_pass).padStart(2, '0')}
               </h3>
               <button
+                type="button"
                 onClick={() => setSelectedPass(null)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+                aria-label="Tutup dialog"
               >
                 ✕
               </button>
@@ -502,10 +496,11 @@ export default function MonitoringPassPage() {
 
             <form onSubmit={handleUpdateStatus} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">
+                <label htmlFor="pass-condition-select" className="block font-semibold text-gray-700 mb-1.5">
                   Status Kartu Pass:
                 </label>
                 <select
+                  id="pass-condition-select"
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
                   className="w-full bg-[#FAF7F0] border border-[#E8DFD8] rounded-xl p-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] cursor-pointer"
@@ -518,11 +513,10 @@ export default function MonitoringPassPage() {
                 </select>
               </div>
 
-              {/* Warning Otomatis Check-Out jika dari IN_USE diubah ke AVAILABLE */}
               {selectedPass.status === 'IN_USE' && newStatus === 'AVAILABLE' && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
                   <div className="font-bold flex items-center space-x-1 mb-0.5">
-                    <span>⚠️ Perhatian Otomatis Check-Out:</span>
+                    <span>Perhatian Otomatis Check-Out:</span>
                   </div>
                   <span>
                     Kartu ini saat ini sedang dibawa oleh tamu{' '}
@@ -533,10 +527,11 @@ export default function MonitoringPassPage() {
               )}
 
               <div>
-                <label className="block font-semibold text-gray-700 mb-1">
+                <label htmlFor="pass-notes-area" className="block font-semibold text-gray-700 mb-1">
                   Catatan Tambahan:
                 </label>
                 <textarea
+                  id="pass-notes-area"
                   rows={2}
                   value={statusNotes}
                   onChange={(e) => setStatusNotes(e.target.value)}
@@ -566,15 +561,16 @@ export default function MonitoringPassPage() {
         </div>
       )}
 
-      {/* Modal: Tambah Pass Baru (Admin) */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-5 space-y-4 animate-scaleUp">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-200 p-5 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-sm font-bold text-gray-900">Tambah Kartu Pass Baru</h3>
               <button
+                type="button"
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+                aria-label="Tutup dialog"
               >
                 ✕
               </button>
@@ -582,10 +578,11 @@ export default function MonitoringPassPage() {
 
             <form onSubmit={handleAddPass} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-gray-700 mb-1">
+                <label htmlFor="new-pass-number" className="block font-semibold text-gray-700 mb-1">
                   Nomor Kartu Pass <span className="text-[#8A001A]">*</span>:
                 </label>
                 <input
+                  id="new-pass-number"
                   type="text"
                   required
                   value={newNoPass}
@@ -596,8 +593,9 @@ export default function MonitoringPassPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-gray-700 mb-1">Posisi Slot Rak Fisik:</label>
+                <label htmlFor="new-pass-slot" className="block font-semibold text-gray-700 mb-1">Posisi Slot Rak Fisik:</label>
                 <input
+                  id="new-pass-slot"
                   type="text"
                   value={newSlot}
                   onChange={(e) => setNewSlot(e.target.value)}
