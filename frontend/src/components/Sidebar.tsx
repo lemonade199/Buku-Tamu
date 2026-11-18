@@ -43,7 +43,7 @@ export default function Sidebar() {
             (item.href === '/checkin' && pathname.startsWith('/checkin')) ||
             (item.href === '/checkout' && pathname.startsWith('/checkout')) ||
             (item.href === '/master' && pathname.startsWith('/master')) ||
-            (item.href === '/settings' && pathname.startsWith('/settings')) ||
+            (item.href === '/settings' && (pathname.startsWith('/settings') || pathname.startsWith('/profile'))) ||
             (item.href === '/dashboard' && pathname === '/dashboard');
 
           return (

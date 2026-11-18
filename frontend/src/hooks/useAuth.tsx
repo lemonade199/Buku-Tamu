@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (updated: Partial<User>) => void;
   isAuthenticated: boolean;
 }
 
@@ -46,12 +47,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/dashboard');
   };
 
+  const updateUser = (updated: Partial<User>) => {
+    if (!user) return;
+    const merged = { ...user, ...updated };
+    setUser(merged);
+    localStorage.setItem('user_info', JSON.stringify(merged));
+  };
+
   const logout = async () => {
     try {
       const refreshToken = localStorage.getItem('refresh_token');
       await api.post('/auth/logout', { refresh_token: refreshToken });
     } catch (e) {
-      // ignore
     } finally {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
@@ -62,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

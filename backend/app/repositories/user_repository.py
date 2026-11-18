@@ -49,3 +49,19 @@ class UserRepository:
             RefreshToken.revoked_at.is_(None)
         ).update({'revoked_at': datetime.utcnow()})
         self.db.commit()
+
+    def update_profile(self, user: User, fullname: str, email: str, telephone: str, username: str) -> User:
+        user.fullname = fullname
+        user.email = email
+        user.telephone = telephone
+        user.username = username
+        user.updated_at = datetime.utcnow()
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def update_password(self, user: User, new_hash_password: str) -> User:
+        user.hash_password = new_hash_password
+        user.updated_at = datetime.utcnow()
+        self.db.commit()
+        return user

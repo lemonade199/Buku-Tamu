@@ -63,8 +63,8 @@ export default function Topbar() {
               {roleLabel}: {userName}
             </div>
             <button
-              onClick={() => router.push('/settings')}
-              className="text-[11px] text-white/80 hover:text-white hover:underline transition-colors block text-left"
+              onClick={() => router.push('/profile')}
+              className="text-[11px] text-white/80 hover:text-white hover:underline transition-colors block text-left cursor-pointer"
             >
               Ubah profil &rsaquo;
             </button>
