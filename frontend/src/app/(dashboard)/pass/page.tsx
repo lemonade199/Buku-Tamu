@@ -20,11 +20,12 @@ interface PassRackItem {
   id_pass: number;
   no_pass: string;
   slot?: string;
-  status: 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE' | 'LOST' | 'INACTIVE';
+  status: 'AVAILABLE' | 'PENDING' | 'IN_USE' | 'MAINTENANCE' | 'LOST' | 'INACTIVE';
   current_holder?: {
     id_visitor: number;
     fullname: string;
     institution?: string;
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED';
     check_in_at?: string;
   } | null;
 }
@@ -142,6 +143,12 @@ export default function MonitoringPassPage() {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
             Tersedia di Rak
+          </span>
+        );
+      case 'PENDING':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+            Menunggu Persetujuan
           </span>
         );
       case 'IN_USE':
@@ -307,7 +314,10 @@ export default function MonitoringPassPage() {
               let bgStyle = 'bg-emerald-50 border-emerald-200 hover:border-emerald-400 text-emerald-900';
               let badgeColor = 'bg-emerald-600 text-white';
 
-              if (pass.status === 'IN_USE') {
+              if (pass.status === 'PENDING') {
+                bgStyle = 'bg-amber-50 border-amber-300 hover:border-amber-400 text-amber-950';
+                badgeColor = 'bg-amber-500 text-black font-extrabold';
+              } else if (pass.status === 'IN_USE') {
                 bgStyle = 'bg-rose-50/70 border-rose-200 hover:border-rose-400 text-rose-950';
                 badgeColor = 'bg-[#8A001A] text-white';
               } else if (pass.status === 'MAINTENANCE' || pass.status === 'LOST') {
@@ -378,8 +388,9 @@ export default function MonitoringPassPage() {
             className="text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/20 focus:border-[#8A001A] cursor-pointer"
           >
             <option value="ALL">Semua Status</option>
-            <option value="AVAILABLE">Tersedia di Rak</option>
-            <option value="IN_USE">Sedang Dipakai</option>
+            <option value="AVAILABLE">Tersedia di Rak (AVAILABLE)</option>
+            <option value="PENDING">Menunggu Persetujuan (PENDING)</option>
+            <option value="IN_USE">Sedang Dipakai (IN_USE)</option>
             <option value="MAINTENANCE">Perlu Perbaikan</option>
             <option value="LOST">Hilang</option>
             <option value="INACTIVE">Nonaktif</option>
@@ -506,12 +517,26 @@ export default function MonitoringPassPage() {
                   className="w-full bg-[#FAF7F0] border border-[#E8DFD8] rounded-xl p-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] cursor-pointer"
                 >
                   <option value="AVAILABLE">AVAILABLE (Tersedia di Rak)</option>
+                  <option value="PENDING">PENDING (Menunggu Persetujuan)</option>
                   <option value="IN_USE">IN_USE (Sedang Dibawa Tamu)</option>
                   <option value="MAINTENANCE">MAINTENANCE (Perlu Perbaikan / Patah)</option>
                   <option value="LOST">LOST (Hilang)</option>
                   <option value="INACTIVE">INACTIVE (Nonaktif Sementara)</option>
                 </select>
               </div>
+
+              {selectedPass.status === 'PENDING' && newStatus === 'AVAILABLE' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
+                  <div className="font-bold flex items-center space-x-1 mb-0.5">
+                    <span>Perhatian Otomatis Pembatalan:</span>
+                  </div>
+                  <span>
+                    Kartu ini saat ini sedang diajukan oleh tamu{' '}
+                    <strong>{selectedPass.current_holder?.fullname || 'pending'}</strong>. Mengubah status menjadi{' '}
+                    <strong>AVAILABLE</strong> akan otomatis membatalkan/menolak permohonan registrasi tamu tersebut.
+                  </span>
+                </div>
+              )}
 
               {selectedPass.status === 'IN_USE' && newStatus === 'AVAILABLE' && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">

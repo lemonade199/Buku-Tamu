@@ -443,7 +443,15 @@ export default function ReportsPage() {
                     </td>
 
                     <td className="py-3 px-3 text-center whitespace-nowrap">
-                      {isCurrentlyActive ? (
+                      {v.status === 'REJECTED' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300" title={v.rejection_reason ? `Alasan: ${v.rejection_reason}` : 'Permohonan ditolak'}>
+                          Ditolak
+                        </span>
+                      ) : v.status === 'PENDING' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                          Menunggu
+                        </span>
+                      ) : isCurrentlyActive ? (
                         <button
                           type="button"
                           onClick={() => handleInitiateCheckout(v)}
