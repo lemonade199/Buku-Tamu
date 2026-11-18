@@ -188,7 +188,6 @@ def list_visitors():
             query = query.filter(
                 or_(
                     Visitor.fullname.ilike(f"%{search}%"),
-                    Visitor.telephone.ilike(f"%{search}%"),
                     Visitor.institution.ilike(f"%{search}%"),
                     Visitor.representing.ilike(f"%{search}%")
                 )
@@ -262,7 +261,6 @@ def export_visitors_excel():
             query = query.filter(
                 or_(
                     Visitor.fullname.ilike(f"%{search}%"),
-                    Visitor.telephone.ilike(f"%{search}%"),
                     Visitor.institution.ilike(f"%{search}%"),
                     Visitor.representing.ilike(f"%{search}%")
                 )
@@ -322,7 +320,6 @@ def export_visitors_pdf():
             query = query.filter(
                 or_(
                     Visitor.fullname.ilike(f"%{search}%"),
-                    Visitor.telephone.ilike(f"%{search}%"),
                     Visitor.institution.ilike(f"%{search}%"),
                     Visitor.representing.ilike(f"%{search}%")
                 )

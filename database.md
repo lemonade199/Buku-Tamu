@@ -110,7 +110,6 @@ CREATE TABLE visitors (
     id_pass BIGINT NOT NULL,
 
     fullname VARCHAR(150) NOT NULL,
-    telephone VARCHAR(25) NOT NULL,
     institution VARCHAR(150),
     representing VARCHAR(150),
     purpose TEXT,

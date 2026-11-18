@@ -58,7 +58,6 @@ class CheckinService:
         visitor = Visitor(
             id_pass=pass_card.id_pass,
             fullname=data['fullname'].strip(),
-            telephone=(data.get('telephone') or '-').strip(),
             institution=institution_val,
             representing=representing_val,
             purpose=purpose_val,

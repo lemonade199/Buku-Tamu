@@ -102,7 +102,6 @@ class Visitor(Base):
     id_visitor = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     id_pass = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey('pass.id_pass', onupdate='CASCADE', ondelete='RESTRICT'), nullable=False, index=True)
     fullname = Column(String(150), nullable=False, index=True)
-    telephone = Column(String(25), nullable=False, index=True)
     institution = Column(String(150), nullable=True)
     representing = Column(String(150), nullable=True)
     purpose = Column(Text, nullable=True)
@@ -128,7 +127,6 @@ class Visitor(Base):
             'id_pass': self.id_pass,
             'no_pass': self.pass_card.no_pass if self.pass_card else None,
             'fullname': self.fullname,
-            'telephone': self.telephone,
             'institution': self.institution,
             'representing': self.representing,
             'purpose': self.purpose,
