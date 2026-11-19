@@ -1,29 +1,88 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import { Database, ShieldAlert, ArrowLeft } from 'lucide-react';
+import {
+  Search,
+  ChevronDown,
+  X,
+  Plus,
+  ShieldAlert,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+interface PassItem {
+  id_pass: number;
+  no_pass: string;
+  slot?: string;
+  status: string;
+}
+
+interface UserItem {
+  id_user: number;
+  fullname: string;
+  username: string;
+  email: string;
+  role_code: string;
+  role_name: string;
+  telephone?: string;
+  is_active: boolean;
+}
 
 export default function MasterDataPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && user && user.role_code !== 'ADMIN') {
-      router.replace('/dashboard');
+  const [activeTab, setActiveTab] = useState<'pass' | 'user'>('pass');
+  const [passes, setPasses] = useState<PassItem[]>([]);
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [conditionFilter, setConditionFilter] = useState('Semua kondisi');
+  const [conditionFilterOpen, setConditionFilterOpen] = useState(false);
+
+  const [editingPass, setEditingPass] = useState<PassItem | null>(null);
+  const [editNomor, setEditNomor] = useState('');
+  const [editSlot, setEditSlot] = useState('');
+  const [editKondisi, setEditKondisi] = useState('Baik');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [savingPass, setSavingPass] = useState(false);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addNomor, setAddNomor] = useState('');
+  const [addSlot, setAddSlot] = useState('');
+  const [addingPass, setAddingPass] = useState(false);
+
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [passRes, userRes] = await Promise.all([
+        api.get<{ success: boolean; data: PassItem[] }>('/pass').catch(() => ({ data: { data: [] } })),
+        api.get<{ success: boolean; data: UserItem[] }>('/auth/users').catch(() => ({ data: { data: [] } })),
+      ]);
+
+      setPasses(passRes.data.data || []);
+      setUsers(userRes.data.data || []);
+    } catch {
+      setFeedback({ type: 'error', text: 'Gagal memuat data master.' });
+    } finally {
+      setLoading(false);
     }
-  }, [user, loading, router]);
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="py-12 text-center text-xs text-gray-500 font-medium">
-        Memeriksa hak akses administrator...
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  if (user && user.role_code !== 'ADMIN') {
+  if (!authLoading && user && user.role_code !== 'ADMIN') {
     return (
       <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-2xl border border-rose-200 shadow-sm text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
@@ -45,36 +104,560 @@ export default function MasterDataPage() {
     );
   }
 
+  const openEditModal = (p: PassItem) => {
+    setEditingPass(p);
+    const num = (p.no_pass || String(p.id_pass)).padStart(2, '0');
+    setEditNomor(num);
+    setEditSlot(p.slot || `Slot ${num}`);
+
+    if (p.status === 'MAINTENANCE') {
+      setEditKondisi('Perlu Perbaikan');
+      setEditIsActive(true);
+    } else if (p.status === 'LOST') {
+      setEditKondisi('Hilang');
+      setEditIsActive(false);
+    } else if (p.status === 'INACTIVE') {
+      setEditKondisi('Baik');
+      setEditIsActive(false);
+    } else {
+      setEditKondisi('Baik');
+      setEditIsActive(true);
+    }
+  };
+
+  const handleSavePass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPass) return;
+
+    setSavingPass(true);
+    setFeedback(null);
+    try {
+      const res = await api.put(`/pass/${editingPass.id_pass}`, {
+        no_pass: editNomor.trim(),
+        slot: editSlot.trim(),
+        kondisi: editKondisi,
+        is_active: editIsActive,
+      });
+
+      setFeedback({ type: 'success', text: res.data.message || 'Data kartu pass berhasil diperbarui.' });
+      setEditingPass(null);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal memperbarui kartu pass.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setSavingPass(false);
+    }
+  };
+
+  const handleTogglePassActive = async (p: PassItem) => {
+    const isCurrentlyActive = p.status !== 'INACTIVE';
+    const newActiveState = !isCurrentlyActive;
+
+    try {
+      await api.put(`/pass/${p.id_pass}`, {
+        no_pass: p.no_pass,
+        slot: p.slot,
+        is_active: newActiveState,
+        kondisi: p.status === 'MAINTENANCE' ? 'Perlu Perbaikan' : p.status === 'LOST' ? 'Hilang' : 'Baik',
+      });
+      fetchData();
+    } catch {
+      setFeedback({ type: 'error', text: 'Gagal mengubah status aktif kartu pass.' });
+    }
+  };
+
+  const handleAddPass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addNomor.trim()) return;
+
+    setAddingPass(true);
+    setFeedback(null);
+    try {
+      const res = await api.post('/pass', {
+        no_pass: addNomor.trim(),
+        slot: addSlot.trim() || `Slot ${addNomor.trim()}`,
+      });
+
+      setFeedback({ type: 'success', text: res.data.message || 'Kartu pass berhasil ditambahkan.' });
+      setShowAddModal(false);
+      setAddNomor('');
+      setAddSlot('');
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menambahkan kartu pass.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setAddingPass(false);
+    }
+  };
+
+  const filteredPasses = passes.filter((p) => {
+    const term = searchTerm.toLowerCase().trim();
+    const formattedPass = (p.no_pass || String(p.id_pass)).padStart(2, '0');
+    const slotStr = (p.slot || `Slot ${formattedPass}`).toLowerCase();
+
+    const matchesSearch = !term || formattedPass.includes(term) || slotStr.includes(term);
+
+    let kondisiLabel = 'Baik';
+    if (p.status === 'MAINTENANCE') kondisiLabel = 'Perlu Perbaikan';
+    if (p.status === 'LOST') kondisiLabel = 'Hilang';
+
+    const matchesCondition =
+      conditionFilter === 'Semua kondisi' || kondisiLabel === conditionFilter;
+
+    return matchesSearch && matchesCondition;
+  });
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Master Data</h1>
-        <p className="text-xs text-gray-600 mt-0.5">
-          Modul pengelolaan data master institusi khusus Administrator
-        </p>
+    <div className="w-full max-w-7xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-extrabold italic text-[#3B0A11] tracking-tight">
+          Master Data
+        </h1>
+        <button
+          type="button"
+          onClick={() => fetchData()}
+          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#8A001A]' : ''}`} />
+          <span>Segarkan</span>
+        </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200/80 p-8 shadow-2xs text-center max-w-lg mx-auto space-y-4 mt-8">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto">
-          <Database className="w-7 h-7" />
-        </div>
-        <div>
-          <h2 className="text-base font-bold text-gray-900">Fitur Dalam Pengembangan</h2>
-          <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-            Halaman Master Data telah dibatasi dan hanya dapat diakses oleh Administrator. Isi modul ini belum diaktifkan saat ini.
-          </p>
-        </div>
-        <div className="pt-2">
+      {feedback && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-2xs ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+              : 'bg-rose-50 text-rose-800 border-rose-300'
+          }`}
+        >
+          <div className="flex items-center space-x-2">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{feedback.text}</span>
+          </div>
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
-            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+            onClick={() => setFeedback(null)}
+            className="text-gray-400 hover:text-gray-700 cursor-pointer p-1"
+            aria-label="Tutup notifikasi"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Kembali ke Dashboard</span>
+            ✕
           </button>
         </div>
+      )}
+
+      <div className="flex items-center space-x-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('pass')}
+          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'pass'
+              ? 'bg-black text-white shadow-md'
+              : 'bg-white border-2 border-black text-gray-800 hover:bg-gray-100'
+          }`}
+        >
+          Data Pass
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('user')}
+          className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'user'
+              ? 'bg-black text-white shadow-md'
+              : 'bg-white border-2 border-black text-gray-800 hover:bg-gray-100'
+          }`}
+        >
+          Data Pengguna
+        </button>
       </div>
+
+      {activeTab === 'pass' ? (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Cari no. pass"
+                  aria-label="Cari nomor pass"
+                  className="w-full bg-white border-2 border-black rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
+                />
+              </div>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setConditionFilterOpen(!conditionFilterOpen)}
+                  className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <span>{conditionFilter}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
+                </button>
+
+                {conditionFilterOpen && (
+                  <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-44 text-xs">
+                    {['Semua kondisi', 'Baik', 'Perlu Perbaikan', 'Hilang'].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => {
+                          setConditionFilter(c);
+                          setConditionFilterOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 cursor-pointer"
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(true);
+                  const nextNo = String(passes.length + 1).padStart(2, '0');
+                  setAddNomor(nextNo);
+                  setAddSlot(`Slot ${nextNo}`);
+                }}
+                className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Tambah pass</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto pt-2">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-400">
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">No. pass</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Slot KTP</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Kondisi</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aktif</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
+                {loading && passes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-gray-500 font-medium">
+                      <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <span>Memuat data master pass...</span>
+                    </td>
+                  </tr>
+                ) : filteredPasses.length > 0 ? (
+                  filteredPasses.map((p) => {
+                    const formattedPass = (p.no_pass || String(p.id_pass)).padStart(2, '0');
+                    const slotDisplay = p.slot || `Slot ${formattedPass}`;
+                    const isActive = p.status !== 'INACTIVE';
+
+                    let kondisiBadge = (
+                      <span className="inline-block px-4 py-0.5 bg-[#1E5631] text-white text-[11px] font-bold rounded-full min-w-[70px] text-center shadow-2xs">
+                        Baik
+                      </span>
+                    );
+                    if (p.status === 'MAINTENANCE') {
+                      kondisiBadge = (
+                        <span className="inline-block px-4 py-0.5 bg-[#D97706] text-white text-[11px] font-bold rounded-full min-w-[70px] text-center shadow-2xs">
+                          Perlu Perbaikan
+                        </span>
+                      );
+                    } else if (p.status === 'LOST') {
+                      kondisiBadge = (
+                        <span className="inline-block px-4 py-0.5 bg-[#BE123C] text-white text-[11px] font-bold rounded-full min-w-[70px] text-center shadow-2xs">
+                          Hilang
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <tr key={p.id_pass} className="hover:bg-black/5 transition-colors">
+                        <td className="py-3 px-3">
+                          <span className="inline-block bg-[#4A000E] text-white font-extrabold text-xs px-3.5 py-0.5 rounded-full shadow-2xs min-w-[36px] text-center">
+                            {formattedPass}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 font-semibold text-gray-900 whitespace-nowrap">
+                          {slotDisplay}
+                        </td>
+
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          {kondisiBadge}
+                        </td>
+
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePassActive(p)}
+                            title={isActive ? 'Nonaktifkan kartu pass' : 'Aktifkan kartu pass'}
+                            className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center cursor-pointer p-0.5 ${
+                              isActive ? 'bg-[#1E5631]' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                                isActive ? 'translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </td>
+
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(p)}
+                            className="px-4 py-1 bg-[#5B6367] hover:bg-[#484F52] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-gray-500 font-medium">
+                      Tidak ada data kartu pass yang cocok.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto pt-2">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-400">
+                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama Lengkap</th>
+                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Username</th>
+                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Role</th>
+                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Email</th>
+                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
+              {users.map((u) => (
+                <tr key={u.id_user} className="hover:bg-black/5 transition-colors">
+                  <td className="py-3 px-3 font-semibold text-gray-900">{u.fullname}</td>
+                  <td className="py-3 px-3 font-medium text-gray-800">@{u.username}</td>
+                  <td className="py-3 px-3">
+                    <span className="inline-block px-3 py-0.5 bg-black text-white text-[11px] font-bold rounded-full">
+                      {u.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-gray-800 font-medium">{u.email}</td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="inline-block px-3 py-0.5 bg-[#1E5631] text-white text-[11px] font-bold rounded-full">
+                      Aktif
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editingPass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200">
+            <div className="bg-[#8A001A] text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white tracking-wide">
+                Edit Kartu
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingPass(null)}
+                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup modal edit kartu"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePass} className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Nomor
+                  </label>
+                  <input
+                    type="text"
+                    value={editNomor}
+                    onChange={(e) => setEditNomor(e.target.value)}
+                    required
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Slot
+                  </label>
+                  <input
+                    type="text"
+                    value={editSlot}
+                    onChange={(e) => setEditSlot(e.target.value)}
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Kondisi
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editKondisi}
+                      onChange={(e) => setEditKondisi(e.target.value)}
+                      className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 appearance-none cursor-pointer"
+                    >
+                      <option value="Baik">Baik</option>
+                      <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                      <option value="Hilang">Hilang</option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-700 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Status aktif
+                  </label>
+                  <div className="flex items-center space-x-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditIsActive(!editIsActive)}
+                      className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center cursor-pointer p-0.5 ${
+                        editIsActive ? 'bg-[#1E5631]' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                          editIsActive ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs font-semibold text-gray-800">
+                      {editIsActive ? 'Aktif (bisa dipinjamkan)' : 'Nonaktif (tidak bisa dipinjamkan)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b border-gray-200 pt-2" />
+
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingPass(null)}
+                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPass}
+                  className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+                >
+                  {savingPass ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200">
+            <div className="bg-[#8A001A] text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white tracking-wide">
+                Tambah Kartu Pass
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup modal tambah kartu"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPass} className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Nomor
+                  </label>
+                  <input
+                    type="text"
+                    value={addNomor}
+                    onChange={(e) => setAddNomor(e.target.value)}
+                    required
+                    placeholder="Contoh: 17"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Slot
+                  </label>
+                  <input
+                    type="text"
+                    value={addSlot}
+                    onChange={(e) => setAddSlot(e.target.value)}
+                    placeholder="Contoh: Slot 17"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="border-b border-gray-200 pt-2" />
+
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingPass}
+                  className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+                >
+                  {addingPass ? 'Menambahkan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

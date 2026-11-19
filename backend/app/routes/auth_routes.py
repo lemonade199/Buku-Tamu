@@ -221,3 +221,16 @@ def update_password():
         }), 200
     finally:
         db.close()
+
+@auth_bp.route('/users', methods=['GET'])
+@jwt_required()
+def get_all_users():
+    db = get_db_session()
+    try:
+        users = db.query(User).order_by(User.id_user.asc()).all()
+        return jsonify({
+            'success': True,
+            'data': [u.to_dict() for u in users]
+        }), 200
+    finally:
+        db.close()

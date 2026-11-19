@@ -202,6 +202,50 @@ def create_pass():
     finally:
         db.close()
 
+@pass_bp.route('/<int:id_pass>', methods=['PUT'])
+@jwt_required()
+def update_pass_details(id_pass: int):
+    data = request.get_json() or {}
+    no_pass = (data.get('no_pass') or '').strip()
+    slot = (data.get('slot') or '').strip()
+    kondisi = (data.get('kondisi') or 'Baik').strip()
+    is_active = data.get('is_active', True)
+
+    db = get_db_session()
+    try:
+        pass_card = db.query(Pass).filter(Pass.id_pass == id_pass).first()
+        if not pass_card:
+            return jsonify({'success': False, 'message': 'Kartu pass tidak ditemukan.'}), 404
+
+        if no_pass:
+            existing = db.query(Pass).filter(Pass.no_pass == no_pass, Pass.id_pass != id_pass).first()
+            if existing:
+                return jsonify({'success': False, 'message': f"Nomor pass '{no_pass}' sudah terdaftar."}), 400
+            pass_card.no_pass = no_pass
+
+        pass_card.slot = slot if slot else None
+
+        if not is_active:
+            pass_card.status = 'INACTIVE'
+        else:
+            if kondisi == 'Perlu Perbaikan':
+                pass_card.status = 'MAINTENANCE'
+            elif kondisi == 'Hilang':
+                pass_card.status = 'LOST'
+            elif pass_card.status in ['MAINTENANCE', 'LOST', 'INACTIVE']:
+                pass_card.status = 'AVAILABLE'
+
+        pass_card.updated_at = datetime.utcnow()
+        db.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f"Data kartu pass #{pass_card.no_pass} berhasil disimpan.",
+            'data': pass_card.to_dict()
+        }), 200
+    finally:
+        db.close()
+
 @pass_bp.route('/<int:id_pass>/status', methods=['PUT'])
 @jwt_required()
 def update_pass_status(id_pass: int):
