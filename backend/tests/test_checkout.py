@@ -40,28 +40,34 @@ def test_checkout_by_id_success(client):
     assert checkin_res.status_code == 201
     visitor_id = checkin_res.get_json()['data']['id_visitor']
 
-    premature_checkout = client.post(f'/api/v1/visitors/{visitor_id}/checkout')
+    # Verify unauthorized checkout returns 401
+    unauth_res = client.post(f'/api/v1/visitors/{visitor_id}/checkout')
+    assert unauth_res.status_code == 401
+
+    auth_headers = {'Authorization': f'Bearer {token}'}
+    premature_checkout = client.post(f'/api/v1/visitors/{visitor_id}/checkout', headers=auth_headers)
     assert premature_checkout.status_code == 400
 
-    approve_res = client.post(f'/api/v1/visitors/{visitor_id}/approve', headers={'Authorization': f'Bearer {token}'})
+    approve_res = client.post(f'/api/v1/visitors/{visitor_id}/approve', headers=auth_headers)
     assert approve_res.status_code == 200
 
     checkout_res = client.post(f'/api/v1/visitors/{visitor_id}/checkout', json={
         'notes': 'Selesai konsultasi'
-    })
+    }, headers=auth_headers)
     assert checkout_res.status_code == 200
     res_data = checkout_res.get_json()
     assert res_data['success'] is True
     assert res_data['data']['visitor']['check_out_at'] is not None
     assert res_data['data']['pass']['status'] == 'AVAILABLE'
 
-    repeat_res = client.post(f'/api/v1/visitors/{visitor_id}/checkout')
+    repeat_res = client.post(f'/api/v1/visitors/{visitor_id}/checkout', headers=auth_headers)
     assert repeat_res.status_code == 400
     assert 'sudah check-out' in repeat_res.get_json()['message']
 
 def test_checkout_by_pass_number(client):
     login_res = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
     token = login_res.get_json()['data']['access_token']
+    auth_headers = {'Authorization': f'Bearer {token}'}
 
     checkin_res = client.post('/api/v1/visitors/checkin', json={
         'fullname': 'Ahmad Fauzi',
@@ -73,12 +79,12 @@ def test_checkout_by_pass_number(client):
     assert checkin_res.status_code == 201
     visitor_id = checkin_res.get_json()['data']['id_visitor']
 
-    approve_res = client.post(f'/api/v1/visitors/{visitor_id}/approve', headers={'Authorization': f'Bearer {token}'})
+    approve_res = client.post(f'/api/v1/visitors/{visitor_id}/approve', headers=auth_headers)
     assert approve_res.status_code == 200
 
     checkout_res = client.post('/api/v1/visitors/checkout', json={
         'no_pass': '02'
-    })
+    }, headers=auth_headers)
     assert checkout_res.status_code == 200
     res_data = checkout_res.get_json()
     assert res_data['success'] is True

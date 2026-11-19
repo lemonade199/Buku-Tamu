@@ -72,11 +72,15 @@ frontend/out/
 out/
 frontend/build/
 
-# Local Storage / Uploads
+# Local Storage / Uploads & Backups
 storage/photos/*
 !storage/photos/.gitkeep
 backend/storage/photos/*
 !backend/storage/photos/.gitkeep
+storage/backups/*
+!storage/backups/.gitkeep
+backend/storage/backups/*
+!backend/storage/backups/.gitkeep
 
 # IDEs & OS
 .DS_Store

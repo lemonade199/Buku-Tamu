@@ -38,7 +38,7 @@ class Config:
     }
 
     # JWT Configuration
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production-min-32-chars-bukutamu-secret')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_ACCESS_TOKEN_EXPIRY', 900)) # 15 minutes
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_REFRESH_TOKEN_EXPIRY', 604800)) # 7 days
     JWT_BLOCKLIST_ENABLED = True

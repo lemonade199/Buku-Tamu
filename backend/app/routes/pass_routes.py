@@ -203,7 +203,7 @@ def create_pass():
         db.close()
 
 @pass_bp.route('/<int:id_pass>', methods=['PUT'])
-@jwt_required()
+@role_required('ADMIN')
 def update_pass_details(id_pass: int):
     data = request.get_json() or {}
     no_pass = (data.get('no_pass') or '').strip()

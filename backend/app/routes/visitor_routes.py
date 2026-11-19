@@ -246,7 +246,7 @@ def list_visitors():
         db.close()
 
 @visitor_bp.route('/export/excel', methods=['GET'])
-@jwt_required(optional=True)
+@role_required('ADMIN', 'PETUGAS')
 def export_visitors_excel():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
@@ -305,7 +305,7 @@ def export_visitors_excel():
         db.close()
 
 @visitor_bp.route('/export/pdf', methods=['GET'])
-@jwt_required(optional=True)
+@role_required('ADMIN', 'PETUGAS')
 def export_visitors_pdf():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
@@ -410,7 +410,7 @@ def get_visitor_photo(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/checkout', methods=['POST'])
-@jwt_required(optional=True)
+@jwt_required()
 def checkout_visitor_by_id(id_visitor: int):
     identity = get_jwt_identity()
     user_id = int(identity) if identity is not None else None
@@ -442,7 +442,7 @@ def checkout_visitor_by_id(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/checkout', methods=['POST'])
-@jwt_required(optional=True)
+@jwt_required()
 def checkout_visitor_general():
     data = request.get_json(silent=True) or {}
     try:

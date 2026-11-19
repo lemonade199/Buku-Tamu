@@ -369,6 +369,9 @@ def update_user_by_admin(user_id: int):
 
         if is_active is not None:
             user.is_active = bool(is_active)
+            if not user.is_active:
+                user_repo = UserRepository(db)
+                user_repo.revoke_all_user_tokens(user.id_user)
 
         db.commit()
         db.refresh(user)

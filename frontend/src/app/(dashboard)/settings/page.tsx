@@ -70,6 +70,12 @@ export default function SettingsPage() {
   } | null>(null);
   const [showPermissionWarningModal, setShowPermissionWarningModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [backups, setBackups] = useState<any[]>([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [triggeringBackup, setTriggeringBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
 
   const [formData, setFormData] = useState<SettingsData>({
     institution_name: 'SEAMOLEC',
@@ -148,6 +154,121 @@ export default function SettingsPage() {
       setLogoPreview('/seamolec-logo.jpg');
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'backup') {
+      fetchBackups();
+    }
+  }, [activeTab]);
+
+  const fetchBackups = async () => {
+    try {
+      setLoadingBackups(true);
+      const res = await api.get('/settings/backups');
+      setBackups(res.data.data || []);
+    } catch {
+      // keep fallback empty
+    } finally {
+      setLoadingBackups(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    try {
+      setTriggeringBackup(true);
+      const res = await api.post('/settings/backup');
+      setSuccessMessage(res.data.message || 'Cadangan database berhasil dibuat.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+      fetchBackups();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal membuat cadangan database.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setTriggeringBackup(false);
+    }
+  };
+
+  const handleDownloadBackup = async (filename: string) => {
+    try {
+      const res = await api.get(`/settings/backup/download/${filename}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal mengunduh file cadangan.');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
+
+  const handleRestoreBackup = async (filename: string) => {
+    if (!window.confirm(`PERINGATAN: Memulihkan database dari '${filename}' akan menimpa data yang ada saat ini. Lanjutkan?`)) {
+      return;
+    }
+    try {
+      setRestoringBackup(true);
+      const res = await api.post('/settings/restore', { filename });
+      setSuccessMessage(res.data.message || 'Database berhasil dipulihkan.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+      fetchSettings();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal memulihkan database.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setRestoringBackup(false);
+    }
+  };
+
+  const handleDeleteBackup = async (filename: string) => {
+    if (!window.confirm(`Yakin ingin menghapus file cadangan '${filename}'?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/settings/backup/${filename}`);
+      setSuccessMessage(`File cadangan '${filename}' berhasil dihapus.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchBackups();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menghapus file cadangan.');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
+
+  const handleUploadRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm(`PERINGATAN: Memulihkan database dari file '${file.name}' akan menimpa data yang ada saat ini. Lanjutkan?`)) {
+      if (backupFileInputRef.current) backupFileInputRef.current.value = '';
+      return;
+    }
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      setRestoringBackup(true);
+      const res = await api.post('/settings/restore', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setSuccessMessage(res.data.message || 'Database berhasil dipulihkan dari file unggahan.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+      fetchSettings();
+      fetchBackups();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal memulihkan database dari file.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setRestoringBackup(false);
+      if (backupFileInputRef.current) backupFileInputRef.current.value = '';
     }
   };
 
@@ -852,7 +973,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
                       <div>
                         <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          Masa berlaku akses token(menit):
+                          Client ID (Aplikasi SSO):
                         </label>
                         <input
                           type="text"
@@ -891,63 +1012,208 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'backup' && (
-              <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
+              <div className="flex flex-col h-full justify-between space-y-6">
                 <div>
-                  <div className="mb-6">
-                    <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
-                      Data & Backup
+                  <div className="mb-5">
+                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                      Data & Cadangan Sistem
                     </span>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        Retensi Foto Tamu (bulan)
-                      </label>
+                  {/* Action Buttons: Instant Backup & Restore from file */}
+                  <div className="bg-[#FAF3F0] border border-[#DEB887] rounded-xl p-4 mb-6">
+                    <h4 className="text-xs font-bold text-[#8A001A] uppercase tracking-wide mb-2">
+                      Operasi Cadangan & Pemulihan
+                    </h4>
+                    <p className="text-xs text-gray-600 mb-3">
+                      Buat salinan data lengkap sistem untuk pencegahan kehilangan data, atau pulihkan database dari salinan sebelumnya.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCreateBackup}
+                        disabled={triggeringBackup}
+                        className="bg-[#8A001A] hover:bg-[#68001a] text-white px-4 py-2 rounded-lg text-xs font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1.5"
+                      >
+                        {triggeringBackup ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                            <span>Memproses cadangan...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>💾</span>
+                            <span>Cadangkan Sekarang (Backup)</span>
+                          </>
+                        )}
+                      </button>
+
                       <input
-                        type="number"
-                        value={formData.guest_photo_retention_months || 6}
-                        onChange={(e) => setFormData({ ...formData, guest_photo_retention_months: Number(e.target.value) })}
-                        className="w-full max-w-[280px] px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        type="file"
+                        ref={backupFileInputRef}
+                        onChange={handleUploadRestoreFile}
+                        accept=".json"
+                        className="hidden"
                       />
+
+                      <button
+                        type="button"
+                        onClick={() => backupFileInputRef.current?.click()}
+                        disabled={restoringBackup}
+                        className="border border-[#8A001A] text-[#8A001A] hover:bg-[#8A001A]/10 px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50 flex items-center space-x-1.5"
+                      >
+                        {restoringBackup ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mr-1" />
+                            <span>Memulihkan data...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🔄</span>
+                            <span>Pulihkan dari File (.json)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List of Backups */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                        Daftar Salinan Database Tersedia
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={fetchBackups}
+                        className="text-xs text-[#8A001A] hover:underline flex items-center space-x-1"
+                      >
+                        <span>↻ Refresh</span>
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        Retensi Riwayat Kunjungan (tahun)
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.visit_data_retention_years || 5}
-                        onChange={(e) => setFormData({ ...formData, visit_data_retention_years: Number(e.target.value) })}
-                        className="w-full max-w-[280px] px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
-                      />
+                    {loadingBackups ? (
+                      <div className="py-6 text-center text-xs text-gray-500">Memuat riwayat cadangan...</div>
+                    ) : backups.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-gray-400 bg-white rounded-lg border border-dashed border-gray-300">
+                        Belum ada salinan database yang dibuat. Klik tombol &ldquo;Cadangkan Sekarang&rdquo; di atas.
+                      </div>
+                    ) : (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm max-h-[220px] overflow-y-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-[#FAF3F0] text-gray-700 font-semibold border-b border-gray-200">
+                            <tr>
+                              <th className="p-2.5">Nama File</th>
+                              <th className="p-2.5">Waktu</th>
+                              <th className="p-2.5">Ukuran</th>
+                              <th className="p-2.5 text-center">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {backups.map((b) => (
+                              <tr key={b.filename} className="hover:bg-gray-50">
+                                <td className="p-2.5 font-mono text-[11px] text-gray-800">{b.filename}</td>
+                                <td className="p-2.5 text-gray-600">
+                                  {new Date(b.created_at).toLocaleString('id-ID', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </td>
+                                <td className="p-2.5 text-gray-600">{b.size_formatted}</td>
+                                <td className="p-2.5 text-center space-x-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadBackup(b.filename)}
+                                    title="Unduh Salinan"
+                                    className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-medium"
+                                  >
+                                    Unduh
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRestoreBackup(b.filename)}
+                                    disabled={restoringBackup}
+                                    title="Pulihkan Database"
+                                    className="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-medium"
+                                  >
+                                    Pulihkan
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteBackup(b.filename)}
+                                    title="Hapus Salinan"
+                                    className="px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-medium"
+                                  >
+                                    Hapus
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Retention Form */}
+                  <form onSubmit={handleSubmit} className="border-t border-gray-200 pt-4">
+                    <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-3">
+                      Kebijakan Retensi & Otomasi
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Retensi Foto Tamu (bulan)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.guest_photo_retention_months || 6}
+                          onChange={(e) => setFormData({ ...formData, guest_photo_retention_months: Number(e.target.value) })}
+                          className="w-full px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Retensi Riwayat Kunjungan (tahun)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.visit_data_retention_years || 5}
+                          onChange={(e) => setFormData({ ...formData, visit_data_retention_years: Number(e.target.value) })}
+                          className="w-full px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        />
+                      </div>
                     </div>
 
-                    <div className="pt-2">
+                    <div className="mb-4">
                       <label className="flex items-center space-x-3 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.auto_backup_enabled}
                           onChange={(e) => setFormData({ ...formData, auto_backup_enabled: e.target.checked })}
-                          className="w-4 h-4 text-[#8A001A] rounded"
+                          className="w-4 h-4 text-[#8A001A] accent-[#8A001A] rounded"
                         />
-                        <span className="text-sm font-medium text-gray-800">Aktifkan Backup Otomatis Database</span>
+                        <span className="text-xs md:text-sm font-medium text-gray-800">Aktifkan Backup Otomatis Database Harian</span>
                       </label>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex justify-end mt-8 pt-4">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
-                  >
-                    Simpan pengaturan
-                  </button>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center space-x-1.5"
+                      >
+                        <span>✓</span>
+                        <span>Simpan pengaturan</span>
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
+              </div>
             )}
           </div>
         </div>

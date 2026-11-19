@@ -1,10 +1,13 @@
 import os
+import json
 from datetime import time
 from flask import Blueprint, request, jsonify, send_file
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.app.models.base import get_db_session
 from backend.app.models.entities import Setting
+from backend.app.middleware.auth import role_required
 from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
+from backend.app.services.backup_service import BackupService
 
 setting_bp = Blueprint('setting_bp', __name__, url_prefix='/api/v1/settings')
 
@@ -201,3 +204,125 @@ def get_logo(filename: str):
         return send_file(photo_path)
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@setting_bp.route('/backup', methods=['POST'])
+@role_required('ADMIN')
+def trigger_database_backup():
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        result = service.create_backup(user_id=user_id, ip_address=ip_addr)
+        return jsonify({
+            'success': True,
+            'message': f"Cadangan database berhasil dibuat ({result['filename']}).",
+            'data': result
+        }), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Gagal membuat cadangan database: {str(e)}"}), 500
+    finally:
+        db.close()
+
+@setting_bp.route('/backups', methods=['GET'])
+@role_required('ADMIN')
+def list_database_backups():
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        backups = service.list_backups()
+        return jsonify({
+            'success': True,
+            'data': backups,
+            'total': len(backups)
+        }), 200
+    finally:
+        db.close()
+
+@setting_bp.route('/backup/download/<filename>', methods=['GET'])
+@role_required('ADMIN')
+def download_backup_file(filename: str):
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        filepath = service.get_backup_path(filename)
+        return send_file(
+            filepath,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/json'
+        )
+    except FileNotFoundError:
+        return jsonify({'success': False, 'message': 'File cadangan tidak ditemukan.'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+
+@setting_bp.route('/backup/<filename>', methods=['DELETE'])
+@role_required('ADMIN')
+def delete_backup_file(filename: str):
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        service.delete_backup(filename, user_id=user_id, ip_address=ip_addr)
+        return jsonify({
+            'success': True,
+            'message': f"File cadangan '{filename}' berhasil dihapus."
+        }), 200
+    except FileNotFoundError:
+        return jsonify({'success': False, 'message': 'File cadangan tidak ditemukan.'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+
+@setting_bp.route('/restore', methods=['POST'])
+@role_required('ADMIN')
+def restore_database():
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+
+    payload = None
+    if 'file' in request.files:
+        uploaded_file = request.files['file']
+        try:
+            payload = json.loads(uploaded_file.read().decode('utf-8'))
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Format file JSON cadangan tidak valid: {str(e)}'}), 400
+    elif request.is_json:
+        data = request.get_json() or {}
+        if 'filename' in data:
+            db_temp = get_db_session()
+            try:
+                service = BackupService(db_temp)
+                filepath = service.get_backup_path(data['filename'])
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    payload = json.load(f)
+            finally:
+                db_temp.close()
+        elif 'data' in data:
+            payload = data
+        else:
+            return jsonify({'success': False, 'message': 'Format data pemulihan tidak valid.'}), 400
+    else:
+        return jsonify({'success': False, 'message': 'Harap lampirkan file cadangan atau nama file yang ada.'}), 400
+
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        result = service.restore_backup(payload, user_id=user_id, ip_address=ip_addr)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Gagal memulihkan database: {str(e)}"}), 500
+    finally:
+        db.close()

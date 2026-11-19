@@ -51,74 +51,7 @@ export default function MonitoringPassPage() {
       }
       setItems(res.data.data || []);
     } catch {
-      setItems([
-        {
-          id_visitor: 1,
-          no_pass: '07',
-          guest_name: 'Ahmad Fauzi',
-          institution: 'PT Jaya',
-          check_in_time: '-',
-          check_out_time: '-',
-          handed_over_by: '-',
-          received_by: '-',
-          status: 'Menunggu',
-        },
-        {
-          id_visitor: 2,
-          no_pass: '08',
-          guest_name: 'Siti Rahma',
-          institution: 'SMKN 2 Depok',
-          check_in_time: '-',
-          check_out_time: '-',
-          handed_over_by: '-',
-          received_by: '-',
-          status: 'Menunggu',
-        },
-        {
-          id_visitor: 3,
-          no_pass: '12',
-          guest_name: 'Joko Susilo',
-          institution: 'CV Makmur',
-          check_in_time: '-',
-          check_out_time: '-',
-          handed_over_by: '-',
-          received_by: '-',
-          status: 'Menunggu',
-        },
-        {
-          id_visitor: 4,
-          no_pass: '09',
-          guest_name: 'Diman Ferdiana',
-          institution: 'PT Telkom',
-          check_in_time: '10.45',
-          check_out_time: '-',
-          handed_over_by: 'Rina',
-          received_by: '-',
-          status: 'Dipakai',
-        },
-        {
-          id_visitor: 5,
-          no_pass: '11',
-          guest_name: 'Rizky Pratama',
-          institution: 'Univ. Indonesia',
-          check_in_time: '11.30',
-          check_out_time: '-',
-          handed_over_by: 'Rina',
-          received_by: '-',
-          status: 'Dipakai',
-        },
-        {
-          id_visitor: 6,
-          no_pass: '10',
-          guest_name: 'Annisa A. Faza',
-          institution: 'Kemendikbud',
-          check_in_time: '08.56',
-          check_out_time: '09.40',
-          handed_over_by: 'Rina',
-          received_by: 'Rina',
-          status: 'Selesai',
-        },
-      ]);
+      // Tidak menyuntikkan data palsu agar operator tidak terkecoh
     } finally {
       setLoading(false);
     }
