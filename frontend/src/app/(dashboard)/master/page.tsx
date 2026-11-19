@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  User as UserIcon,
+  KeyRound,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -32,6 +34,7 @@ interface UserItem {
   role_name: string;
   telephone?: string;
   is_active: boolean;
+  last_login_at?: string;
 }
 
 export default function MasterDataPage() {
@@ -47,6 +50,10 @@ export default function MasterDataPage() {
   const [conditionFilter, setConditionFilter] = useState('Semua kondisi');
   const [conditionFilterOpen, setConditionFilterOpen] = useState(false);
 
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('Semua peran');
+  const [userRoleFilterOpen, setUserRoleFilterOpen] = useState(false);
+
   const [editingPass, setEditingPass] = useState<PassItem | null>(null);
   const [editNomor, setEditNomor] = useState('');
   const [editSlot, setEditSlot] = useState('');
@@ -58,6 +65,32 @@ export default function MasterDataPage() {
   const [addNomor, setAddNomor] = useState('');
   const [addSlot, setAddSlot] = useState('');
   const [addingPass, setAddingPass] = useState(false);
+
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [addUserForm, setAddUserForm] = useState({
+    fullname: '',
+    username: '',
+    email: '',
+    telephone: '',
+    role_code: 'PETUGAS',
+    password: '',
+  });
+  const [addingUser, setAddingUser] = useState(false);
+
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
+    fullname: '',
+    username: '',
+    email: '',
+    telephone: '',
+    role_code: 'PETUGAS',
+    is_active: true,
+  });
+  const [savingUser, setSavingUser] = useState(false);
+
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserItem | null>(null);
+  const [newResetPassword, setNewResetPassword] = useState('123456');
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -192,6 +225,132 @@ export default function MasterDataPage() {
     }
   };
 
+  const openEditUserModal = (u: UserItem) => {
+    setEditingUser(u);
+    setEditUserForm({
+      fullname: u.fullname,
+      username: u.username,
+      email: u.email,
+      telephone: u.telephone || '',
+      role_code: u.role_code || 'PETUGAS',
+      is_active: u.is_active,
+    });
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setSavingUser(true);
+    setFeedback(null);
+    try {
+      const res = await api.put(`/auth/users/${editingUser.id_user}`, {
+        fullname: editUserForm.fullname.trim(),
+        username: editUserForm.username.trim(),
+        email: editUserForm.email.trim(),
+        telephone: editUserForm.telephone.trim(),
+        role_code: editUserForm.role_code,
+        is_active: editUserForm.is_active,
+      });
+
+      setFeedback({ type: 'success', text: res.data.message || 'Data pengguna berhasil diperbarui.' });
+      setEditingUser(null);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal memperbarui pengguna.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const handleToggleUserActive = async (u: UserItem) => {
+    try {
+      const res = await api.patch(`/auth/users/${u.id_user}/toggle-active`);
+      setFeedback({ type: 'success', text: res.data.message || 'Status pengguna berhasil diubah.' });
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal mengubah status aktif pengguna.';
+      setFeedback({ type: 'error', text: msg });
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addUserForm.fullname.trim() || !addUserForm.username.trim() || !addUserForm.email.trim()) return;
+
+    setAddingUser(true);
+    setFeedback(null);
+    try {
+      const res = await api.post('/auth/users', {
+        fullname: addUserForm.fullname.trim(),
+        username: addUserForm.username.trim(),
+        email: addUserForm.email.trim(),
+        telephone: addUserForm.telephone.trim(),
+        role_code: addUserForm.role_code,
+        password: addUserForm.password.trim() || '123456',
+      });
+
+      setFeedback({ type: 'success', text: res.data.message || 'Pengguna berhasil ditambahkan.' });
+      setShowAddUserModal(false);
+      setAddUserForm({
+        fullname: '',
+        username: '',
+        email: '',
+        telephone: '',
+        role_code: 'PETUGAS',
+        password: '',
+      });
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menambahkan pengguna.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setAddingUser(false);
+    }
+  };
+
+  const openResetPasswordModal = (u: UserItem) => {
+    setResetPasswordUser(u);
+    setNewResetPassword('123456');
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordUser) return;
+
+    setResettingPassword(true);
+    setFeedback(null);
+    try {
+      const res = await api.post(`/auth/users/${resetPasswordUser.id_user}/reset-password`, {
+        password: newResetPassword.trim() || '123456',
+      });
+
+      setFeedback({ type: 'success', text: res.data.message || 'Password berhasil direset.' });
+      setResetPasswordUser(null);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal mereset password.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const formatLastLogin = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '-';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${day}/${month} · ${hours}.${mins}`;
+    } catch {
+      return '-';
+    }
+  };
+
   const filteredPasses = passes.filter((p) => {
     const term = searchTerm.toLowerCase().trim();
     const formattedPass = (p.no_pass || String(p.id_pass)).padStart(2, '0');
@@ -207,6 +366,20 @@ export default function MasterDataPage() {
       conditionFilter === 'Semua kondisi' || kondisiLabel === conditionFilter;
 
     return matchesSearch && matchesCondition;
+  });
+
+  const filteredUsers = users.filter((u) => {
+    const term = userSearchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      u.fullname.toLowerCase().includes(term) ||
+      u.username.toLowerCase().includes(term);
+
+    const roleDisplay = u.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis';
+    const matchesRole =
+      userRoleFilter === 'Semua peran' || roleDisplay === userRoleFilter;
+
+    return matchesSearch && matchesRole;
   });
 
   return (
@@ -443,37 +616,180 @@ export default function MasterDataPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto pt-2">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-400">
-                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama Lengkap</th>
-                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Username</th>
-                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Role</th>
-                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Email</th>
-                <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
-              {users.map((u) => (
-                <tr key={u.id_user} className="hover:bg-black/5 transition-colors">
-                  <td className="py-3 px-3 font-semibold text-gray-900">{u.fullname}</td>
-                  <td className="py-3 px-3 font-medium text-gray-800">@{u.username}</td>
-                  <td className="py-3 px-3">
-                    <span className="inline-block px-3 py-0.5 bg-black text-white text-[11px] font-bold rounded-full">
-                      {u.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-gray-800 font-medium">{u.email}</td>
-                  <td className="py-3 px-3 text-center">
-                    <span className="inline-block px-3 py-0.5 bg-[#1E5631] text-white text-[11px] font-bold rounded-full">
-                      Aktif
-                    </span>
-                  </td>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  placeholder="Cari nama / username"
+                  aria-label="Cari nama atau username"
+                  className="w-full bg-white border-2 border-black rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
+                />
+              </div>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserRoleFilterOpen(!userRoleFilterOpen)}
+                  className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <span>{userRoleFilter}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
+                </button>
+
+                {userRoleFilterOpen && (
+                  <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-44 text-xs">
+                    {['Semua peran', 'Admin', 'Resepsionis'].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setUserRoleFilter(r);
+                          setUserRoleFilterOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 cursor-pointer"
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddUserModal(true);
+                  setAddUserForm({
+                    fullname: '',
+                    username: '',
+                    email: '',
+                    telephone: '',
+                    role_code: 'PETUGAS',
+                    password: '',
+                  });
+                }}
+                className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Tambah pengguna</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto pt-2">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-400">
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] w-14">Foto</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Username</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Peran</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">No. HP</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Terakhir login</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aktif</th>
+                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
+                {loading && users.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-gray-500 font-medium">
+                      <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <span>Memuat data pengguna...</span>
+                    </td>
+                  </tr>
+                ) : filteredUsers.length > 0 ? (
+                  filteredUsers.map((u) => {
+                    const roleIsAdmin = u.role_code === 'ADMIN';
+                    return (
+                      <tr key={u.id_user} className="hover:bg-black/5 transition-colors">
+                        <td className="py-3 px-3">
+                          <div className="w-9 h-9 rounded-full bg-gray-400 flex items-center justify-center text-white overflow-hidden shadow-2xs">
+                            <UserIcon className="w-5 h-5 text-gray-200 fill-gray-200" />
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-3 font-semibold text-gray-900 whitespace-nowrap">
+                          {u.fullname}
+                        </td>
+
+                        <td className="py-3 px-3 text-gray-800 whitespace-nowrap">
+                          {u.username}
+                        </td>
+
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span
+                            className={`inline-block px-3.5 py-0.5 text-[11px] font-bold rounded-full min-w-[75px] text-center shadow-2xs text-white ${
+                              roleIsAdmin ? 'bg-black' : 'bg-[#8A001A]'
+                            }`}
+                          >
+                            {roleIsAdmin ? 'Admin' : 'Resepsionis'}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 text-gray-800 whitespace-nowrap font-medium">
+                          {u.telephone || '-'}
+                        </td>
+
+                        <td className="py-3 px-3 text-gray-800 whitespace-nowrap font-medium">
+                          {formatLastLogin(u.last_login_at)}
+                        </td>
+
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserActive(u)}
+                            title={u.is_active ? 'Nonaktifkan pengguna' : 'Aktifkan pengguna'}
+                            className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center cursor-pointer p-0.5 ${
+                              u.is_active ? 'bg-[#1E5631]' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                                u.is_active ? 'translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </td>
+
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <div className="inline-flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditUserModal(u)}
+                              className="px-3.5 py-1 bg-[#5B6367] hover:bg-[#484F52] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openResetPasswordModal(u)}
+                              className="px-3.5 py-1 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                            >
+                              Reset password
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-gray-500 font-medium">
+                      Tidak ada data pengguna yang cocok.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -610,7 +926,7 @@ export default function MasterDataPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
-                    Nomor
+                    Nomor Pass
                   </label>
                   <input
                     type="text"
@@ -624,7 +940,7 @@ export default function MasterDataPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
-                    Slot
+                    Slot KTP
                   </label>
                   <input
                     type="text"
@@ -652,6 +968,340 @@ export default function MasterDataPage() {
                   className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
                 >
                   {addingPass ? 'Menambahkan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAddUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200">
+            <div className="bg-[#8A001A] text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white tracking-wide">
+                Tambah Pengguna
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddUserModal(false)}
+                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup modal tambah pengguna"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddUser} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Nama Lengkap
+                  </label>
+                  <input
+                    type="text"
+                    value={addUserForm.fullname}
+                    onChange={(e) => setAddUserForm({ ...addUserForm, fullname: e.target.value })}
+                    required
+                    placeholder="Contoh: Dimas Prakoso"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    value={addUserForm.username}
+                    onChange={(e) => setAddUserForm({ ...addUserForm, username: e.target.value })}
+                    required
+                    placeholder="dimas.resepsionis"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={addUserForm.email}
+                    onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
+                    required
+                    placeholder="dimas@seamolec.org"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    No. HP
+                  </label>
+                  <input
+                    type="text"
+                    value={addUserForm.telephone}
+                    onChange={(e) => setAddUserForm({ ...addUserForm, telephone: e.target.value })}
+                    placeholder="081377788899"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Peran
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={addUserForm.role_code}
+                      onChange={(e) => setAddUserForm({ ...addUserForm, role_code: e.target.value })}
+                      className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 appearance-none cursor-pointer"
+                    >
+                      <option value="PETUGAS">Resepsionis</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-700 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Password Awal
+                  </label>
+                  <input
+                    type="password"
+                    value={addUserForm.password}
+                    onChange={(e) => setAddUserForm({ ...addUserForm, password: e.target.value })}
+                    placeholder="Default: 123456"
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="border-b border-gray-200 pt-2" />
+
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingUser}
+                  className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+                >
+                  {addingUser ? 'Menambahkan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200">
+            <div className="bg-[#8A001A] text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white tracking-wide">
+                Edit Pengguna
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup modal edit pengguna"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Nama Lengkap
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserForm.fullname}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, fullname: e.target.value })}
+                    required
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserForm.username}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })}
+                    required
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editUserForm.email}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                    required
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    No. HP
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserForm.telephone}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, telephone: e.target.value })}
+                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Peran
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editUserForm.role_code}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, role_code: e.target.value })}
+                      className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 appearance-none cursor-pointer"
+                    >
+                      <option value="PETUGAS">Resepsionis</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-700 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                    Status aktif
+                  </label>
+                  <div className="flex items-center space-x-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditUserForm({ ...editUserForm, is_active: !editUserForm.is_active })}
+                      className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center cursor-pointer p-0.5 ${
+                        editUserForm.is_active ? 'bg-[#1E5631]' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                          editUserForm.is_active ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs font-semibold text-gray-800">
+                      {editUserForm.is_active ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b border-gray-200 pt-2" />
+
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingUser}
+                  className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+                >
+                  {savingUser ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {resetPasswordUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200">
+            <div className="bg-[#8A001A] text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white tracking-wide flex items-center space-x-2">
+                <KeyRound className="w-4 h-4 text-white" />
+                <span>Reset Password</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setResetPasswordUser(null)}
+                className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup modal reset password"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="p-6 space-y-4">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Atur ulang password untuk akun{' '}
+                <span className="font-bold text-gray-900">{resetPasswordUser.fullname}</span> (
+                <span className="font-medium text-gray-700">@{resetPasswordUser.username}</span>).
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
+                  Password Baru
+                </label>
+                <input
+                  type="text"
+                  value={newResetPassword}
+                  onChange={(e) => setNewResetPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Minimal 6 karakter"
+                  className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                />
+              </div>
+
+              <div className="border-b border-gray-200 pt-2" />
+
+              <div className="flex items-center justify-end space-x-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordUser(null)}
+                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword}
+                  className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+                >
+                  {resettingPassword ? 'Memproses...' : 'Reset Password'}
                 </button>
               </div>
             </form>

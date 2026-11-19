@@ -3,11 +3,12 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import User
+from backend.app.models.entities import User, Role
 from backend.app.repositories.user_repository import UserRepository
 from backend.app.services.auth_service import AuthService
 from backend.app.schemas.auth import LoginRequest, RefreshRequest
 from backend.app.utils.security import verify_password, hash_password
+from backend.app.middleware.auth import role_required
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 
@@ -231,6 +232,184 @@ def get_all_users():
         return jsonify({
             'success': True,
             'data': [u.to_dict() for u in users]
+        }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/users', methods=['POST'])
+@role_required('ADMIN')
+def create_user():
+    data = request.get_json() or {}
+    fullname = (data.get('fullname') or '').strip()
+    username = (data.get('username') or '').strip()
+    email = (data.get('email') or '').strip()
+    telephone = (data.get('telephone') or '').strip()
+    role_code = (data.get('role_code') or 'PETUGAS').strip().upper()
+    password = (data.get('password') or '123456').strip()
+
+    if not fullname or not username or not email:
+        return jsonify({
+            'success': False,
+            'message': 'Nama lengkap, username, dan email wajib diisi.'
+        }), 400
+
+    db = get_db_session()
+    try:
+        if db.query(User).filter(User.username == username).first():
+            return jsonify({
+                'success': False,
+                'message': 'Username sudah digunakan.'
+            }), 409
+
+        if db.query(User).filter(User.email == email).first():
+            return jsonify({
+                'success': False,
+                'message': 'Email sudah digunakan.'
+            }), 409
+
+        role = db.query(Role).filter(Role.code == role_code).first()
+        if not role:
+            role = db.query(Role).filter(Role.code == 'PETUGAS').first()
+
+        new_user = User(
+            fullname=fullname,
+            username=username,
+            email=email,
+            telephone=telephone or None,
+            id_role=role.id_role if role else 2,
+            hash_password=hash_password(password),
+            is_active=True
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        return jsonify({
+            'success': True,
+            'message': 'Pengguna baru berhasil ditambahkan.',
+            'data': new_user.to_dict()
+        }), 201
+    finally:
+        db.close()
+
+@auth_bp.route('/users/<int:user_id>', methods=['PUT'])
+@role_required('ADMIN')
+def update_user_by_admin(user_id: int):
+    data = request.get_json() or {}
+    fullname = (data.get('fullname') or '').strip()
+    username = (data.get('username') or '').strip()
+    email = (data.get('email') or '').strip()
+    telephone = (data.get('telephone') or '').strip()
+    role_code = data.get('role_code')
+    is_active = data.get('is_active')
+
+    if not fullname or not username or not email:
+        return jsonify({
+            'success': False,
+            'message': 'Nama lengkap, username, dan email wajib diisi.'
+        }), 400
+
+    db = get_db_session()
+    try:
+        user = db.query(User).filter(User.id_user == user_id).first()
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Pengguna tidak ditemukan.'
+            }), 404
+
+        existing_username = db.query(User).filter(User.username == username, User.id_user != user_id).first()
+        if existing_username:
+            return jsonify({
+                'success': False,
+                'message': 'Username sudah digunakan oleh akun lain.'
+            }), 409
+
+        existing_email = db.query(User).filter(User.email == email, User.id_user != user_id).first()
+        if existing_email:
+            return jsonify({
+                'success': False,
+                'message': 'Email sudah digunakan oleh akun lain.'
+            }), 409
+
+        user.fullname = fullname
+        user.username = username
+        user.email = email
+        user.telephone = telephone or None
+
+        if role_code:
+            role = db.query(Role).filter(Role.code == role_code.strip().upper()).first()
+            if role:
+                user.id_role = role.id_role
+
+        if is_active is not None:
+            user.is_active = bool(is_active)
+
+        db.commit()
+        db.refresh(user)
+
+        return jsonify({
+            'success': True,
+            'message': 'Data pengguna berhasil diperbarui.',
+            'data': user.to_dict()
+        }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/users/<int:user_id>/toggle-active', methods=['PATCH', 'PUT'])
+@role_required('ADMIN')
+def toggle_user_active(user_id: int):
+    db = get_db_session()
+    try:
+        user = db.query(User).filter(User.id_user == user_id).first()
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Pengguna tidak ditemukan.'
+            }), 404
+
+        user.is_active = not user.is_active
+        db.commit()
+        db.refresh(user)
+
+        status_text = 'diaktifkan' if user.is_active else 'dinonaktifkan'
+        return jsonify({
+            'success': True,
+            'message': f'Pengguna {user.fullname} berhasil {status_text}.',
+            'data': user.to_dict()
+        }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+@role_required('ADMIN')
+def reset_user_password(user_id: int):
+    data = request.get_json() or {}
+    new_password = (data.get('password') or '123456').strip()
+
+    if len(new_password) < 6:
+        return jsonify({
+            'success': False,
+            'message': 'Password minimal 6 karakter.'
+        }), 400
+
+    db = get_db_session()
+    try:
+        user = db.query(User).filter(User.id_user == user_id).first()
+        if not user:
+            return jsonify({
+                'success': False,
+                'message': 'Pengguna tidak ditemukan.'
+            }), 404
+
+        user.hash_password = hash_password(new_password)
+        user_repo = UserRepository(db)
+        user_repo.revoke_all_user_tokens(user.id_user)
+        db.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Password untuk {user.fullname} berhasil direset.'
         }), 200
     finally:
         db.close()
