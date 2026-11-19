@@ -46,7 +46,7 @@ export default function MasterDataPage() {
   const router = useRouter();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
-  const [activeTab, setActiveTab] = useState<'pass' | 'user'>('pass');
+  const [activeTab, setActiveTab] = useState<'pass' | 'user'>('user');
   const [passes, setPasses] = useState<PassItem[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -451,18 +451,10 @@ export default function MasterDataPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold italic text-[#3B0A11] tracking-tight">
+      <div>
+        <h1 className="text-3xl font-black text-[#1A1A1A] tracking-tight">
           Master Data
         </h1>
-        <button
-          type="button"
-          onClick={() => fetchData()}
-          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-2xs transition-colors cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#8A001A]' : ''}`} />
-          <span>Segarkan</span>
-        </button>
       </div>
 
       {feedback && (
