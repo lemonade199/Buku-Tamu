@@ -1,5 +1,7 @@
 import os
-from flask import Blueprint, request, jsonify, send_file
+import time
+from collections import defaultdict
+from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
@@ -14,8 +16,34 @@ from backend.app.middleware.auth import role_required
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 
+_login_attempts = defaultdict(list)
+_MAX_LOGIN_ATTEMPTS = 5
+_LOGIN_LOCKOUT_SECONDS = 60
+
+def _is_rate_limited(ip: str) -> bool:
+    if current_app and current_app.config.get('TESTING') and not current_app.config.get('TEST_RATE_LIMIT'):
+        return False
+    now = time.time()
+    _login_attempts[ip] = [ts for ts in _login_attempts[ip] if now - ts < _LOGIN_LOCKOUT_SECONDS]
+    return len(_login_attempts[ip]) >= _MAX_LOGIN_ATTEMPTS
+
+def _record_failed_attempt(ip: str):
+    now = time.time()
+    _login_attempts[ip].append(now)
+
+def _clear_login_attempts(ip: str):
+    _login_attempts.pop(ip, None)
+
 @auth_bp.route('/login', methods=['POST'])
 def login():
+    client_ip = request.remote_addr or 'unknown'
+    if _is_rate_limited(client_ip):
+        return jsonify({
+            'success': False,
+            'message': 'Terlalu banyak percobaan login yang gagal. Silakan coba kembali dalam 1 menit.',
+            'code': 'TOO_MANY_REQUESTS'
+        }), 429
+
     data = request.get_json() or {}
     try:
         req = LoginRequest(**data)
@@ -31,12 +59,14 @@ def login():
         user_repo = UserRepository(db)
         auth_service = AuthService(user_repo)
         result = auth_service.authenticate_user(req.username, req.password)
+        _clear_login_attempts(client_ip)
         return jsonify({
             'success': True,
             'message': 'Login berhasil.',
             'data': result
         }), 200
     except ValueError as e:
+        _record_failed_attempt(client_ip)
         return jsonify({
             'success': False,
             'message': str(e)

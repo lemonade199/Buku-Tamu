@@ -12,7 +12,7 @@ def client():
 
     app = create_app('development')
     app.config['TESTING'] = True
-    app.config['JWT_SECRET_KEY'] = 'test-secret-key-12345'
+    app.config['JWT_SECRET_KEY'] = 'test-secret-key-1234567890-min-32-chars'
 
     with app.test_client() as client:
         yield client
@@ -83,3 +83,24 @@ def test_protected_dashboard_metrics(client):
     assert data['success'] is True
     assert 'total_visitors_today' in data['data']
     assert 'available_pass' in data['data']
+
+def test_login_rate_limiting(client):
+    client.application.config['TEST_RATE_LIMIT'] = True
+    try:
+        # 5 failed login attempts
+        for _ in range(5):
+            res = client.post('/api/v1/auth/login', json={
+                'username': 'admin',
+                'password': 'WrongPassword123!'
+            })
+            assert res.status_code == 401
+
+        # 6th attempt should be blocked with 429 Too Many Requests
+        blocked_res = client.post('/api/v1/auth/login', json={
+            'username': 'admin',
+            'password': 'WrongPassword123!'
+        })
+        assert blocked_res.status_code == 429
+        assert blocked_res.get_json()['code'] == 'TOO_MANY_REQUESTS'
+    finally:
+        client.application.config['TEST_RATE_LIMIT'] = False
