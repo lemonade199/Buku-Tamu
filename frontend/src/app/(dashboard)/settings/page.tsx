@@ -906,70 +906,71 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'sso' && (
-              <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
+              <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between space-y-6">
                 <div>
-                  <div className="mb-5">
-                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                  <div className="mb-6">
+                    <h3 className="text-[#8A001A] text-lg font-bold tracking-tight">
                       Keamanan, JWT & SSO
-                    </span>
+                    </h3>
                   </div>
 
-                  <div className="space-y-3.5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Masa berlaku akses token(menit):
                         </label>
                         <input
                           type="number"
                           value={formData.jwt_access_token_expiry ?? 5}
                           onChange={(e) => setFormData({ ...formData, jwt_access_token_expiry: Number(e.target.value) })}
-                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Masa berlaku refresh token(hari):
                         </label>
                         <input
                           type="number"
                           value={formData.jwt_refresh_token_expiry ?? 7}
                           onChange={(e) => setFormData({ ...formData, jwt_refresh_token_expiry: Number(e.target.value) })}
-                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Sesi antarmuka(jam):
                         </label>
                         <input
                           type="number"
                           value={formData.session_timeout_hours ?? 8}
                           onChange={(e) => setFormData({ ...formData, session_timeout_hours: Number(e.target.value) })}
-                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
+                      <div className="hidden md:block" />
                     </div>
 
-                    <div className="pt-1">
-                      <label className="flex items-center space-x-2.5 cursor-pointer">
+                    <div className="pt-2 pb-1">
+                      <label className="flex items-center space-x-3 cursor-pointer select-none">
                         <input
                           type="checkbox"
-                          checked={formData.sso_enabled}
+                          checked={formData.sso_enabled ?? true}
                           onChange={(e) => setFormData({ ...formData, sso_enabled: e.target.checked })}
-                          className="w-4 h-4 text-[#8A001A] accent-[#8A001A] rounded"
+                          className="w-4 h-4 text-[#8A001A] accent-[#8A001A] rounded cursor-pointer"
                         />
-                        <span className="text-xs md:text-sm font-medium text-gray-800">
+                        <span className="text-xs md:text-sm font-semibold text-gray-900">
                           Aktifkan login SSO (OAuth 2.0 + OpenID Connect)
                         </span>
                       </label>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-gray-800 mb-1">
+                      <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                         Issuer / identity Provider
                       </label>
                       <input
@@ -977,13 +978,13 @@ export default function SettingsPage() {
                         value={formData.sso_issuer || ''}
                         onChange={(e) => setFormData({ ...formData, sso_issuer: e.target.value })}
                         placeholder="https://accounts.google.com"
-                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Client ID (Aplikasi SSO):
                         </label>
                         <input
@@ -991,18 +992,19 @@ export default function SettingsPage() {
                           value={formData.sso_client_id || ''}
                           onChange={(e) => setFormData({ ...formData, sso_client_id: e.target.value })}
                           placeholder="bukutamu-seamolec"
-                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Client secret:
                         </label>
                         <input
                           type="password"
                           value={formData.sso_client_secret || ''}
                           onChange={(e) => setFormData({ ...formData, sso_client_secret: e.target.value })}
-                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                          placeholder="••••••••••••"
+                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
                     </div>
@@ -1013,7 +1015,7 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-7 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center space-x-1.5"
+                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-8 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50 flex items-center space-x-2"
                   >
                     <span>✓</span>
                     <span>Simpan</span>

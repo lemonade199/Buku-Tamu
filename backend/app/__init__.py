@@ -1,4 +1,5 @@
 import os
+import time
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -14,6 +15,15 @@ from backend.app.routes.setting_routes import setting_bp
 
 jwt = JWTManager()
 
+_user_active_cache = {}
+
+def invalidate_user_active_cache(user_id=None):
+    global _user_active_cache
+    if user_id is None:
+        _user_active_cache.clear()
+    else:
+        _user_active_cache.pop(user_id, None)
+
 def create_app(config_name=None, db_url=None):
     if config_name is None:
         config_name = os.getenv('FLASK_ENV', 'development')
@@ -21,8 +31,10 @@ def create_app(config_name=None, db_url=None):
     app = Flask(__name__)
     app.config.from_object(config_by_name.get(config_name, config_by_name['default']))
 
-    # Initialize extensions
-    CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+    # Initialize extensions with explicit origin whitelist compliant with W3C CORS spec
+    cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000')
+    cors_origins = [o.strip() for o in cors_origins_env.split(',') if o.strip()]
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}}, supports_credentials=True)
     jwt.init_app(app)
 
     @jwt.token_in_blocklist_loader
@@ -35,13 +47,18 @@ def create_app(config_name=None, db_url=None):
         except (ValueError, TypeError):
             return True
 
+        now_ts = time.time()
+        cached = _user_active_cache.get(user_id)
+        if cached and (now_ts - cached[1] < 15):
+            return not cached[0]
+
         from backend.app.models.entities import User
         db = get_db_session()
         try:
             user = db.query(User).filter(User.id_user == user_id).first()
-            if not user or not user.is_active:
-                return True
-            return False
+            is_active = bool(user and user.is_active)
+            _user_active_cache[user_id] = (is_active, now_ts)
+            return not is_active
         finally:
             db.close()
 
