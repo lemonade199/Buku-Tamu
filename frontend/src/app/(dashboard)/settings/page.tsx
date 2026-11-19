@@ -43,6 +43,7 @@ export default function SettingsPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.jpg');
+  const [testingEmail, setTestingEmail] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<SettingsData>({
@@ -50,12 +51,12 @@ export default function SettingsPage() {
     opening_time: '07.30',
     closing_time: '16.00',
     pass_warning_limit: 5,
-    smtp_host: 'smtp.gmail.com',
+    smtp_host: 'email-smtp.ap-southeast-1.amazonaws.com',
     smtp_port: 587,
-    smtp_username: 'notifikasi@seamolec.org',
-    smtp_encryption: 'tls',
-    smtp_sender_name: 'Buku Tamu Digital',
-    smtp_sender_email: 'noreply@seamolec.org',
+    smtp_username: 'bukutamu-smpt',
+    smtp_encryption: 'STARTTLS',
+    smtp_sender_name: 'buku tamu SEAMOLEC',
+    smtp_sender_email: 'buktam@seamolec.org',
     notify_app_checkin: true,
     notify_app_backup_fail: true,
     notify_email_monthly_report: false,
@@ -86,12 +87,12 @@ export default function SettingsPage() {
           opening_time: (d.opening_time || '07:30').replace(':', '.'),
           closing_time: (d.closing_time || '16:00').replace(':', '.'),
           pass_warning_limit: d.pass_warning_limit ?? 5,
-          smtp_host: d.smtp_host || 'smtp.gmail.com',
+          smtp_host: d.smtp_host || 'email-smtp.ap-southeast-1.amazonaws.com',
           smtp_port: d.smtp_port ?? 587,
-          smtp_username: d.smtp_username || '',
-          smtp_encryption: d.smtp_encryption || 'tls',
-          smtp_sender_name: d.smtp_sender_name || 'Buku Tamu Digital',
-          smtp_sender_email: d.smtp_sender_email || '',
+          smtp_username: d.smtp_username || 'bukutamu-smpt',
+          smtp_encryption: d.smtp_encryption || 'STARTTLS',
+          smtp_sender_name: d.smtp_sender_name || 'buku tamu SEAMOLEC',
+          smtp_sender_email: d.smtp_sender_email || 'buktam@seamolec.org',
           notify_app_checkin: d.notify_app_checkin ?? true,
           notify_app_backup_fail: d.notify_app_backup_fail ?? true,
           notify_email_monthly_report: d.notify_email_monthly_report ?? false,
@@ -160,11 +161,27 @@ export default function SettingsPage() {
     }
   };
 
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    setSuccessMessage('');
+    setErrorMessage('');
+    try {
+      const res = await api.post('/settings/smtp/test');
+      setSuccessMessage(res.data?.message || 'Koneksi ke server SMTP berhasil. Email uji telah berhasil dikirim.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal mengirim email uji.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   const tabs: { key: TabType; label: string }[] = [
     { key: 'umum', label: 'Umum' },
     { key: 'smtp', label: 'SMTP' },
     { key: 'notifikasi', label: 'Aturan notifikasi' },
-    { key: 'role', label: 'Role & hak akses' },
+    { key: 'role', label: 'Role & Hak akses' },
     { key: 'sso', label: 'Keamanan & SSO' },
     { key: 'backup', label: 'Data & Backup' },
   ];
@@ -308,69 +325,109 @@ export default function SettingsPage() {
                 <div>
                   <div className="mb-6">
                     <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
-                      Pengaturan SMTP
+                      Server email (SMTP)
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-x-6 gap-y-3.5">
                     <div>
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        SMTP Host
+                        Host:
                       </label>
                       <input
                         type="text"
                         value={formData.smtp_host || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_host: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        SMTP Port
+                        Port:
                       </label>
                       <input
                         type="number"
                         value={formData.smtp_port || 587}
                         onChange={(e) => setFormData({ ...formData, smtp_port: Number(e.target.value) })}
-                        className="w-full px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        SMTP Username
+                        Username:
                       </label>
                       <input
                         type="text"
                         value={formData.smtp_username || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_username: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        Enkripsi
+                        Enskripsi:
                       </label>
                       <select
-                        value={formData.smtp_encryption || 'tls'}
+                        value={formData.smtp_encryption || 'STARTTLS'}
                         onChange={(e) => setFormData({ ...formData, smtp_encryption: e.target.value })}
-                        className="w-full px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       >
-                        <option value="tls">TLS</option>
-                        <option value="ssl">SSL</option>
-                        <option value="none">None</option>
+                        <option value="STARTTLS">STARTTLS</option>
+                        <option value="SSL/TLS">SSL/TLS</option>
+                        <option value="None">None</option>
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        Nama Pengirim
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.smtp_sender_name || ''}
+                        onChange={(e) => setFormData({ ...formData, smtp_sender_name: e.target.value })}
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        Email pengirim:
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.smtp_sender_email || ''}
+                        onChange={(e) => setFormData({ ...formData, smtp_sender_email: e.target.value })}
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3 mt-6">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="bg-[#8A001A] hover:bg-[#68001a] text-white px-7 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center space-x-1.5"
+                    >
+                      <span>✓</span>
+                      <span>Simpan</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestEmail}
+                      disabled={testingEmail}
+                      className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-6 py-2 rounded-xl font-medium text-sm shadow-sm transition disabled:opacity-50"
+                    >
+                      {testingEmail ? 'Mengirim...' : 'Kirim email uji'}
+                    </button>
                   </div>
                 </div>
 
                 <div className="flex justify-end mt-8 pt-4">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
-                  >
-                    Simpan pengaturan
-                  </button>
+                  <div className="bg-[#2D6A4F] text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                    <span>✓</span>
+                    <span>Terhubung</span>
+                  </div>
                 </div>
               </form>
             )}

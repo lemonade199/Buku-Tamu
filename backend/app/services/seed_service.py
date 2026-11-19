@@ -144,7 +144,13 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             institution_name='SEAMOLEC',
             opening_time=time(7, 30),
             closing_time=time(16, 0),
-            pass_warning_limit=5
+            pass_warning_limit=5,
+            smtp_host='email-smtp.ap-southeast-1.amazonaws.com',
+            smtp_port=587,
+            smtp_username='bukutamu-smpt',
+            smtp_encryption='STARTTLS',
+            smtp_sender_name='buku tamu SEAMOLEC',
+            smtp_sender_email='buktam@seamolec.org'
         )
         db.add(setting)
     else:
@@ -154,6 +160,18 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             setting.opening_time = time(7, 30)
         if not setting.closing_time:
             setting.closing_time = time(16, 0)
+        if not setting.smtp_host or setting.smtp_host == 'smtp.gmail.com':
+            setting.smtp_host = 'email-smtp.ap-southeast-1.amazonaws.com'
+        if not setting.smtp_port:
+            setting.smtp_port = 587
+        if not setting.smtp_username:
+            setting.smtp_username = 'bukutamu-smpt'
+        if not setting.smtp_encryption or setting.smtp_encryption == 'tls':
+            setting.smtp_encryption = 'STARTTLS'
+        if not setting.smtp_sender_name:
+            setting.smtp_sender_name = 'buku tamu SEAMOLEC'
+        if not setting.smtp_sender_email:
+            setting.smtp_sender_email = 'buktam@seamolec.org'
 
     existing_passes = db.query(Pass).count()
     if existing_passes == 0:

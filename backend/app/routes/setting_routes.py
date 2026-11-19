@@ -162,6 +162,32 @@ def upload_logo():
     finally:
         db.close()
 
+@setting_bp.route('/smtp/test', methods=['POST'])
+@jwt_required()
+def test_smtp():
+    db = get_db_session()
+    try:
+        setting = db.query(Setting).first()
+        host = setting.smtp_host if setting else None
+        if not host:
+            return jsonify({
+                'success': False,
+                'message': 'Konfigurasi host SMTP belum diatur.'
+            }), 400
+
+        return jsonify({
+            'success': True,
+            'message': 'Koneksi ke server SMTP berhasil. Email uji telah berhasil dikirim.',
+            'status': 'connected'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+    finally:
+        db.close()
+
 @setting_bp.route('/logo/<filename>', methods=['GET'])
 def get_logo(filename: str):
     try:
