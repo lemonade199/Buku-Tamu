@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from PIL import Image
 from sqlalchemy.orm import Session
 from backend.app.models.entities import Role, User, Pass, Setting, Visitor, AuditLog
@@ -141,10 +141,19 @@ def seed_initial_data(db: Session, is_testing: bool = False):
     setting = db.query(Setting).first()
     if not setting:
         setting = Setting(
-            institution_name='SEAMEO SEAMOLEC',
+            institution_name='SEAMOLEC',
+            opening_time=time(7, 30),
+            closing_time=time(16, 0),
             pass_warning_limit=5
         )
         db.add(setting)
+    else:
+        if setting.institution_name in ['Nama Institusi', 'Sistem Informasi Buku Tamu Digital', 'SEAMEO SEAMOLEC']:
+            setting.institution_name = 'SEAMOLEC'
+        if not setting.opening_time:
+            setting.opening_time = time(7, 30)
+        if not setting.closing_time:
+            setting.closing_time = time(16, 0)
 
     existing_passes = db.query(Pass).count()
     if existing_passes == 0:
