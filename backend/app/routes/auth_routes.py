@@ -233,7 +233,7 @@ def update_password():
         db.close()
 
 @auth_bp.route('/users', methods=['GET'])
-@jwt_required()
+@role_required('ADMIN')
 def get_all_users():
     db = get_db_session()
     try:

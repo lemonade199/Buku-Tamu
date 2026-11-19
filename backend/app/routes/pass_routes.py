@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
 from backend.app.models.base import get_db_session
@@ -264,6 +264,15 @@ def update_pass_status(id_pass: int):
 
         old_status = pass_card.status
         new_status = req.status
+
+        claims = get_jwt()
+        user_role = claims.get('role')
+        if new_status in ['MAINTENANCE', 'LOST', 'INACTIVE'] and user_role != 'ADMIN':
+            return jsonify({
+                'success': False,
+                'message': f"Akses ditolak: Hanya Administrator yang berwenang mengubah status kartu ke '{new_status}'."
+            }), 403
+
         now = datetime.utcnow()
 
         auto_action_message = None

@@ -37,6 +37,13 @@ def test_create_pass_admin_only(client):
     assert success_res.get_json()['data']['no_pass'] == '99'
 
 def test_update_pass_status(client):
+    login_petugas = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    petugas_token = login_petugas.get_json()['data']['access_token']
+
+    # Petugas cannot set card to MAINTENANCE (403 Forbidden)
+    forbidden_res = client.put('/api/v1/pass/1/status', json={'status': 'MAINTENANCE', 'notes': 'Kartu retak'}, headers={'Authorization': f'Bearer {petugas_token}'})
+    assert forbidden_res.status_code == 403
+
     login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
     token = login_admin.get_json()['data']['access_token']
 

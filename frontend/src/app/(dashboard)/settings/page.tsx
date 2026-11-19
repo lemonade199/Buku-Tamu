@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
 import { CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 
@@ -51,6 +53,15 @@ const permissionsMatrix = [
 ];
 
 export default function SettingsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && user && user.role_code !== 'ADMIN') {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
   const [activeTab, setActiveTab] = useState<TabType>('umum');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

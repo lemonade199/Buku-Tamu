@@ -55,6 +55,7 @@ def test_checkin_success(client):
     data = res.get_json()
     assert data['success'] is True
     assert data['data']['fullname'] == 'Budi Santoso'
+    assert data['data']['telephone'] == '081298765432'
     assert data['data']['no_pass'] == '01'
     assert 'capture_id' in data['data']
 

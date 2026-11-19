@@ -51,6 +51,7 @@ class CheckinService:
             raise ValueError(f"Gagal memproses foto pengunjung: {str(e)}")
 
         now = datetime.utcnow()
+        telephone_val = (data.get('telephone') or '').strip() or None
         institution_val = (data.get('institution') or '').strip() or None
         representing_val = (data.get('representing') or '').strip() or None
         purpose_val = (data.get('purpose') or '').strip() or None
@@ -58,6 +59,7 @@ class CheckinService:
         visitor = Visitor(
             id_pass=pass_card.id_pass,
             fullname=data['fullname'].strip(),
+            telephone=telephone_val,
             institution=institution_val,
             representing=representing_val,
             purpose=purpose_val,
@@ -84,6 +86,7 @@ class CheckinService:
         return {
             'id_visitor': visitor.id_visitor,
             'fullname': visitor.fullname,
+            'telephone': visitor.telephone,
             'id_pass': pass_card.id_pass,
             'no_pass': pass_card.no_pass,
             'slot': pass_card.slot,

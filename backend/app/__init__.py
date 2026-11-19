@@ -61,6 +61,7 @@ def create_app(config_name=None, db_url=None):
         with engine.connect() as conn:
             conn.execute(text("""
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
+                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS telephone VARCHAR(25);
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS approved_by_id BIGINT REFERENCES users(id_user) ON DELETE SET NULL;
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;

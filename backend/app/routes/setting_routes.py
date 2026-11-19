@@ -21,7 +21,7 @@ def parse_time_str(time_str: str) -> time:
     return time(h, m)
 
 @setting_bp.route('', methods=['GET'])
-@jwt_required()
+@role_required('ADMIN')
 def get_settings():
     db = get_db_session()
     try:
@@ -50,7 +50,7 @@ def get_settings():
         db.close()
 
 @setting_bp.route('', methods=['PUT', 'PATCH'])
-@jwt_required()
+@role_required('ADMIN')
 def update_settings():
     db = get_db_session()
     try:
@@ -133,7 +133,7 @@ def update_settings():
         db.close()
 
 @setting_bp.route('/logo', methods=['POST'])
-@jwt_required()
+@role_required('ADMIN')
 def upload_logo():
     db = get_db_session()
     try:

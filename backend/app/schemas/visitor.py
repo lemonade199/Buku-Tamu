@@ -16,6 +16,7 @@ class VisitorResponse(BaseModel):
     id_pass: int
     no_pass: Optional[str] = None
     fullname: str
+    telephone: Optional[str] = None
     institution: Optional[str] = None
     representing: Optional[str] = None
     purpose: Optional[str] = None
