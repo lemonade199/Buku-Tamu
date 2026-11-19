@@ -24,7 +24,8 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const checkActiveInterval = setInterval(async () => {
+    const checkMe = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         await api.get('/auth/me');
       } catch (err: any) {
@@ -35,9 +36,20 @@ export default function DashboardLayout({
           router.push('/login?reason=inactive');
         }
       }
-    }, 4000);
+    };
 
-    return () => clearInterval(checkActiveInterval);
+    const checkActiveInterval = setInterval(checkMe, 8000);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        checkMe();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(checkActiveInterval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [isAuthenticated, router]);
 
   if (loading) {

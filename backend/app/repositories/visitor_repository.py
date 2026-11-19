@@ -2,6 +2,7 @@ from datetime import datetime, date, time, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.app.models.entities import Visitor
+from backend.app.utils.datetime_utils import utc_now
 
 class VisitorRepository:
     def __init__(self, db: Session):
@@ -90,7 +91,7 @@ class VisitorRepository:
         return results
 
     def count_this_month(self) -> int:
-        now = datetime.utcnow()
+        now = utc_now()
         month_start = datetime(now.year, now.month, 1)
         return self.db.query(func.count(Visitor.id_visitor)).filter(
             Visitor.status == 'APPROVED',
@@ -98,7 +99,7 @@ class VisitorRepository:
         ).scalar() or 0
 
     def get_monthly_stats(self) -> list:
-        now = datetime.utcnow()
+        now = utc_now()
         year = now.year
         months_label = ['Jan', 'Feb', 'Mart', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
         result = []

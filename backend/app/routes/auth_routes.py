@@ -372,6 +372,11 @@ def update_user_by_admin(user_id: int):
             if not user.is_active:
                 user_repo = UserRepository(db)
                 user_repo.revoke_all_user_tokens(user.id_user)
+            try:
+                from backend.app import invalidate_user_active_cache
+                invalidate_user_active_cache(user.id_user)
+            except Exception:
+                pass
 
         db.commit()
         db.refresh(user)
@@ -400,6 +405,11 @@ def toggle_user_active(user_id: int):
         if not user.is_active:
             user_repo = UserRepository(db)
             user_repo.revoke_all_user_tokens(user.id_user)
+        try:
+            from backend.app import invalidate_user_active_cache
+            invalidate_user_active_cache(user.id_user)
+        except Exception:
+            pass
         db.commit()
         db.refresh(user)
 

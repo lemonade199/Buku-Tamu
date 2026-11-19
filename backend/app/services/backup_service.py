@@ -2,7 +2,8 @@ import os
 import json
 from datetime import datetime, time
 from sqlalchemy.orm import Session
-from backend.app.models.entities import Setting, Role, User, Pass, Visitor, AuditLog
+from backend.app.models.entities import Setting, Role, User, Pass, Visitor, AuditLog, BackupHistory
+from backend.app.utils.datetime_utils import utc_now
 
 def get_backup_dir() -> str:
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -24,7 +25,7 @@ class BackupService:
         self.backup_dir = get_backup_dir()
 
     def create_backup(self, user_id: int = None, ip_address: str = None) -> dict:
-        now = datetime.utcnow()
+        now = utc_now()
         timestamp_str = now.strftime('%Y%m%d_%H%M%S')
         filename = f"bukutamu_backup_{timestamp_str}.json"
         filepath = os.path.join(self.backup_dir, filename)
@@ -62,6 +63,16 @@ class BackupService:
             json.dump(backup_payload, f, indent=2, ensure_ascii=False)
 
         size_bytes = os.path.getsize(filepath)
+
+        history = BackupHistory(
+            id_user=user_id,
+            type='MANUAL',
+            status='SUCCESS',
+            file_size_bytes=size_bytes,
+            file_path=filepath,
+            created_at=now
+        )
+        self.db.add(history)
 
         audit = AuditLog(
             id_user=user_id,

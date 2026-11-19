@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from backend.app.models.entities import Visitor, Pass, AuditLog
 from backend.app.utils.photo_storage import save_visitor_photo
+from backend.app.utils.datetime_utils import utc_now
 
 class CheckinService:
     def __init__(self, db: Session):
@@ -50,7 +51,7 @@ class CheckinService:
         except Exception as e:
             raise ValueError(f"Gagal memproses foto pengunjung: {str(e)}")
 
-        now = datetime.utcnow()
+        now = utc_now()
         telephone_val = (data.get('telephone') or '').strip() or None
         institution_val = (data.get('institution') or '').strip() or None
         representing_val = (data.get('representing') or '').strip() or None
@@ -108,7 +109,7 @@ class CheckinService:
         if not pass_card:
             raise ValueError("Kartu pass terkait tidak ditemukan.")
 
-        now = datetime.utcnow()
+        now = utc_now()
         visitor.status = 'APPROVED'
         visitor.approved_by_id = approved_by_user_id
         visitor.approved_at = now
@@ -156,7 +157,7 @@ class CheckinService:
 
         pass_card = self.db.query(Pass).filter(Pass.id_pass == visitor.id_pass).with_for_update().first()
 
-        now = datetime.utcnow()
+        now = utc_now()
         visitor.status = 'REJECTED'
         visitor.rejection_reason = reason.strip()
         visitor.rejected_by_id = rejected_by_user_id

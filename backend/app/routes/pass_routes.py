@@ -7,6 +7,7 @@ from backend.app.models.base import get_db_session
 from backend.app.models.entities import Pass, Visitor, AuditLog
 from backend.app.schemas.pass_schema import PassCreateRequest, PassStatusUpdateRequest
 from backend.app.middleware.auth import role_required
+from backend.app.utils.datetime_utils import utc_now
 
 pass_bp = Blueprint('pass', __name__, url_prefix='/api/v1/pass')
 
@@ -235,7 +236,7 @@ def update_pass_details(id_pass: int):
             elif pass_card.status in ['MAINTENANCE', 'LOST', 'INACTIVE']:
                 pass_card.status = 'AVAILABLE'
 
-        pass_card.updated_at = datetime.utcnow()
+        pass_card.updated_at = utc_now()
         db.commit()
 
         return jsonify({
@@ -273,7 +274,7 @@ def update_pass_status(id_pass: int):
                 'message': f"Akses ditolak: Hanya Administrator yang berwenang mengubah status kartu ke '{new_status}'."
             }), 403
 
-        now = datetime.utcnow()
+        now = utc_now()
 
         auto_action_message = None
 
@@ -387,7 +388,7 @@ def approve_pass(id_pass: int):
         if pass_card.status != 'PENDING':
             return jsonify({'success': False, 'message': f'Kartu pass #{pass_card.no_pass} tidak dalam status PENDING (status saat ini: {pass_card.status}).'}), 400
 
-        now = datetime.utcnow()
+        now = utc_now()
         pending_visitor = db.query(Visitor).filter(
             Visitor.id_pass == pass_card.id_pass,
             Visitor.status == 'PENDING'
@@ -456,7 +457,7 @@ def reject_pass(id_pass: int):
         if pass_card.status != 'PENDING':
             return jsonify({'success': False, 'message': f'Kartu pass #{pass_card.no_pass} tidak dalam status PENDING (status saat ini: {pass_card.status}).'}), 400
 
-        now = datetime.utcnow()
+        now = utc_now()
         pending_visitor = db.query(Visitor).filter(
             Visitor.id_pass == pass_card.id_pass,
             Visitor.status == 'PENDING'

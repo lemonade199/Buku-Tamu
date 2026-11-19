@@ -3,6 +3,7 @@ import json
 from flask_jwt_extended import create_access_token, create_refresh_token
 from backend.app.repositories.user_repository import UserRepository
 from backend.app.utils.security import verify_password, hash_token, generate_random_token
+from backend.app.utils.datetime_utils import utc_now
 
 class AuthService:
     def __init__(self, user_repo: UserRepository):
@@ -35,7 +36,7 @@ class AuthService:
         # Refresh token custom random string
         raw_refresh_token = generate_random_token(48)
         token_hash = hash_token(raw_refresh_token)
-        expires_at = datetime.utcnow() + timedelta(days=7)
+        expires_at = utc_now() + timedelta(days=7)
         self.user_repo.save_refresh_token(user.id_user, token_hash, expires_at)
 
         return {

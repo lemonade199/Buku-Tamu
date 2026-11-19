@@ -7,6 +7,7 @@ from sqlalchemy import (
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 from backend.app.models.base import Base
+from backend.app.utils.datetime_utils import utc_now
 
 class Role(Base):
     __tablename__ = 'roles'
@@ -17,8 +18,8 @@ class Role(Base):
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     permissions = Column(JSON, nullable=False, default=list)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     users = relationship('User', back_populates='role')
 
@@ -47,8 +48,8 @@ class User(Base):
     avatar = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     last_login_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     role = relationship('Role', back_populates='users')
     refresh_tokens = relationship('RefreshToken', back_populates='user', cascade='all, delete-orphan')
@@ -80,8 +81,8 @@ class Pass(Base):
     handled_over_at = Column(DateTime, nullable=True)
     achieve_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey('users.id_user', onupdate='CASCADE', ondelete='SET NULL'), nullable=True)
     achieve_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     visitors = relationship('Visitor', back_populates='pass_card')
 
@@ -108,7 +109,7 @@ class Visitor(Base):
     institution = Column(String(150), nullable=True)
     representing = Column(String(150), nullable=True)
     purpose = Column(Text, nullable=True)
-    check_in_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    check_in_at = Column(DateTime, nullable=False, default=utc_now, index=True)
     check_out_at = Column(DateTime, nullable=True, index=True)
     status = Column(String(20), nullable=False, default='PENDING', index=True)
     rejection_reason = Column(Text, nullable=True)
@@ -117,8 +118,8 @@ class Visitor(Base):
     rejected_by_id = Column(BigInteger().with_variant(Integer, "sqlite"), ForeignKey('users.id_user', onupdate='CASCADE', ondelete='SET NULL'), nullable=True)
     rejected_at = Column(DateTime, nullable=True)
     capture_id = Column(String(500), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     pass_card = relationship('Pass', back_populates='visitors')
     approved_by = relationship('User', foreign_keys=[approved_by_id])
@@ -179,8 +180,8 @@ class Setting(Base):
     visit_data_retention_years = Column(Integer, nullable=False, default=5)
     auto_backup_enabled = Column(Boolean, nullable=False, default=False)
     auto_backup_schedule = Column(String(100), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     def to_dict(self):
         return {
@@ -223,7 +224,7 @@ class RefreshToken(Base):
     token_hash = Column(String(255), nullable=False, unique=True, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
 
     user = relationship('User', back_populates='refresh_tokens')
 
@@ -237,7 +238,7 @@ class BackupHistory(Base):
     file_size_bytes = Column(BigInteger().with_variant(Integer, "sqlite"), nullable=True)
     file_path = Column(String(500), nullable=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now, index=True)
 
 class AuditLog(Base):
     __tablename__ = 'audit_logs'
@@ -250,6 +251,6 @@ class AuditLog(Base):
     description = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now, index=True)
 
     user = relationship('User')

@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from backend.app.models.entities import Visitor, Pass, AuditLog
+from backend.app.utils.datetime_utils import utc_now
 
 class CheckoutService:
     def __init__(self, db: Session):
@@ -50,7 +51,7 @@ class CheckoutService:
             Pass.id_pass == visitor.id_pass
         ).with_for_update().first()
 
-        now = datetime.utcnow()
+        now = utc_now()
 
         # 1. Update Visitor checkout timestamp
         visitor.check_out_at = now

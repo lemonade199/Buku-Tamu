@@ -2,8 +2,11 @@ import os
 import base64
 import uuid
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import current_app
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def get_upload_dir() -> str:
     upload_dir = current_app.config.get('UPLOAD_FOLDER') if current_app else None
@@ -35,7 +38,7 @@ def save_visitor_photo(photo_base64: str) -> str:
     upload_dir = get_upload_dir()
     os.makedirs(upload_dir, exist_ok=True)
 
-    date_str = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    date_str = utc_now().strftime('%Y%m%d_%H%M%S')
     unique_suffix = uuid.uuid4().hex[:8]
     filename = f"visitor_{date_str}_{unique_suffix}.jpg"
     full_path = os.path.join(upload_dir, filename)
@@ -47,7 +50,8 @@ def save_visitor_photo(photo_base64: str) -> str:
 
 def get_photo_path(filename: str) -> str:
     upload_dir = get_upload_dir()
-    return os.path.abspath(os.path.join(upload_dir, filename))
+    clean_filename = os.path.basename(filename)
+    return os.path.abspath(os.path.join(upload_dir, clean_filename))
 
 def save_user_avatar(photo_base64: str) -> str:
     if ',' in photo_base64:
@@ -62,7 +66,7 @@ def save_user_avatar(photo_base64: str) -> str:
     upload_dir = get_upload_dir()
     os.makedirs(upload_dir, exist_ok=True)
 
-    date_str = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    date_str = utc_now().strftime('%Y%m%d_%H%M%S')
     unique_suffix = uuid.uuid4().hex[:8]
     filename = f"avatar_{date_str}_{unique_suffix}.jpg"
     full_path = os.path.join(upload_dir, filename)
