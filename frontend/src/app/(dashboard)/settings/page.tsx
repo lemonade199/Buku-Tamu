@@ -30,6 +30,8 @@ interface SettingsData {
   sso_enabled?: boolean;
   sso_issuer?: string;
   sso_client_id?: string;
+  sso_client_secret?: string;
+  session_timeout_hours?: number;
   guest_photo_retention_months?: number;
   visit_data_retention_years?: number;
   auto_backup_enabled?: boolean;
@@ -86,9 +88,13 @@ export default function SettingsPage() {
     notify_email_new_account: true,
     notify_email_reset_password: true,
     admin_notification_email: 'tasha@seamolec.org',
-    jwt_access_token_expiry: 15,
+    jwt_access_token_expiry: 5,
     jwt_refresh_token_expiry: 7,
-    sso_enabled: false,
+    session_timeout_hours: 8,
+    sso_enabled: true,
+    sso_issuer: 'https://accounts.google.com',
+    sso_client_id: 'bukutamu-seamolec',
+    sso_client_secret: '',
     guest_photo_retention_months: 6,
     visit_data_retention_years: 5,
     auto_backup_enabled: true,
@@ -122,11 +128,13 @@ export default function SettingsPage() {
           notify_email_new_account: d.notify_email_new_account ?? true,
           notify_email_reset_password: d.notify_email_reset_password ?? true,
           admin_notification_email: d.admin_notification_email || 'tasha@seamolec.org',
-          jwt_access_token_expiry: d.jwt_access_token_expiry ? Math.round(d.jwt_access_token_expiry / 60) : 15,
+          jwt_access_token_expiry: d.jwt_access_token_expiry ? Math.round(d.jwt_access_token_expiry / 60) : 5,
           jwt_refresh_token_expiry: d.jwt_refresh_token_expiry ? Math.round(d.jwt_refresh_token_expiry / 86400) : 7,
-          sso_enabled: d.sso_enabled ?? false,
-          sso_issuer: d.sso_issuer || '',
-          sso_client_id: d.sso_client_id || '',
+          session_timeout_hours: d.session_timeout_hours ?? 8,
+          sso_enabled: d.sso_enabled ?? true,
+          sso_issuer: d.sso_issuer || 'https://accounts.google.com',
+          sso_client_id: d.sso_client_id || 'bukutamu-seamolec',
+          sso_client_secret: d.sso_client_secret || '',
           guest_photo_retention_months: d.guest_photo_retention_months ?? 6,
           visit_data_retention_years: d.visit_data_retention_years ?? 5,
           auto_backup_enabled: d.auto_backup_enabled ?? true,
@@ -768,47 +776,103 @@ export default function SettingsPage() {
             {activeTab === 'sso' && (
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
-                  <div className="mb-6">
-                    <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
-                      Keamanan & SSO
+                  <div className="mb-5">
+                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                      Keamanan, JWT & SSO
                     </span>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        JWT Access Token Expiry (menit)
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.jwt_access_token_expiry || 15}
-                        onChange={(e) => setFormData({ ...formData, jwt_access_token_expiry: Number(e.target.value) })}
-                        className="w-full max-w-[280px] px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
-                      />
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Masa berlaku akses token(menit):
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.jwt_access_token_expiry ?? 5}
+                          onChange={(e) => setFormData({ ...formData, jwt_access_token_expiry: Number(e.target.value) })}
+                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Masa berlaku refresh token(hari):
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.jwt_refresh_token_expiry ?? 7}
+                          onChange={(e) => setFormData({ ...formData, jwt_refresh_token_expiry: Number(e.target.value) })}
+                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        JWT Refresh Token Expiry (hari)
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.jwt_refresh_token_expiry || 7}
-                        onChange={(e) => setFormData({ ...formData, jwt_refresh_token_expiry: Number(e.target.value) })}
-                        className="w-full max-w-[280px] px-3 py-1.5 rounded-lg border border-gray-600 text-sm bg-white"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Sesi antarmuka(jam):
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.session_timeout_hours ?? 8}
+                          onChange={(e) => setFormData({ ...formData, session_timeout_hours: Number(e.target.value) })}
+                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                      </div>
                     </div>
 
-                    <div className="pt-2">
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                    <div className="pt-1">
+                      <label className="flex items-center space-x-2.5 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.sso_enabled}
                           onChange={(e) => setFormData({ ...formData, sso_enabled: e.target.checked })}
-                          className="w-4 h-4 text-[#8A001A] rounded"
+                          className="w-4 h-4 text-[#8A001A] accent-[#8A001A] rounded"
                         />
-                        <span className="text-sm font-medium text-gray-800">Aktifkan Single Sign-On (SSO)</span>
+                        <span className="text-xs md:text-sm font-medium text-gray-800">
+                          Aktifkan login SSO (OAuth 2.0 + OpenID Connect)
+                        </span>
                       </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        Issuer / identity Provider
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.sso_issuer || ''}
+                        onChange={(e) => setFormData({ ...formData, sso_issuer: e.target.value })}
+                        placeholder="https://accounts.google.com"
+                        className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3.5">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Masa berlaku akses token(menit):
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.sso_client_id || ''}
+                          onChange={(e) => setFormData({ ...formData, sso_client_id: e.target.value })}
+                          placeholder="bukutamu-seamolec"
+                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Client secret:
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.sso_client_secret || ''}
+                          onChange={(e) => setFormData({ ...formData, sso_client_secret: e.target.value })}
+                          className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -817,9 +881,10 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
+                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-7 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center space-x-1.5"
                   >
-                    Simpan pengaturan
+                    <span>✓</span>
+                    <span>Simpan</span>
                   </button>
                 </div>
               </form>

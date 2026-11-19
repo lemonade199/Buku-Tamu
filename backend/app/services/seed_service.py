@@ -185,6 +185,12 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         setting.notify_email_monthly_report = True
         setting.notify_email_new_account = True
         setting.notify_email_reset_password = True
+        setting.jwt_access_token_expiry = 300
+        setting.jwt_refresh_token_expiry = 604800
+        setting.session_timeout_hours = 8
+        setting.sso_enabled = True
+        setting.sso_issuer = 'https://accounts.google.com'
+        setting.sso_client_id = 'bukutamu-seamolec'
 
     existing_passes = db.query(Pass).count()
     if existing_passes == 0:

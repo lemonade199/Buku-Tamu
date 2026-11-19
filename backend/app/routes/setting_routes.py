@@ -99,6 +99,10 @@ def update_settings():
             setting.sso_issuer = data['sso_issuer']
         if 'sso_client_id' in data:
             setting.sso_client_id = data['sso_client_id']
+        if 'sso_client_secret' in data:
+            setting.sso_client_secret = data['sso_client_secret']
+        if 'session_timeout_hours' in data:
+            setting.session_timeout_hours = int(data['session_timeout_hours'])
         if 'guest_photo_retention_months' in data:
             setting.guest_photo_retention_months = int(data['guest_photo_retention_months'])
         if 'visit_data_retention_years' in data:

@@ -171,6 +171,8 @@ class Setting(Base):
     sso_enabled = Column(Boolean, nullable=False, default=False)
     sso_issuer = Column(String(255), nullable=True)
     sso_client_id = Column(String(255), nullable=True)
+    sso_client_secret = Column(String(255), nullable=True)
+    session_timeout_hours = Column(Integer, nullable=False, default=8)
     guest_photo_retention_months = Column(Integer, nullable=False, default=6)
     visit_data_retention_years = Column(Integer, nullable=False, default=5)
     auto_backup_enabled = Column(Boolean, nullable=False, default=False)
@@ -203,6 +205,8 @@ class Setting(Base):
             'sso_enabled': self.sso_enabled,
             'sso_issuer': self.sso_issuer,
             'sso_client_id': self.sso_client_id,
+            'sso_client_secret': self.sso_client_secret,
+            'session_timeout_hours': self.session_timeout_hours,
             'guest_photo_retention_months': self.guest_photo_retention_months,
             'visit_data_retention_years': self.visit_data_retention_years,
             'auto_backup_enabled': self.auto_backup_enabled,

@@ -67,6 +67,8 @@ def create_app(config_name=None, db_url=None):
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejected_by_id BIGINT REFERENCES users(id_user) ON DELETE SET NULL;
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP;
                 CREATE INDEX IF NOT EXISTS ix_visitors_status ON visitors(status);
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS sso_client_secret VARCHAR(255);
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS session_timeout_hours INTEGER DEFAULT 8;
             """))
             conn.commit()
 
