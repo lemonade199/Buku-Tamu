@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import api from '@/lib/api';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 
 type TabType = 'umum' | 'smtp' | 'notifikasi' | 'role' | 'sso' | 'backup';
 
@@ -58,6 +58,15 @@ export default function SettingsPage() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleModalData, setRoleModalData] = useState({ name: '', description: '' });
+  const [matrix, setMatrix] = useState(permissionsMatrix);
+  const [pendingPermissionChange, setPendingPermissionChange] = useState<{
+    featureIndex: number;
+    featureName: string;
+    role: 'Admin' | 'Resepsionis';
+    roleKey: 'admin' | 'receptionist';
+    currentVal: boolean;
+  } | null>(null);
+  const [showPermissionWarningModal, setShowPermissionWarningModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<SettingsData>({
@@ -189,6 +198,42 @@ export default function SettingsPage() {
     } finally {
       setTestingEmail(false);
     }
+  };
+
+  const handlePermissionClick = (
+    index: number,
+    featureName: string,
+    role: 'Admin' | 'Resepsionis',
+    roleKey: 'admin' | 'receptionist',
+    currentVal: boolean
+  ) => {
+    setPendingPermissionChange({
+      featureIndex: index,
+      featureName,
+      role,
+      roleKey,
+      currentVal,
+    });
+    setShowPermissionWarningModal(true);
+  };
+
+  const confirmPermissionChange = () => {
+    if (!pendingPermissionChange) return;
+    const { featureIndex, featureName, role, roleKey } = pendingPermissionChange;
+
+    setMatrix((prev) => {
+      const next = [...prev];
+      next[featureIndex] = {
+        ...next[featureIndex],
+        [roleKey]: !next[featureIndex][roleKey],
+      };
+      return next;
+    });
+
+    setShowPermissionWarningModal(false);
+    setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
+    setTimeout(() => setSuccessMessage(''), 3500);
+    setPendingPermissionChange(null);
   };
 
   const tabs: { key: TabType; label: string }[] = [
@@ -341,25 +386,39 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {permissionsMatrix.map((item) => (
+                      {matrix.map((item, index) => (
                         <tr key={item.feature}>
                           <td className="py-2.5 text-xs text-gray-800 font-medium">{item.feature}</td>
                           <td className="py-2.5 text-center">
                             <div className="flex justify-center">
-                              {item.admin ? (
-                                <span className="w-5 h-5 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center text-xs font-bold shadow-sm">✓</span>
-                              ) : (
-                                <span className="w-5 h-5 rounded-full bg-[#E5E7EB] text-gray-500 flex items-center justify-center text-xs font-bold">—</span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => handlePermissionClick(index, item.feature, 'Admin', 'admin', item.admin)}
+                                className="group relative focus:outline-none cursor-pointer"
+                                title={`Klik untuk mengubah izin fitur ${item.feature} untuk Admin`}
+                              >
+                                {item.admin ? (
+                                  <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
+                                )}
+                              </button>
                             </div>
                           </td>
                           <td className="py-2.5 text-center">
                             <div className="flex justify-center">
-                              {item.receptionist ? (
-                                <span className="w-5 h-5 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center text-xs font-bold shadow-sm">✓</span>
-                              ) : (
-                                <span className="w-5 h-5 rounded-full bg-[#E5E7EB] text-gray-500 flex items-center justify-center text-xs font-bold">—</span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => handlePermissionClick(index, item.feature, 'Resepsionis', 'receptionist', item.receptionist)}
+                                className="group relative focus:outline-none cursor-pointer"
+                                title={`Klik untuk mengubah izin fitur ${item.feature} untuk Resepsionis`}
+                              >
+                                {item.receptionist ? (
+                                  <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
+                                )}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -876,6 +935,45 @@ export default function SettingsPage() {
                 className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition"
               >
                 Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPermissionWarningModal && pendingPermissionChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 animate-fadeIn">
+            <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 mb-3 mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 text-center mb-2">
+              Peringatan Perubahan Hak Akses
+            </h3>
+            <p className="text-xs text-gray-600 text-center leading-relaxed mb-4">
+              Anda akan {pendingPermissionChange.currentVal ? 'mencabut' : 'mengaktifkan'} hak akses fitur <strong className="text-gray-900 font-semibold">{pendingPermissionChange.featureName}</strong> untuk role <strong className="text-gray-900 font-semibold">{pendingPermissionChange.role}</strong>.
+              <br />
+              <span className="text-red-600 font-medium inline-block mt-2">
+                Perhatian: Perubahan ini berdampak langsung pada izin menu dan aksi operasional pengguna dengan role ini.
+              </span>
+            </p>
+            <div className="flex justify-center space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPermissionWarningModal(false);
+                  setPendingPermissionChange(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmPermissionChange}
+                className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition"
+              >
+                Ya, Ubah Hak Akses
               </button>
             </div>
           </div>
