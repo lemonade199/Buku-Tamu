@@ -59,10 +59,10 @@ export default function SettingsPage() {
     smtp_sender_email: 'buktam@seamolec.org',
     notify_app_checkin: true,
     notify_app_backup_fail: true,
-    notify_email_monthly_report: false,
-    notify_email_new_account: false,
+    notify_email_monthly_report: true,
+    notify_email_new_account: true,
     notify_email_reset_password: true,
-    admin_notification_email: 'admin@seamolec.org',
+    admin_notification_email: 'tasha@seamolec.org',
     jwt_access_token_expiry: 15,
     jwt_refresh_token_expiry: 7,
     sso_enabled: false,
@@ -95,10 +95,10 @@ export default function SettingsPage() {
           smtp_sender_email: d.smtp_sender_email || 'buktam@seamolec.org',
           notify_app_checkin: d.notify_app_checkin ?? true,
           notify_app_backup_fail: d.notify_app_backup_fail ?? true,
-          notify_email_monthly_report: d.notify_email_monthly_report ?? false,
-          notify_email_new_account: d.notify_email_new_account ?? false,
+          notify_email_monthly_report: d.notify_email_monthly_report ?? true,
+          notify_email_new_account: d.notify_email_new_account ?? true,
           notify_email_reset_password: d.notify_email_reset_password ?? true,
-          admin_notification_email: d.admin_notification_email || '',
+          admin_notification_email: d.admin_notification_email || 'tasha@seamolec.org',
           jwt_access_token_expiry: d.jwt_access_token_expiry ? Math.round(d.jwt_access_token_expiry / 60) : 15,
           jwt_refresh_token_expiry: d.jwt_refresh_token_expiry ? Math.round(d.jwt_refresh_token_expiry / 86400) : 7,
           sso_enabled: d.sso_enabled ?? false,
@@ -435,52 +435,118 @@ export default function SettingsPage() {
             {activeTab === 'notifikasi' && (
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
-                  <div className="mb-6">
-                    <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
-                      Aturan Notifikasi
+                  <div className="mb-4">
+                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                      Notifikasi di aplikasi
                     </span>
                   </div>
 
-                  <div className="space-y-4">
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.notify_app_checkin}
-                        onChange={(e) => setFormData({ ...formData, notify_app_checkin: e.target.checked })}
-                        className="w-4 h-4 text-[#8A001A] rounded"
-                      />
-                      <span className="text-sm text-gray-800">Notifikasi aplikasi saat tamu check-in</span>
-                    </label>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center justify-between max-w-[280px]">
+                      <span className="text-sm font-medium text-gray-800">Tamu check in</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, notify_app_checkin: !formData.notify_app_checkin })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.notify_app_checkin ? 'bg-[#2D6A4F]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
+                            formData.notify_app_checkin ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
 
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.notify_app_backup_fail}
-                        onChange={(e) => setFormData({ ...formData, notify_app_backup_fail: e.target.checked })}
-                        className="w-4 h-4 text-[#8A001A] rounded"
-                      />
-                      <span className="text-sm text-gray-800">Notifikasi aplikasi saat backup database gagal</span>
-                    </label>
+                    <div className="flex items-center justify-between max-w-[280px]">
+                      <span className="text-sm font-medium text-gray-800">Gagal Backup data</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, notify_app_backup_fail: !formData.notify_app_backup_fail })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.notify_app_backup_fail ? 'bg-[#2D6A4F]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
+                            formData.notify_app_backup_fail ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
 
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.notify_email_reset_password}
-                        onChange={(e) => setFormData({ ...formData, notify_email_reset_password: e.target.checked })}
-                        className="w-4 h-4 text-[#8A001A] rounded"
-                      />
-                      <span className="text-sm text-gray-800">Kirim email saat reset password akun</span>
-                    </label>
+                  <div className="mb-4">
+                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                      Notifikasi email
+                    </span>
+                  </div>
 
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.notify_email_monthly_report}
-                        onChange={(e) => setFormData({ ...formData, notify_email_monthly_report: e.target.checked })}
-                        className="w-4 h-4 text-[#8A001A] rounded"
-                      />
-                      <span className="text-sm text-gray-800">Kirim laporan bulanan otomatis ke email admin</span>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center justify-between max-w-[280px]">
+                      <span className="text-sm font-medium text-gray-800">Laporan bulanan admin</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, notify_email_monthly_report: !formData.notify_email_monthly_report })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.notify_email_monthly_report ? 'bg-[#2D6A4F]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
+                            formData.notify_email_monthly_report ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between max-w-[280px]">
+                      <span className="text-sm font-medium text-gray-800">Info akun baru</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, notify_email_new_account: !formData.notify_email_new_account })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.notify_email_new_account ? 'bg-[#2D6A4F]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
+                            formData.notify_email_new_account ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between max-w-[280px]">
+                      <span className="text-sm font-medium text-gray-800">Reset Password</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, notify_email_reset_password: !formData.notify_email_reset_password })}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.notify_email_reset_password ? 'bg-[#2D6A4F]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
+                            formData.notify_email_reset_password ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <label className="block text-xs font-bold text-[#3B0207] mb-1.5">
+                      Email penerima notifikasi admin
                     </label>
+                    <input
+                      type="email"
+                      value={formData.admin_notification_email || ''}
+                      onChange={(e) => setFormData({ ...formData, admin_notification_email: e.target.value })}
+                      placeholder="tasha@seamolec.org"
+                      className="w-full max-w-md px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                    />
                   </div>
                 </div>
 

@@ -150,7 +150,13 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             smtp_username='bukutamu-smpt',
             smtp_encryption='STARTTLS',
             smtp_sender_name='buku tamu SEAMOLEC',
-            smtp_sender_email='buktam@seamolec.org'
+            smtp_sender_email='buktam@seamolec.org',
+            notify_app_checkin=True,
+            notify_app_backup_fail=True,
+            notify_email_monthly_report=True,
+            notify_email_new_account=True,
+            notify_email_reset_password=True,
+            admin_notification_email='tasha@seamolec.org'
         )
         db.add(setting)
     else:
@@ -172,6 +178,13 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             setting.smtp_sender_name = 'buku tamu SEAMOLEC'
         if not setting.smtp_sender_email:
             setting.smtp_sender_email = 'buktam@seamolec.org'
+        if not setting.admin_notification_email or setting.admin_notification_email == 'admin@seamolec.org':
+            setting.admin_notification_email = 'tasha@seamolec.org'
+        setting.notify_app_checkin = True
+        setting.notify_app_backup_fail = True
+        setting.notify_email_monthly_report = True
+        setting.notify_email_new_account = True
+        setting.notify_email_reset_password = True
 
     existing_passes = db.query(Pass).count()
     if existing_passes == 0:
