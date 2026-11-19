@@ -41,6 +41,8 @@ class Config:
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_ACCESS_TOKEN_EXPIRY', 900)) # 15 minutes
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(seconds=_get_int_env('JWT_REFRESH_TOKEN_EXPIRY', 604800)) # 7 days
+    JWT_BLOCKLIST_ENABLED = True
+    JWT_BLOCKLIST_TOKEN_CHECKS = ['access', 'refresh']
     
     # Upload & Media Configuration
     BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))

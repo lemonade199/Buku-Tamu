@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import api from '@/lib/api';
 import Topbar from '@/components/Topbar';
 import Sidebar from '@/components/Sidebar';
 
@@ -19,6 +20,25 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [loading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkActiveInterval = setInterval(async () => {
+      try {
+        await api.get('/auth/me');
+      } catch (err: any) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user_info');
+          router.push('/login?reason=inactive');
+        }
+      }
+    }, 4000);
+
+    return () => clearInterval(checkActiveInterval);
+  }, [isAuthenticated, router]);
 
   if (loading) {
     return (

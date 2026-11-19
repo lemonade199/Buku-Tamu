@@ -394,6 +394,9 @@ def toggle_user_active(user_id: int):
             }), 404
 
         user.is_active = not user.is_active
+        if not user.is_active:
+            user_repo = UserRepository(db)
+            user_repo.revoke_all_user_tokens(user.id_user)
         db.commit()
         db.refresh(user)
 

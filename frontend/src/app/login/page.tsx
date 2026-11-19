@@ -1,16 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useSearchParams } from 'next/navigation';
 import { User, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const { login } = useAuth();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('reason') === 'inactive') {
+      setErrorMessage('Akun Anda telah dinonaktifkan oleh administrator. Anda otomatis dikeluarkan dari sistem.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,15 +36,11 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-[#FAF7F0] px-4">
-      {/* Blurred background decoration */}
       <div className="absolute inset-0 bg-gradient-to-tr from-[#8A001A]/10 via-[#FAF7F0] to-[#8A001A]/5 pointer-events-none" />
 
-      {/* Main Login Card */}
       <div className="relative w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-200 p-8 z-10">
-        {/* Top Header */}
         <div className="flex flex-col items-center text-center mb-7">
           <div className="w-16 h-16 rounded-full bg-white p-1 border-2 border-[#8A001A] shadow-md mb-3 flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/seamolec-logo.jpg"
               alt="SEAMOLEC Logo"
@@ -51,7 +55,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Error Alert */}
         {errorMessage && (
           <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 flex items-start space-x-2 text-xs text-red-700 animate-fadeIn">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
@@ -60,7 +63,6 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username Input */}
           <div>
             <label className="block text-xs font-semibold text-gray-800 mb-1.5">
               Username atau Email
@@ -78,7 +80,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Password Input */}
           <div>
             <label className="block text-xs font-semibold text-gray-800 mb-1.5">
               Kata Sandi
@@ -103,7 +104,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
@@ -121,5 +121,13 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF7F0]" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

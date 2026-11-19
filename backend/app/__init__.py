@@ -24,6 +24,34 @@ def create_app(config_name=None, db_url=None):
     CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
     jwt.init_app(app)
 
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        identity = jwt_payload.get('sub')
+        if not identity:
+            return True
+        try:
+            user_id = int(identity)
+        except (ValueError, TypeError):
+            return True
+
+        from backend.app.models.entities import User
+        db = get_db_session()
+        try:
+            user = db.query(User).filter(User.id_user == user_id).first()
+            if not user or not user.is_active:
+                return True
+            return False
+        finally:
+            db.close()
+
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        return jsonify({
+            'success': False,
+            'message': 'Akun Anda telah dinonaktifkan oleh administrator. Silakan hubungi admin.',
+            'code': 'USER_INACTIVE'
+        }), 401
+
     engine, _ = init_db(db_url)
     Base.metadata.create_all(bind=engine)
 
