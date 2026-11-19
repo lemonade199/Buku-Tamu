@@ -92,15 +92,20 @@ export interface DashboardMetrics {
   pending_registrations_count: number;
   completed_visitors_today: number;
   total_pass?: number;
+  active_pass_count?: number;
   available_pass: number;
   pending_pass: number;
   in_use_pass: number;
+  inactive_pass?: number;
+  lost_pass?: number;
+  maintenance_pass?: number;
   pass_stats: {
     AVAILABLE: number;
     PENDING?: number;
     IN_USE: number;
     MAINTENANCE: number;
     LOST: number;
+    INACTIVE?: number;
   };
   pending_visitors?: VisitorItem[];
   recent_visitors: VisitorItem[];

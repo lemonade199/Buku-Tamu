@@ -173,6 +173,8 @@ export default function DashboardPage() {
   const inUsePass = metrics?.in_use_pass ?? 0;
   const availablePass = metrics?.available_pass ?? 0;
   const pendingPass = metrics?.pending_pass ?? pendingVisitors.length;
+  const inactivePass = metrics?.inactive_pass ?? metrics?.pass_stats?.INACTIVE ?? 0;
+  const activePassCount = metrics?.active_pass_count ?? Math.max(0, totalPass - inactivePass);
 
   const monthlyChartData = metrics?.monthly_stats && metrics.monthly_stats.length > 0
     ? metrics.monthly_stats
@@ -195,6 +197,7 @@ export default function DashboardPage() {
     { name: 'Tersedia', value: availablePass, color: '#FFFFFF' },
     { name: 'Menunggu', value: pendingPass, color: '#EAB308' },
     { name: 'Dipakai', value: inUsePass, color: '#4A000E' },
+    ...(inactivePass > 0 ? [{ name: 'Nonaktif', value: inactivePass, color: '#9CA3AF' }] : []),
   ];
 
   const recentActivities: RecentActivity[] = metrics?.recent_activities && metrics.recent_activities.length > 0
@@ -279,7 +282,7 @@ export default function DashboardPage() {
                 Pass aktif
               </span>
               <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-                {inUsePass} / {totalPass}
+                {inUsePass} / {activePassCount}
               </span>
             </div>
 
@@ -420,6 +423,15 @@ export default function DashboardPage() {
                     </div>
                     <span className="font-bold text-white text-xs">{inUsePass}</span>
                   </div>
+                  {inactivePass > 0 && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-xs bg-[#9CA3AF] shrink-0"></span>
+                        <span className="text-white text-[11px] font-medium">Nonaktif</span>
+                      </div>
+                      <span className="font-bold text-white text-xs">{inactivePass}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

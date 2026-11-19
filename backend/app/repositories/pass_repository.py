@@ -18,9 +18,12 @@ class PassRepository:
     def count_total(self) -> int:
         return self.db.query(func.count(Pass.id_pass)).scalar() or 0
 
+    def count_active(self) -> int:
+        return self.db.query(func.count(Pass.id_pass)).filter(Pass.status != 'INACTIVE').scalar() or 0
+
     def count_by_status(self):
         results = self.db.query(Pass.status, func.count(Pass.id_pass)).group_by(Pass.status).all()
-        counts = {'AVAILABLE': 0, 'IN_USE': 0, 'MAINTENANCE': 0, 'LOST': 0}
+        counts = {'AVAILABLE': 0, 'IN_USE': 0, 'PENDING': 0, 'MAINTENANCE': 0, 'LOST': 0, 'INACTIVE': 0}
         for status, count in results:
             counts[status] = count
         return counts
