@@ -491,6 +491,7 @@ def reset_user_password(user_id: int):
         db.close()
 
 @auth_bp.route('/users/<int:user_id>/avatar', methods=['GET'])
+@jwt_required()
 def get_user_avatar(user_id: int):
     db = get_db_session()
     try:

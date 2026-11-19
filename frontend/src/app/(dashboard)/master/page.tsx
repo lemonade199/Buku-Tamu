@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import api from '@/lib/api';
+import api, { getUserAvatarUrl } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Search,
@@ -255,7 +255,7 @@ export default function MasterDataPage() {
       avatar: '',
     });
     if (u.avatar) {
-      setEditUserAvatarPreview(`${apiBaseUrl}/auth/users/${u.id_user}/avatar`);
+      setEditUserAvatarPreview(getUserAvatarUrl(u.id_user));
     } else {
       setEditUserAvatarPreview(null);
     }
@@ -777,7 +777,7 @@ export default function MasterDataPage() {
                 ) : filteredUsers.length > 0 ? (
                   filteredUsers.map((u) => {
                     const roleIsAdmin = u.role_code === 'ADMIN';
-                    const avatarUrl = u.avatar ? `${apiBaseUrl}/auth/users/${u.id_user}/avatar` : null;
+                    const avatarUrl = u.avatar ? getUserAvatarUrl(u.id_user) : null;
 
                     return (
                       <tr key={u.id_user} className="hover:bg-black/5 transition-colors">

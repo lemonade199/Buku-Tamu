@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import api from '@/lib/api';
+import api, { getUserAvatarUrl } from '@/lib/api';
 import { Camera, LogOut, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -32,8 +32,7 @@ export default function ProfilePage() {
       setEmail(user.email || '');
 
       if (user.avatar) {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-        setPhotoPreview(`${apiBase}/auth/users/${user.id_user}/avatar`);
+        setPhotoPreview(getUserAvatarUrl(user.id_user));
       }
     }
     const savedPhoto = localStorage.getItem('profile_avatar');

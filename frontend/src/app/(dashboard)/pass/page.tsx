@@ -59,8 +59,22 @@ export default function MonitoringPassPage() {
 
   useEffect(() => {
     fetchMonitoringData();
-    const interval = setInterval(fetchMonitoringData, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchMonitoringData();
+    }, 5000);
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchMonitoringData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [fetchMonitoringData]);
 
   const filteredItems = items.filter((item) => {
@@ -79,7 +93,33 @@ export default function MonitoringPassPage() {
       item.handed_over_by.toLowerCase() === selectedReceptionist.toLowerCase() ||
       item.received_by.toLowerCase() === selectedReceptionist.toLowerCase();
 
-    return matchesSearch && matchesStatus && matchesReceptionist;
+    // Logika filter tanggal (Hari ini, Minggu ini, Bulan ini, Semua)
+    let matchesDate = true;
+    if (selectedDate !== 'Semua') {
+      if (!item.date) {
+        matchesDate = false;
+      } else {
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+        if (selectedDate === 'Hari ini') {
+          matchesDate = item.date === todayStr;
+        } else if (selectedDate === 'Minggu ini') {
+          const day = now.getDay();
+          const diffToMonday = (day + 6) % 7;
+          const monday = new Date(now);
+          monday.setDate(now.getDate() - diffToMonday);
+          const startOfWeekStr = `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
+          matchesDate = item.date >= startOfWeekStr && item.date <= todayStr;
+        } else if (selectedDate === 'Bulan ini') {
+          const monthPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+          matchesDate = item.date.startsWith(monthPrefix);
+        }
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesReceptionist && matchesDate;
   });
 
   return (
