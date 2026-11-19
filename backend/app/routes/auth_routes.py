@@ -1,4 +1,5 @@
-from flask import Blueprint, request, jsonify
+import os
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
@@ -8,6 +9,7 @@ from backend.app.repositories.user_repository import UserRepository
 from backend.app.services.auth_service import AuthService
 from backend.app.schemas.auth import LoginRequest, RefreshRequest
 from backend.app.utils.security import verify_password, hash_password
+from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
 from backend.app.middleware.auth import role_required
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
@@ -161,6 +163,13 @@ def update_profile():
                 'message': 'Email sudah digunakan oleh akun lain.'
             }), 409
 
+        avatar_b64 = data.get('avatar')
+        if avatar_b64:
+            try:
+                user.avatar = save_user_avatar(avatar_b64)
+            except Exception:
+                pass
+
         updated_user = user_repo.update_profile(user, fullname, email, telephone, username)
         return jsonify({
             'success': True,
@@ -271,6 +280,14 @@ def create_user():
         if not role:
             role = db.query(Role).filter(Role.code == 'PETUGAS').first()
 
+        avatar_b64 = data.get('avatar')
+        avatar_filename = None
+        if avatar_b64:
+            try:
+                avatar_filename = save_user_avatar(avatar_b64)
+            except Exception:
+                pass
+
         new_user = User(
             fullname=fullname,
             username=username,
@@ -278,6 +295,7 @@ def create_user():
             telephone=telephone or None,
             id_role=role.id_role if role else 2,
             hash_password=hash_password(password),
+            avatar=avatar_filename,
             is_active=True
         )
         db.add(new_user)
@@ -336,6 +354,13 @@ def update_user_by_admin(user_id: int):
         user.username = username
         user.email = email
         user.telephone = telephone or None
+
+        avatar_b64 = data.get('avatar')
+        if avatar_b64:
+            try:
+                user.avatar = save_user_avatar(avatar_b64)
+            except Exception:
+                pass
 
         if role_code:
             role = db.query(Role).filter(Role.code == role_code.strip().upper()).first()
@@ -409,7 +434,34 @@ def reset_user_password(user_id: int):
 
         return jsonify({
             'success': True,
-            'message': f'Password untuk {user.fullname} berhasil direset.'
+            'message': f'Password untuk {user.fullname} (@{user.username}) berhasil diatur ulang menjadi "{new_password}".',
+            'data': {
+                'id_user': user.id_user,
+                'username': user.username,
+                'new_password': new_password
+            }
         }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/users/<int:user_id>/avatar', methods=['GET'])
+def get_user_avatar(user_id: int):
+    db = get_db_session()
+    try:
+        user = db.query(User).filter(User.id_user == user_id).first()
+        if not user or not user.avatar:
+            return jsonify({
+                'success': False,
+                'message': 'Avatar tidak ditemukan.'
+            }), 404
+
+        photo_path = get_photo_path(user.avatar)
+        if not os.path.exists(photo_path):
+            return jsonify({
+                'success': False,
+                'message': 'File avatar tidak ditemukan di server.'
+            }), 404
+
+        return send_file(photo_path, mimetype='image/jpeg')
     finally:
         db.close()

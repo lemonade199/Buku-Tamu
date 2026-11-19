@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -15,6 +15,9 @@ import {
   RefreshCw,
   User as UserIcon,
   KeyRound,
+  Camera,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -33,6 +36,7 @@ interface UserItem {
   role_code: string;
   role_name: string;
   telephone?: string;
+  avatar?: string | null;
   is_active: boolean;
   last_login_at?: string;
 }
@@ -40,6 +44,7 @@ interface UserItem {
 export default function MasterDataPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
   const [activeTab, setActiveTab] = useState<'pass' | 'user'>('pass');
   const [passes, setPasses] = useState<PassItem[]>([]);
@@ -74,8 +79,11 @@ export default function MasterDataPage() {
     telephone: '',
     role_code: 'PETUGAS',
     password: '',
+    avatar: '',
   });
+  const [addUserAvatarPreview, setAddUserAvatarPreview] = useState<string | null>(null);
   const [addingUser, setAddingUser] = useState(false);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
 
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [editUserForm, setEditUserForm] = useState({
@@ -85,12 +93,16 @@ export default function MasterDataPage() {
     telephone: '',
     role_code: 'PETUGAS',
     is_active: true,
+    avatar: '',
   });
+  const [editUserAvatarPreview, setEditUserAvatarPreview] = useState<string | null>(null);
   const [savingUser, setSavingUser] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const [resetPasswordUser, setResetPasswordUser] = useState<UserItem | null>(null);
   const [newResetPassword, setNewResetPassword] = useState('123456');
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -234,7 +246,39 @@ export default function MasterDataPage() {
       telephone: u.telephone || '',
       role_code: u.role_code || 'PETUGAS',
       is_active: u.is_active,
+      avatar: '',
     });
+    if (u.avatar) {
+      setEditUserAvatarPreview(`${apiBaseUrl}/auth/users/${u.id_user}/avatar`);
+    } else {
+      setEditUserAvatarPreview(null);
+    }
+  };
+
+  const handleEditUserAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = reader.result as string;
+        setEditUserAvatarPreview(b64);
+        setEditUserForm((prev) => ({ ...prev, avatar: b64 }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddUserAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = reader.result as string;
+        setAddUserAvatarPreview(b64);
+        setAddUserForm((prev) => ({ ...prev, avatar: b64 }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -244,14 +288,19 @@ export default function MasterDataPage() {
     setSavingUser(true);
     setFeedback(null);
     try {
-      const res = await api.put(`/auth/users/${editingUser.id_user}`, {
+      const payload: any = {
         fullname: editUserForm.fullname.trim(),
         username: editUserForm.username.trim(),
         email: editUserForm.email.trim(),
         telephone: editUserForm.telephone.trim(),
         role_code: editUserForm.role_code,
         is_active: editUserForm.is_active,
-      });
+      };
+      if (editUserForm.avatar) {
+        payload.avatar = editUserForm.avatar;
+      }
+
+      const res = await api.put(`/auth/users/${editingUser.id_user}`, payload);
 
       setFeedback({ type: 'success', text: res.data.message || 'Data pengguna berhasil diperbarui.' });
       setEditingUser(null);
@@ -282,14 +331,19 @@ export default function MasterDataPage() {
     setAddingUser(true);
     setFeedback(null);
     try {
-      const res = await api.post('/auth/users', {
+      const payload: any = {
         fullname: addUserForm.fullname.trim(),
         username: addUserForm.username.trim(),
         email: addUserForm.email.trim(),
         telephone: addUserForm.telephone.trim(),
         role_code: addUserForm.role_code,
         password: addUserForm.password.trim() || '123456',
-      });
+      };
+      if (addUserForm.avatar) {
+        payload.avatar = addUserForm.avatar;
+      }
+
+      const res = await api.post('/auth/users', payload);
 
       setFeedback({ type: 'success', text: res.data.message || 'Pengguna berhasil ditambahkan.' });
       setShowAddUserModal(false);
@@ -300,7 +354,9 @@ export default function MasterDataPage() {
         telephone: '',
         role_code: 'PETUGAS',
         password: '',
+        avatar: '',
       });
+      setAddUserAvatarPreview(null);
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Gagal menambahkan pengguna.';
@@ -313,6 +369,14 @@ export default function MasterDataPage() {
   const openResetPasswordModal = (u: UserItem) => {
     setResetPasswordUser(u);
     setNewResetPassword('123456');
+    setCopiedPassword(false);
+  };
+
+  const handleCopyPassword = () => {
+    if (!newResetPassword) return;
+    navigator.clipboard.writeText(newResetPassword);
+    setCopiedPassword(true);
+    setTimeout(() => setCopiedPassword(false), 2000);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -326,7 +390,10 @@ export default function MasterDataPage() {
         password: newResetPassword.trim() || '123456',
       });
 
-      setFeedback({ type: 'success', text: res.data.message || 'Password berhasil direset.' });
+      setFeedback({
+        type: 'success',
+        text: res.data.message || `Password untuk ${resetPasswordUser.fullname} berhasil diatur ke "${newResetPassword}".`,
+      });
       setResetPasswordUser(null);
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Gagal mereset password.';
@@ -672,8 +739,10 @@ export default function MasterDataPage() {
                     email: '',
                     telephone: '',
                     role_code: 'PETUGAS',
-                    password: '',
+                    password: '123456',
+                    avatar: '',
                   });
+                  setAddUserAvatarPreview(null);
                 }}
                 className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
               >
@@ -708,11 +777,24 @@ export default function MasterDataPage() {
                 ) : filteredUsers.length > 0 ? (
                   filteredUsers.map((u) => {
                     const roleIsAdmin = u.role_code === 'ADMIN';
+                    const avatarUrl = u.avatar ? `${apiBaseUrl}/auth/users/${u.id_user}/avatar` : null;
+
                     return (
                       <tr key={u.id_user} className="hover:bg-black/5 transition-colors">
                         <td className="py-3 px-3">
-                          <div className="w-9 h-9 rounded-full bg-gray-400 flex items-center justify-center text-white overflow-hidden shadow-2xs">
-                            <UserIcon className="w-5 h-5 text-gray-200 fill-gray-200" />
+                          <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center text-white overflow-hidden shadow-2xs border border-gray-300">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={u.fullname}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <UserIcon className="w-5 h-5 text-gray-500 fill-gray-500" />
+                            )}
                           </div>
                         </td>
 
@@ -993,6 +1075,34 @@ export default function MasterDataPage() {
             </div>
 
             <form onSubmit={handleAddUser} className="p-6 space-y-4">
+              <div className="flex flex-col items-center justify-center mb-2">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center overflow-hidden shadow-sm">
+                    {addUserAvatarPreview ? (
+                      <img src={addUserAvatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-10 h-10 text-gray-400 fill-gray-400" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addFileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 p-1.5 bg-[#8A001A] text-white rounded-full shadow-md hover:bg-[#700015] transition-colors cursor-pointer"
+                    title="Pilih foto profil"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                  </button>
+                  <input
+                    ref={addFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAddUserAvatarSelect}
+                    className="hidden"
+                  />
+                </div>
+                <span className="text-[11px] text-gray-500 font-medium mt-1">Unggah Foto Profil</span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
@@ -1075,7 +1185,7 @@ export default function MasterDataPage() {
                     Password Awal
                   </label>
                   <input
-                    type="password"
+                    type="text"
                     value={addUserForm.password}
                     onChange={(e) => setAddUserForm({ ...addUserForm, password: e.target.value })}
                     placeholder="Default: 123456"
@@ -1125,6 +1235,34 @@ export default function MasterDataPage() {
             </div>
 
             <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+              <div className="flex flex-col items-center justify-center mb-2">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center overflow-hidden shadow-sm">
+                    {editUserAvatarPreview ? (
+                      <img src={editUserAvatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-10 h-10 text-gray-400 fill-gray-400" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 p-1.5 bg-[#8A001A] text-white rounded-full shadow-md hover:bg-[#700015] transition-colors cursor-pointer"
+                    title="Ganti foto profil"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                  </button>
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditUserAvatarSelect}
+                    className="hidden"
+                  />
+                </div>
+                <span className="text-[11px] text-gray-500 font-medium mt-1">Ganti Foto Profil</span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
@@ -1252,7 +1390,7 @@ export default function MasterDataPage() {
             <div className="bg-[#8A001A] text-white px-6 py-4 flex items-center justify-between">
               <h3 className="text-base font-bold text-white tracking-wide flex items-center space-x-2">
                 <KeyRound className="w-4 h-4 text-white" />
-                <span>Reset Password</span>
+                <span>Reset Password Pengguna</span>
               </h3>
               <button
                 type="button"
@@ -1265,25 +1403,61 @@ export default function MasterDataPage() {
             </div>
 
             <form onSubmit={handleResetPassword} className="p-6 space-y-4">
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Atur ulang password untuk akun{' '}
-                <span className="font-bold text-gray-900">{resetPasswordUser.fullname}</span> (
-                <span className="font-medium text-gray-700">@{resetPasswordUser.username}</span>).
-              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900">
+                <p className="font-semibold mb-1">
+                  Atur ulang password untuk akun:
+                </p>
+                <p className="text-gray-800">
+                  <span className="font-bold text-gray-900">{resetPasswordUser.fullname}</span>{' '}
+                  (<span className="font-mono text-gray-700">@{resetPasswordUser.username}</span>)
+                </p>
+              </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#4A000E] mb-1.5">
                   Password Baru
                 </label>
-                <input
-                  type="text"
-                  value={newResetPassword}
-                  onChange={(e) => setNewResetPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  placeholder="Minimal 6 karakter"
-                  className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newResetPassword}
+                    onChange={(e) => setNewResetPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    placeholder="Minimal 6 karakter"
+                    className="w-full bg-white border-2 border-black rounded-full pl-4 pr-20 py-2 text-xs text-gray-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyPassword}
+                      title="Salin password"
+                      className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-semibold rounded-lg flex items-center space-x-1 cursor-pointer transition-colors"
+                    >
+                      {copiedPassword ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span className="text-emerald-600">Disalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-gray-600" />
+                          <span>Salin</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-1 px-1">
+                  <span className="text-[10px] text-gray-500">Minimal 6 karakter</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewResetPassword('123456')}
+                    className="text-[10px] text-[#8A001A] font-bold hover:underline cursor-pointer"
+                  >
+                    Gunakan Default: 123456
+                  </button>
+                </div>
               </div>
 
               <div className="border-b border-gray-200 pt-2" />
@@ -1301,7 +1475,7 @@ export default function MasterDataPage() {
                   disabled={resettingPassword}
                   className="px-6 py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-full text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
                 >
-                  {resettingPassword ? 'Memproses...' : 'Reset Password'}
+                  {resettingPassword ? 'Menyimpan...' : 'Simpan Password Baru'}
                 </button>
               </div>
             </form>

@@ -6,6 +6,7 @@ export interface User {
   role_code: 'ADMIN' | 'PETUGAS';
   role_name: string;
   telephone?: string;
+  avatar?: string | null;
   permissions: string[];
 }
 

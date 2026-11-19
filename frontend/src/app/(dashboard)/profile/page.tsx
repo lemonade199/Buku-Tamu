@@ -27,12 +27,17 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       setFullname(user.fullname || '');
-      setTelephone(user.telephone || '081298765432');
+      setTelephone(user.telephone || '');
       setUsername(user.username || '');
       setEmail(user.email || '');
+
+      if (user.avatar) {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        setPhotoPreview(`${apiBase}/auth/users/${user.id_user}/avatar`);
+      }
     }
     const savedPhoto = localStorage.getItem('profile_avatar');
-    if (savedPhoto) {
+    if (savedPhoto && !user?.avatar) {
       setPhotoPreview(savedPhoto);
     }
   }, [user]);
@@ -41,11 +46,22 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const result = reader.result as string;
         setPhotoPreview(result);
         localStorage.setItem('profile_avatar', result);
-        setFeedback({ type: 'success', text: 'Foto profil berhasil diperbarui.' });
+        try {
+          await api.put('/auth/profile', {
+            fullname: fullname || user?.fullname || '',
+            telephone: telephone || user?.telephone || '',
+            username: username || user?.username || '',
+            email: email || user?.email || '',
+            avatar: result,
+          });
+          setFeedback({ type: 'success', text: 'Foto profil berhasil disimpan ke server.' });
+        } catch {
+          setFeedback({ type: 'error', text: 'Foto disimpan lokal, gagal sinkron ke server.' });
+        }
       };
       reader.readAsDataURL(file);
     }

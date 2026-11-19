@@ -48,3 +48,26 @@ def save_visitor_photo(photo_base64: str) -> str:
 def get_photo_path(filename: str) -> str:
     upload_dir = get_upload_dir()
     return os.path.abspath(os.path.join(upload_dir, filename))
+
+def save_user_avatar(photo_base64: str) -> str:
+    if ',' in photo_base64:
+        photo_base64 = photo_base64.split(',', 1)[1]
+
+    clean_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', photo_base64)
+    image_bytes = base64.b64decode(clean_base64)
+
+    if len(image_bytes) < 100:
+        raise ValueError("Data foto tidak valid.")
+
+    upload_dir = get_upload_dir()
+    os.makedirs(upload_dir, exist_ok=True)
+
+    date_str = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    unique_suffix = uuid.uuid4().hex[:8]
+    filename = f"avatar_{date_str}_{unique_suffix}.jpg"
+    full_path = os.path.join(upload_dir, filename)
+
+    with open(full_path, 'wb') as f:
+        f.write(image_bytes)
+
+    return filename

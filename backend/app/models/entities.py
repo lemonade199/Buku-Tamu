@@ -44,6 +44,7 @@ class User(Base):
     email = Column(String(150), nullable=False, unique=True, index=True)
     hash_password = Column(String(255), nullable=False)
     telephone = Column(String(25), nullable=True)
+    avatar = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -62,6 +63,7 @@ class User(Base):
             'username': self.username,
             'email': self.email,
             'telephone': self.telephone,
+            'avatar': self.avatar,
             'is_active': self.is_active,
             'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
