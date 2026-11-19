@@ -111,6 +111,66 @@ def get_pass_rack_view():
     finally:
         db.close()
 
+@pass_bp.route('/monitoring', methods=['GET'])
+@jwt_required()
+def get_pass_monitoring():
+    db = get_db_session()
+    try:
+        available_count = db.query(Pass).filter(Pass.status == 'AVAILABLE').count()
+        pending_count = db.query(Pass).filter(Pass.status == 'PENDING').count()
+        in_use_count = db.query(Pass).filter(Pass.status == 'IN_USE').count()
+
+        visitors = db.query(Visitor).order_by(Visitor.check_in_at.desc()).limit(150).all()
+
+        checkout_logs = db.query(AuditLog).filter(AuditLog.action == 'VISITOR_CHECKOUT').all()
+        checkout_map = {}
+        for l in checkout_logs:
+            if l.entity_id:
+                checkout_map[str(l.entity_id)] = l.user.fullname if l.user else None
+
+        records = []
+        for v in visitors:
+            if v.status == 'REJECTED':
+                continue
+            if v.status == 'PENDING':
+                status_label = 'Menunggu'
+            elif v.check_out_at:
+                status_label = 'Selesai'
+            else:
+                status_label = 'Dipakai'
+
+            raw_no = v.pass_card.no_pass if v.pass_card else str(v.id_pass)
+            pass_no = raw_no.zfill(2)
+            check_in_time = v.check_in_at.strftime('%H.%M') if v.status == 'APPROVED' and v.check_in_at else '-'
+            check_out_time = v.check_out_at.strftime('%H.%M') if v.check_out_at else '-'
+            handed_over_by = v.approved_by.fullname if v.approved_by and v.status == 'APPROVED' else '-'
+            received_by = checkout_map.get(str(v.id_visitor)) or (handed_over_by if v.check_out_at else '-')
+
+            records.append({
+                'id_visitor': v.id_visitor,
+                'no_pass': pass_no,
+                'guest_name': v.fullname,
+                'institution': v.institution or '-',
+                'check_in_time': check_in_time,
+                'check_out_time': check_out_time,
+                'handed_over_by': handed_over_by,
+                'received_by': received_by if v.check_out_at else '-',
+                'status': status_label,
+                'date': v.check_in_at.strftime('%Y-%m-%d') if v.check_in_at else None
+            })
+
+        return jsonify({
+            'success': True,
+            'counts': {
+                'available': available_count,
+                'pending': pending_count,
+                'in_use': in_use_count
+            },
+            'data': records
+        }), 200
+    finally:
+        db.close()
+
 @pass_bp.route('', methods=['POST'])
 @role_required('ADMIN')
 def create_pass():
