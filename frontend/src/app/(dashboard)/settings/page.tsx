@@ -36,6 +36,18 @@ interface SettingsData {
   auto_backup_schedule?: string;
 }
 
+const permissionsMatrix = [
+  { feature: 'Dashboard', admin: true, receptionist: true },
+  { feature: 'Penerimaan tamu', admin: false, receptionist: true },
+  { feature: 'Serahkan kartu', admin: false, receptionist: true },
+  { feature: 'Pengembalian akses', admin: false, receptionist: true },
+  { feature: 'Monitoring kartu pass', admin: true, receptionist: true },
+  { feature: 'Laporan & ekspor', admin: true, receptionist: true },
+  { feature: 'Master data (kartu pass & pengguna', admin: true, receptionist: false },
+  { feature: 'Pengguna & role', admin: true, receptionist: false },
+  { feature: 'Pengaturan sistem', admin: true, receptionist: false },
+];
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('umum');
   const [loading, setLoading] = useState(true);
@@ -44,6 +56,8 @@ export default function SettingsPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.jpg');
   const [testingEmail, setTestingEmail] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [roleModalData, setRoleModalData] = useState({ name: '', description: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<SettingsData>({
@@ -181,7 +195,7 @@ export default function SettingsPage() {
     { key: 'umum', label: 'Umum' },
     { key: 'smtp', label: 'SMTP' },
     { key: 'notifikasi', label: 'Aturan notifikasi' },
-    { key: 'role', label: 'Role & Hak akses' },
+    { key: 'role', label: 'Role & hak akses' },
     { key: 'sso', label: 'Keamanan & SSO' },
     { key: 'backup', label: 'Data & Backup' },
   ];
@@ -227,9 +241,139 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="flex-1 w-full max-w-2xl bg-[#3B0207] p-2 rounded-2xl shadow-xl">
-          <div className="bg-white rounded-xl border-2 border-[#8A001A] p-6 md:p-8 min-h-[360px] flex flex-col justify-between">
-            {activeTab === 'umum' && (
+        {activeTab === 'role' ? (
+          <div className="flex-1 w-full max-w-2xl space-y-6">
+            <div>
+              <div className="flex justify-end mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRoleModalData({ name: '', description: '' });
+                    setShowRoleModal(true);
+                  }}
+                  className="bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-sm transition"
+                >
+                  + Tambah role
+                </button>
+              </div>
+
+              <div className="w-full">
+                <table className="w-full text-left text-xs md:text-sm">
+                  <thead>
+                    <tr className="text-[#3B0207] font-bold">
+                      <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Role</span></th>
+                      <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Deskripsi</span></th>
+                      <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Jumlah pengguna</span></th>
+                      <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Aksi</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    <tr>
+                      <td className="py-3 pr-4">
+                        <span className="bg-black text-white px-4 py-1 rounded-full text-xs font-semibold inline-block">
+                          Admin
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
+                        Mengatur sistem, master data, pengguna, dan laporan
+                      </td>
+                      <td className="py-3 px-4 text-center font-semibold text-gray-800">
+                        1
+                      </td>
+                      <td className="py-3 pl-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoleModalData({ name: 'Admin', description: 'Mengatur sistem, master data, pengguna, dan laporan' });
+                            setShowRoleModal(true);
+                          }}
+                          className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 pr-4">
+                        <span className="bg-[#8A001A] text-white px-3 py-1 rounded-full text-xs font-semibold inline-block">
+                          Resepsionis
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
+                        Melayani penerimaan dan pengembalian tamu
+                      </td>
+                      <td className="py-3 px-4 text-center font-semibold text-gray-800">
+                        3
+                      </td>
+                      <td className="py-3 pl-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoleModalData({ name: 'Resepsionis', description: 'Melayani penerimaan dan pengembalian tamu' });
+                            setShowRoleModal(true);
+                          }}
+                          className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-[#3B0207] p-2 rounded-2xl shadow-xl">
+              <div className="bg-white rounded-xl border-2 border-[#8A001A] p-6">
+                <div className="mb-4">
+                  <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                    Hak akses per role
+                  </span>
+                </div>
+
+                <div className="w-full">
+                  <table className="w-full text-left text-xs md:text-sm">
+                    <thead>
+                      <tr className="text-[#3B0207] font-bold">
+                        <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Fitur</span></th>
+                        <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Admin</span></th>
+                        <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Resepsionis</span></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {permissionsMatrix.map((item) => (
+                        <tr key={item.feature}>
+                          <td className="py-2.5 text-xs text-gray-800 font-medium">{item.feature}</td>
+                          <td className="py-2.5 text-center">
+                            <div className="flex justify-center">
+                              {item.admin ? (
+                                <span className="w-5 h-5 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center text-xs font-bold shadow-sm">✓</span>
+                              ) : (
+                                <span className="w-5 h-5 rounded-full bg-[#E5E7EB] text-gray-500 flex items-center justify-center text-xs font-bold">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <div className="flex justify-center">
+                              {item.receptionist ? (
+                                <span className="w-5 h-5 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center text-xs font-bold shadow-sm">✓</span>
+                              ) : (
+                                <span className="w-5 h-5 rounded-full bg-[#E5E7EB] text-gray-500 flex items-center justify-center text-xs font-bold">—</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 w-full max-w-2xl bg-[#3B0207] p-2 rounded-2xl shadow-xl">
+            <div className="bg-white rounded-xl border-2 border-[#8A001A] p-6 md:p-8 min-h-[360px] flex flex-col justify-between">
+              {activeTab === 'umum' && (
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
                   <div className="mb-6">
@@ -562,44 +706,6 @@ export default function SettingsPage() {
               </form>
             )}
 
-            {activeTab === 'role' && (
-              <div className="flex flex-col h-full justify-between">
-                <div>
-                  <div className="mb-6">
-                    <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
-                      Role & Hak Akses
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-3.5 border border-gray-300 rounded-xl bg-gray-50">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-gray-900">Administrator</span>
-                        <span className="text-[10px] bg-black text-white px-2 py-0.5 rounded-full">Full Access</span>
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        Memiliki akses menyeluruh ke Dashboard, Monitoring Kartu Pass, Laporan, Master Data, dan Pengaturan Sistem.
-                      </p>
-                    </div>
-
-                    <div className="p-3.5 border border-gray-300 rounded-xl bg-gray-50">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-gray-900">Resepsionis / Petugas</span>
-                        <span className="text-[10px] bg-[#8A001A] text-white px-2 py-0.5 rounded-full">Front Desk</span>
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        Memiliki akses ke Dashboard operasional, Penerimaan Tamu (Check-in), Pengembalian Akses (Check-out), Kontrol Pass Aktif, dan Riwayat Kunjungan.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end mt-8 pt-4">
-                  <span className="text-xs text-gray-500">Konfigurasi role default sistem</span>
-                </div>
-              </div>
-            )}
-
             {activeTab === 'sso' && (
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
@@ -721,7 +827,60 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+      )}
       </div>
+
+      {showRoleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 animate-fadeIn">
+            <h3 className="text-lg font-bold text-[#8A001A] mb-4">
+              {roleModalData.name ? `Edit Role: ${roleModalData.name}` : 'Tambah Role Baru'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-800 mb-1">Nama Role</label>
+                <input
+                  type="text"
+                  value={roleModalData.name}
+                  onChange={(e) => setRoleModalData({ ...roleModalData, name: e.target.value })}
+                  placeholder="Nama role..."
+                  className="w-full px-3 py-2 rounded-lg border border-gray-400 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-800 mb-1">Deskripsi</label>
+                <textarea
+                  rows={3}
+                  value={roleModalData.description}
+                  onChange={(e) => setRoleModalData({ ...roleModalData, description: e.target.value })}
+                  placeholder="Deskripsi tugas dan tanggung jawab..."
+                  className="w-full px-3 py-2 rounded-lg border border-gray-400 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowRoleModal(false)}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRoleModal(false);
+                  setSuccessMessage('Data role berhasil diperbarui.');
+                  setTimeout(() => setSuccessMessage(''), 3000);
+                }}
+                className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
