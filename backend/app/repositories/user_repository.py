@@ -11,9 +11,19 @@ class UserRepository:
         return self.db.query(User).filter(User.id_user == user_id).first()
 
     def get_by_username_or_email(self, identifier: str) -> User | None:
-        return self.db.query(User).filter(
+        user = self.db.query(User).filter(
             or_(User.username == identifier, User.email == identifier)
         ).first()
+        if not user:
+            alias_map = {
+                'tasha': 'tasha.admin',
+                'tasha.admin': 'tasha',
+                'rina': 'rina.resepsionis',
+                'rina.resepsionis': 'rina',
+            }
+            if identifier in alias_map:
+                user = self.db.query(User).filter(User.username == alias_map[identifier]).first()
+        return user
 
     def update_last_login(self, user: User):
         user.last_login_at = datetime.utcnow()

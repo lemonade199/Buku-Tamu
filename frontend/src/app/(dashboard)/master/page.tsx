@@ -435,19 +435,21 @@ export default function MasterDataPage() {
     return matchesSearch && matchesCondition;
   });
 
-  const filteredUsers = users.filter((u) => {
-    const term = userSearchTerm.toLowerCase().trim();
-    const matchesSearch =
-      !term ||
-      u.fullname.toLowerCase().includes(term) ||
-      u.username.toLowerCase().includes(term);
+  const filteredUsers = users
+    .filter((u) => !['admin', 'petugas'].includes(u.username.toLowerCase()))
+    .filter((u) => {
+      const term = userSearchTerm.toLowerCase().trim();
+      const matchesSearch =
+        !term ||
+        u.fullname.toLowerCase().includes(term) ||
+        u.username.toLowerCase().includes(term);
 
-    const roleDisplay = u.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis';
-    const matchesRole =
-      userRoleFilter === 'Semua peran' || roleDisplay === userRoleFilter;
+      const roleDisplay = u.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis';
+      const matchesRole =
+        userRoleFilter === 'Semua peran' || roleDisplay === userRoleFilter;
 
-    return matchesSearch && matchesRole;
-  });
+      return matchesSearch && matchesRole;
+    });
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">

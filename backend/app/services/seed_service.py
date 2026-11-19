@@ -71,44 +71,72 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         )
         db.add(petugas_user)
 
-    tasha_user = db.query(User).filter(User.username == 'tasha').first()
+    tasha_user = db.query(User).filter((User.username == 'tasha') | (User.username == 'tasha.admin') | (User.email == 'tasha@seamolec.org')).first()
     if not tasha_user:
         tasha_user = User(
             id_role=admin_role.id_role,
-            fullname='Tasha',
-            username='tasha',
+            fullname='Tasha Amelia',
+            username='tasha.admin',
             email='tasha@seamolec.org',
             hash_password=hash_password('Tasha123!'),
-            telephone='081234567891',
+            telephone='081211110000',
+            last_login_at=datetime(2026, 11, 10, 7, 40),
             is_active=True
         )
         db.add(tasha_user)
+    else:
+        tasha_user.fullname = 'Tasha Amelia'
+        tasha_user.username = 'tasha.admin'
+        tasha_user.telephone = '081211110000'
+        tasha_user.last_login_at = datetime(2026, 11, 10, 7, 40)
+        tasha_user.is_active = True
 
-    rina_user = db.query(User).filter(User.username == 'rina').first()
+    rina_user = db.query(User).filter((User.username == 'rina') | (User.username == 'rina.resepsionis') | (User.email == 'rina@seamolec.org')).first()
     if not rina_user:
         rina_user = User(
             id_role=petugas_role.id_role,
-            fullname='Rina',
+            fullname='Rina Wulandari',
             username='rina',
             email='rina@seamolec.org',
             hash_password=hash_password('Rina123!'),
-            telephone='089876543212',
+            telephone='081298765432',
+            last_login_at=datetime(2026, 11, 10, 7, 55),
             is_active=True
         )
         db.add(rina_user)
+    else:
+        rina_user.fullname = 'Rina Wulandari'
+        rina_user.telephone = '081298765432'
+        rina_user.last_login_at = datetime(2026, 11, 10, 7, 55)
+        rina_user.is_active = True
 
-    dina_user = db.query(User).filter(User.username == 'dina').first()
-    if not dina_user:
-        dina_user = User(
+    dimas_user = db.query(User).filter((User.username == 'dimas.resepsionis') | (User.email == 'dimas@seamolec.org')).first()
+    if not dimas_user:
+        dimas_user = User(
             id_role=petugas_role.id_role,
-            fullname='Dina',
-            username='dina',
-            email='dina@seamolec.org',
-            hash_password=hash_password('Dina123!'),
-            telephone='089876543213',
+            fullname='Dimas Prakoso',
+            username='dimas.resepsionis',
+            email='dimas@seamolec.org',
+            hash_password=hash_password('123456'),
+            telephone='081377788899',
+            last_login_at=datetime(2026, 11, 9, 7, 50),
             is_active=True
         )
-        db.add(dina_user)
+        db.add(dimas_user)
+
+    sari_user = db.query(User).filter((User.username == 'sari.resepsionis') | (User.email == 'sari@seamolec.org')).first()
+    if not sari_user:
+        sari_user = User(
+            id_role=petugas_role.id_role,
+            fullname='Sari Indah',
+            username='sari.resepsionis',
+            email='sari@seamolec.org',
+            hash_password=hash_password('123456'),
+            telephone='081355544433',
+            last_login_at=datetime(2026, 10, 21, 8, 2),
+            is_active=False
+        )
+        db.add(sari_user)
 
     setting = db.query(Setting).first()
     if not setting:
