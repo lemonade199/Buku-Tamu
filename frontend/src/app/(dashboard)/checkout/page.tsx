@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-
 export default function CheckoutPage() {
   const [activeVisitors, setActiveVisitors] = useState<ActiveVisitor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +44,22 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetchActiveVisitors();
-    const interval = setInterval(fetchActiveVisitors, 20000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchActiveVisitors();
+    }, 20000);
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchActiveVisitors();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [fetchActiveVisitors]);
 
   const handleQuickCheckout = (e: React.FormEvent) => {

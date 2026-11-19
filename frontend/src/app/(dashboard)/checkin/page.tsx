@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
+import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { VisitorItem } from '@/types';
 import {
   Search,
@@ -14,8 +14,6 @@ import {
   Clock,
   RefreshCw,
 } from 'lucide-react';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 export default function ReceptionGuestIntakePage() {
   const [visitors, setVisitors] = useState<VisitorItem[]>([]);
@@ -46,8 +44,22 @@ export default function ReceptionGuestIntakePage() {
 
   useEffect(() => {
     fetchPendingVisitors();
-    const interval = setInterval(fetchPendingVisitors, 4000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchPendingVisitors();
+    }, 4000);
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchPendingVisitors();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [fetchPendingVisitors]);
 
   const handleConfirmApprove = async (visitor: VisitorItem) => {
@@ -223,7 +235,7 @@ export default function ReceptionGuestIntakePage() {
                       <div className="w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center shrink-0">
                         {v.capture_id ? (
                           <img
-                            src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
+                            src={getVisitorPhotoUrl(v.id_visitor)}
                             alt={v.fullname}
                             className="w-full h-full object-cover"
                           />
@@ -308,7 +320,7 @@ export default function ReceptionGuestIntakePage() {
                 <div className="w-20 h-20 rounded-2xl bg-gray-200 overflow-hidden shrink-0 flex items-center justify-center border border-gray-300">
                   {detailVisitor.capture_id ? (
                     <img
-                      src={`${API_BASE_URL}/visitors/${detailVisitor.id_visitor}/photo`}
+                      src={getVisitorPhotoUrl(detailVisitor.id_visitor)}
                       alt={detailVisitor.fullname}
                       className="w-full h-full object-cover"
                     />

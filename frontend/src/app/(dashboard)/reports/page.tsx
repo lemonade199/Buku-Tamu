@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-
 export default function ReportsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role_code === 'ADMIN';
