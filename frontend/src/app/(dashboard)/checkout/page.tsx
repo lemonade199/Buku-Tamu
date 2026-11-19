@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
+import api, { getVisitorPhotoUrl } from '@/lib/api';
 import {
   LogOut,
   Search,
@@ -260,13 +260,13 @@ export default function CheckoutPage() {
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-3">
                           <div
-                            onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`)}
+                            onClick={() => setPreviewPhotoUrl(getVisitorPhotoUrl(visitor.id_visitor))}
                             className="w-10 h-10 rounded-xl bg-ivory-100 overflow-hidden border border-ivory-200 relative group cursor-pointer shrink-0 shadow-sm flex items-center justify-center"
                             title="Klik untuk melihat foto lebih besar"
                           >
                             <User className="w-5 h-5 text-gray-400 absolute" />
                             <img
-                              src={`${API_BASE_URL}/visitors/${visitor.id_visitor}/photo`}
+                              src={getVisitorPhotoUrl(visitor.id_visitor)}
                               alt={visitor.fullname}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform relative z-10"
                               onError={(e) => {

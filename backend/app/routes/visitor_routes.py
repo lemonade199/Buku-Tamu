@@ -394,6 +394,7 @@ def get_visitor_detail(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/photo', methods=['GET'])
+@jwt_required()
 def get_visitor_photo(id_visitor: int):
     db = get_db_session()
     try:

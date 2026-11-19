@@ -107,3 +107,35 @@ def test_checkin_requires_photo(client):
         'Authorization': f'Bearer {token}'
     })
     assert res.status_code == 422
+
+def test_visitor_photo_protection(client):
+    # 1. Login as petugas
+    login_res = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    token = login_res.get_json()['data']['access_token']
+
+    # 2. Check-in visitor with photo
+    checkin_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Terlindungi',
+        'telephone': '081234567899',
+        'no_pass': '04',
+        'photo_base64': SAMPLE_PHOTO_BASE64
+    })
+    assert checkin_res.status_code == 201
+    visitor_id = checkin_res.get_json()['data']['id_visitor']
+
+    # 3. Unauthenticated request MUST return 401
+    unauth_res = client.get(f'/api/v1/visitors/{visitor_id}/photo')
+    assert unauth_res.status_code == 401
+
+    # 4. Authenticated request with Bearer header MUST return 200
+    auth_header_res = client.get(
+        f'/api/v1/visitors/{visitor_id}/photo',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert auth_header_res.status_code == 200
+    assert auth_header_res.mimetype == 'image/jpeg'
+
+    # 5. Authenticated request with query string token MUST return 200
+    auth_query_res = client.get(f'/api/v1/visitors/{visitor_id}/photo?token={token}')
+    assert auth_query_res.status_code == 200
+    assert auth_query_res.mimetype == 'image/jpeg'

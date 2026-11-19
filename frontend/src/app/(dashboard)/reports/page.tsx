@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
+import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { VisitorItem } from '@/types';
 import {
@@ -414,14 +414,14 @@ export default function ReportsPage() {
                     <td className="py-3 px-3">
                       <button
                         type="button"
-                        onClick={() => setPreviewPhotoUrl(`${API_BASE_URL}/visitors/${v.id_visitor}/photo`)}
+                        onClick={() => setPreviewPhotoUrl(getVisitorPhotoUrl(v.id_visitor))}
                         className="w-10 h-10 rounded-full overflow-hidden bg-gray-400 flex items-center justify-center cursor-pointer shrink-0 border border-gray-400 shadow-2xs group relative focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
                         title={`Lihat foto ${v.fullname}`}
                         aria-label={`Perbesar foto ${v.fullname}`}
                       >
                         <User className="w-6 h-6 text-gray-200 absolute" />
                         <img
-                          src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
+                          src={getVisitorPhotoUrl(v.id_visitor)}
                           alt={v.fullname}
                           className="w-full h-full object-cover relative z-10 group-hover:scale-110 transition-transform"
                           onError={(e) => {

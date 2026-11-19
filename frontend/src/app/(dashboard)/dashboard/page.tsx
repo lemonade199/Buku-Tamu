@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import api from '@/lib/api';
+import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardMetrics, VisitorItem, RecentActivity } from '@/types';
 import {
@@ -566,7 +566,7 @@ export default function DashboardPage() {
                         <div className="w-full h-32 bg-[#D1D5DB] rounded flex items-center justify-center overflow-hidden mb-2.5">
                           {v.capture_id ? (
                             <img
-                              src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
+                              src={getVisitorPhotoUrl(v.id_visitor)}
                               alt={v.fullname}
                               className="w-full h-full object-cover"
                             />
@@ -678,7 +678,7 @@ export default function DashboardPage() {
                             <div className="w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center shrink-0">
                               {v.capture_id ? (
                                 <img
-                                  src={`${API_BASE_URL}/visitors/${v.id_visitor}/photo`}
+                                  src={getVisitorPhotoUrl(v.id_visitor)}
                                   alt={v.fullname}
                                   className="w-full h-full object-cover"
                                 />
@@ -744,7 +744,7 @@ export default function DashboardPage() {
                 <div className="w-20 h-20 rounded-2xl bg-gray-200 overflow-hidden shrink-0 flex items-center justify-center border border-gray-300">
                   {detailVisitor.capture_id ? (
                     <img
-                      src={`${API_BASE_URL}/visitors/${detailVisitor.id_visitor}/photo`}
+                      src={getVisitorPhotoUrl(detailVisitor.id_visitor)}
                       alt={detailVisitor.fullname}
                       className="w-full h-full object-cover"
                     />
