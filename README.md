@@ -162,6 +162,7 @@ CREATE DATABASE buku_tamu WITH ENCODING = 'UTF8';
    python run.py
    ```
    *Backend akan aktif di `http://127.0.0.1:5000` (atau port yang ditentukan).*
+   *Dokumentasi interaktif **Swagger UI** dapat diakses langsung melalui browser di: `http://127.0.0.1:5000/apidocs/`*
 
 ---
 
