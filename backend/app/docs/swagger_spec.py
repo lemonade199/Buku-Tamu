@@ -695,6 +695,34 @@ SWAGGER_TEMPLATE = {
                 }
             }
         },
+        "/api/v1/settings/public": {
+            "get": {
+                "tags": ["Pengaturan & Cadangan"],
+                "summary": "Ambil profil publik institusi (Nama & Logo)",
+                "description": "Menyajikan data publik instansi seperti nama institusi dan URL logo aktif tanpa memerlukan otentikasi.",
+                "responses": {
+                    "200": {
+                        "description": "Profil publik institusi berhasil diambil",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "success": {"type": "boolean", "example": True},
+                                "data": {
+                                    "type": "object",
+                                    "properties": {
+                                        "institution_name": {"type": "string", "example": "SEAMOLEC"},
+                                        "logo_path": {"type": "string", "example": "logo_20261123_041348_e4918d56.png"},
+                                        "logo_url": {"type": "string", "example": "/api/v1/settings/logo/logo_20261123_041348_e4918d56.png"},
+                                        "opening_time": {"type": "string", "example": "07:30"},
+                                        "closing_time": {"type": "string", "example": "16:00"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/settings": {
             "get": {
                 "tags": ["Pengaturan & Cadangan"],
