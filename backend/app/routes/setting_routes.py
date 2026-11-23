@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.app.models.base import get_db_session
 from backend.app.models.entities import Setting
 from backend.app.middleware.auth import role_required
-from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
+from backend.app.utils.photo_storage import get_photo_path, save_institution_logo, save_user_avatar
 from backend.app.services.backup_service import BackupService
 
 setting_bp = Blueprint('setting_bp', __name__, url_prefix='/api/v1/settings')
@@ -145,7 +145,7 @@ def upload_logo():
                 'message': 'Data logo tidak ditemukan.'
             }), 400
 
-        filename = save_user_avatar(photo_base64)
+        filename = save_institution_logo(photo_base64)
 
         setting = db.query(Setting).first()
         if not setting:
@@ -197,8 +197,25 @@ def test_smtp():
 
 @setting_bp.route('/logo/<filename>', methods=['GET'])
 def get_logo(filename: str):
+    clean_filename = os.path.basename(filename)
+
+    # Strictly block attempts to access visitor photos or staff avatars via logo endpoint
+    if clean_filename.startswith(('visitor_', 'avatar_')):
+        return jsonify({'success': False, 'message': 'Akses ditolak: File bukan logo institusi.'}), 403
+
+    db = get_db_session()
     try:
-        photo_path = get_photo_path(filename)
+        setting = db.query(Setting).first()
+        active_logo = setting.logo_path if setting else None
+    finally:
+        db.close()
+
+    is_allowed = clean_filename.startswith('logo_') or (active_logo and clean_filename == active_logo)
+    if not is_allowed:
+        return jsonify({'success': False, 'message': 'Akses ditolak: File bukan logo institusi yang sah.'}), 403
+
+    try:
+        photo_path = get_photo_path(clean_filename)
         if not os.path.exists(photo_path):
             return jsonify({'success': False, 'message': 'File logo tidak ditemukan.'}), 404
         return send_file(photo_path)

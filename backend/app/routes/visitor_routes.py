@@ -1,6 +1,8 @@
 import os
+import time as sys_time
+from collections import defaultdict
 from datetime import datetime, date, time
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pydantic import ValidationError
 from sqlalchemy import or_
@@ -16,9 +18,35 @@ from backend.app.utils.export_service import generate_excel, generate_pdf
 
 visitor_bp = Blueprint('visitors', __name__, url_prefix='/api/v1/visitors')
 
+# In-memory rate limiting for public kiosk checkin
+_checkin_attempts = defaultdict(list)
+_MAX_CHECKIN_PER_MINUTE = 15
+_CHECKIN_LOCKOUT_SECONDS = 60
+
+def _is_checkin_rate_limited(ip: str) -> bool:
+    if current_app and current_app.config.get('TESTING') and not current_app.config.get('TEST_RATE_LIMIT'):
+        return False
+    now = sys_time.time()
+    _checkin_attempts[ip] = [ts for ts in _checkin_attempts[ip] if now - ts < _CHECKIN_LOCKOUT_SECONDS]
+    return len(_checkin_attempts[ip]) >= _MAX_CHECKIN_PER_MINUTE
+
+def _record_checkin_attempt(ip: str):
+    now = sys_time.time()
+    _checkin_attempts[ip].append(now)
+
 @visitor_bp.route('/checkin', methods=['POST'])
 @jwt_required(optional=True)
 def checkin_visitor():
+    client_ip = request.remote_addr or 'unknown'
+    if _is_checkin_rate_limited(client_ip):
+        return jsonify({
+            'success': False,
+            'message': 'Terlalu banyak permintaan check-in dari perangkat Anda. Silakan coba kembali dalam 1 menit.',
+            'code': 'TOO_MANY_REQUESTS'
+        }), 429
+
+    _record_checkin_attempt(client_ip)
+
     data = request.get_json() or {}
     try:
         req = CheckinRequest(**data)
