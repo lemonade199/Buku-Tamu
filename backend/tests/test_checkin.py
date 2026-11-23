@@ -40,7 +40,6 @@ def test_checkin_success(client):
     # Process checkin
     checkin_data = {
         'fullname': 'Budi Santoso',
-        'telephone': '081298765432',
         'institution': 'PT Teknologi Bangsa',
         'representing': 'Divisi IT',
         'purpose': 'Rapat koordinasi teknis',
@@ -55,7 +54,6 @@ def test_checkin_success(client):
     data = res.get_json()
     assert data['success'] is True
     assert data['data']['fullname'] == 'Budi Santoso'
-    assert data['data']['telephone'] == '081298765432'
     assert data['data']['no_pass'] == '01'
     assert 'capture_id' in data['data']
 
@@ -69,7 +67,6 @@ def test_checkin_duplicate_pass_rejection(client):
 
     checkin_data = {
         'fullname': 'Tamu Pertama',
-        'telephone': '081111111111',
         'no_pass': '02',
         'photo_base64': SAMPLE_PHOTO_BASE64
     }
@@ -81,7 +78,6 @@ def test_checkin_duplicate_pass_rejection(client):
     # Second visitor attempts to use the SAME pass '02' while first is active
     checkin_data_2 = {
         'fullname': 'Tamu Kedua',
-        'telephone': '082222222222',
         'no_pass': '02',
         'photo_base64': SAMPLE_PHOTO_BASE64
     }
@@ -100,7 +96,6 @@ def test_checkin_requires_photo(client):
 
     bad_data = {
         'fullname': 'Tamu Tanpa Foto',
-        'telephone': '081233333333',
         'no_pass': '03',
         'photo_base64': ''
     }
@@ -117,7 +112,6 @@ def test_visitor_photo_protection(client):
     # 2. Check-in visitor with photo
     checkin_res = client.post('/api/v1/visitors/checkin', json={
         'fullname': 'Tamu Terlindungi',
-        'telephone': '081234567899',
         'no_pass': '04',
         'photo_base64': SAMPLE_PHOTO_BASE64
     })

@@ -145,9 +145,6 @@ CREATE UNIQUE INDEX uq_visitors_active_pass
 CREATE INDEX idx_visitors_fullname
     ON visitors(fullname);
 
-CREATE INDEX idx_visitors_telephone
-    ON visitors(telephone);
-
 CREATE INDEX idx_visitors_checkin
     ON visitors(check_in_at);
 

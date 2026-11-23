@@ -41,7 +41,6 @@ export interface VisitorItem {
   id_pass: number;
   no_pass?: string;
   fullname: string;
-  telephone?: string;
   institution?: string;
   representing?: string;
   purpose?: string;

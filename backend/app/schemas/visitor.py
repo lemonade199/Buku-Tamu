@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 
 class CheckinRequest(BaseModel):
     fullname: str = Field(..., min_length=2, max_length=150, description="Nama lengkap pengunjung")
-    telephone: Optional[str] = Field(None, max_length=25, description="Nomor telepon opsional")
     institution: Optional[str] = Field(None, max_length=150, description="Asal instansi atau perusahaan")
     representing: Optional[str] = Field(None, max_length=150, description="Pihak atau pejabat yang dikunjungi")
     purpose: Optional[str] = Field(None, max_length=1000, description="Tujuan atau keperluan kunjungan")
@@ -16,7 +15,6 @@ class VisitorResponse(BaseModel):
     id_pass: int
     no_pass: Optional[str] = None
     fullname: str
-    telephone: Optional[str] = None
     institution: Optional[str] = None
     representing: Optional[str] = None
     purpose: Optional[str] = None

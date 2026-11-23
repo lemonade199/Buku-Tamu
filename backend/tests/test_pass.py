@@ -64,7 +64,6 @@ def test_change_pass_in_use_to_available_auto_checkouts_visitor(client):
 
     checkin_res = client.post('/api/v1/visitors/checkin', json={
         'fullname': 'Tamu Uji Otomatis',
-        'telephone': '081234567890',
         'institution': 'PT Testing Otomatis',
         'representing': 'Quality Assurance',
         'purpose': 'Testing pass state transition',
