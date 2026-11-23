@@ -27,6 +27,11 @@ interface RegistrationStatusData {
 
 export default function KioskCheckinPage() {
   const [currentDateTime, setCurrentDateTime] = useState<string>('');
+  const [institutionName, setInstitutionName] = useState('seamolec');
+  const [institutionLogo, setInstitutionLogo] = useState('/seamolec-logo.jpg');
+  const [openingTime, setOpeningTime] = useState('07:30');
+  const [closingTime, setClosingTime] = useState('16:00');
+  const [isOperationalOpen, setIsOperationalOpen] = useState(true);
 
   const [fullname, setFullname] = useState('');
   const [institution, setInstitution] = useState('');
@@ -48,6 +53,28 @@ export default function KioskCheckinPage() {
   const [registrationResult, setRegistrationResult] = useState<RegistrationStatusData | null>(null);
   const [countdown, setCountdown] = useState(15);
 
+  const checkOperationalStatus = (openStr: string, closeStr: string) => {
+    try {
+      const now = new Date();
+      const cleanOpen = (openStr || '07:30').replace('.', ':');
+      const cleanClose = (closeStr || '16:00').replace('.', ':');
+      const [openH, openM] = cleanOpen.split(':').map(Number);
+      const [closeH, closeM] = cleanClose.split(':').map(Number);
+
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const openMinutes = openH * 60 + (openM || 0);
+      const closeMinutes = closeH * 60 + (closeM || 0);
+
+      if (openMinutes <= closeMinutes) {
+        return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+      } else {
+        return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+      }
+    } catch {
+      return true;
+    }
+  };
+
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -62,12 +89,32 @@ export default function KioskCheckinPage() {
       const minutes = String(now.getMinutes()).padStart(2, '0');
 
       setCurrentDateTime(`${dayName}, ${day} ${monthName} ${year} · ${hours}:${minutes}`);
+      setIsOperationalOpen(checkOperationalStatus(openingTime, closingTime));
     };
 
     updateTime();
     const interval = setInterval(updateTime, 1000);
+
+    const fetchPublicSettings = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/settings/public`);
+        if (res.data?.success && res.data?.data) {
+          if (res.data.data.institution_name) setInstitutionName(res.data.data.institution_name);
+          if (res.data.data.logo_url) setInstitutionLogo(res.data.data.logo_url);
+          const oTime = res.data.data.opening_time || '07:30';
+          const cTime = res.data.data.closing_time || '16:00';
+          setOpeningTime(oTime);
+          setClosingTime(cTime);
+          setIsOperationalOpen(checkOperationalStatus(oTime, cTime));
+        }
+      } catch {
+        // Fallback to default
+      }
+    };
+    fetchPublicSettings();
+
     return () => clearInterval(interval);
-  }, []);
+  }, [openingTime, closingTime]);
 
   const fetchPasses = useCallback(async () => {
     setLoadingPasses(true);
@@ -200,6 +247,11 @@ export default function KioskCheckinPage() {
     e.preventDefault();
     setFormError('');
 
+    if (!isOperationalOpen) {
+      setFormError(`Pendaftaran tamu mandiri saat ini ditutup di luar jam operasional (${openingTime} - ${closingTime} WIB). Silakan hubungi petugas resepsionis di meja informasi.`);
+      return;
+    }
+
     if (!fullname.trim()) {
       setFormError('Nama Tamu wajib diisi.');
       return;
@@ -288,17 +340,27 @@ export default function KioskCheckinPage() {
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-0.5 shadow-sm overflow-hidden shrink-0">
             <img
-              src="/seamolec-logo.jpg"
-              alt="SEAMOLEC Logo"
+              src={institutionLogo}
+              alt={`${institutionName} Logo`}
+              onError={() => setInstitutionLogo('/seamolec-logo.jpg')}
               className="w-full h-full object-contain"
             />
           </div>
           <span className="text-xl sm:text-2xl font-bold tracking-tight text-white font-sans lowercase">
-            seamolec
+            {institutionName}
           </span>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <span className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs ${
+            isOperationalOpen
+              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+              : 'bg-rose-100 text-rose-900 border border-rose-300'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${isOperationalOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-600'}`} />
+            <span>{isOperationalOpen ? `Buka (${openingTime} - ${closingTime})` : `Tutup (${openingTime} - ${closingTime})`}</span>
+          </span>
+
           <div className="bg-white text-gray-800 rounded-full px-4 py-1.5 flex items-center text-xs sm:text-sm font-medium shadow-sm space-x-2 border border-gray-100">
             <Clock className="w-4 h-4 text-gray-500" />
             <span>{currentDateTime || 'Memuat waktu...'}</span>
@@ -483,6 +545,15 @@ export default function KioskCheckinPage() {
               <h1 className="text-center font-serif text-2xl sm:text-[28px] text-[#222222] tracking-wide mb-5 lowercase">
                 form input data tamu
               </h1>
+
+              {!isOperationalOpen && (
+                <div className="mb-4 p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs sm:text-sm text-amber-900 flex items-start space-x-2.5">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Layanan Penerimaan Tamu Tutup:</span> Saat ini di luar jam operasional ({openingTime} - {closingTime} WIB). Jika Anda memiliki janji temu dinas khusus, silakan konfirmasi langsung ke petugas resepsionis di lobi.
+                  </div>
+                </div>
+              )}
 
               {formError && (
                 <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs sm:text-sm text-red-700 flex items-center space-x-2">

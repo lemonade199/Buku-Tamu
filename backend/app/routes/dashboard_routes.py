@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
 
 from backend.app.models.base import get_db_session
+from backend.app.models.entities import Setting
 from backend.app.repositories.visitor_repository import VisitorRepository
 from backend.app.repositories.pass_repository import PassRepository
 
@@ -21,6 +22,11 @@ def get_dashboard_metrics():
         total_pass_count = pass_repo.count_total()
         active_pass_count = pass_repo.count_active()
 
+        setting = db.query(Setting).first()
+        pass_warning_limit = setting.pass_warning_limit if setting and setting.pass_warning_limit else 5
+        available_pass = pass_counts.get('AVAILABLE', 0)
+        is_pass_warning = available_pass <= pass_warning_limit
+
         data = {
             'total_visitors_today': visitor_repo.count_today(),
             'total_visitors_all_time': visitor_repo.count_total(),
@@ -30,7 +36,11 @@ def get_dashboard_metrics():
             'completed_visitors_today': visitor_repo.count_completed_today(),
             'total_pass': total_pass_count,
             'active_pass_count': active_pass_count,
-            'available_pass': pass_counts.get('AVAILABLE', 0),
+            'available_pass': available_pass,
+            'pass_warning_limit': pass_warning_limit,
+            'is_pass_warning': is_pass_warning,
+            'opening_time': setting.opening_time.strftime('%H:%M') if setting and setting.opening_time else '07:30',
+            'closing_time': setting.closing_time.strftime('%H:%M') if setting and setting.closing_time else '16:00',
             'pending_pass': pass_counts.get('PENDING', 0),
             'in_use_pass': pass_counts.get('IN_USE', 0),
             'inactive_pass': pass_counts.get('INACTIVE', 0),

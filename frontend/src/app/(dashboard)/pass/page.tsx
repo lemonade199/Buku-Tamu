@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import { Search, Calendar, ChevronDown, RefreshCw } from 'lucide-react';
+import { Search, Calendar, ChevronDown, RefreshCw, ShieldAlert, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import Link from 'next/link';
 
 interface PassMonitoringItem {
   id_visitor: number;
@@ -21,9 +23,14 @@ interface PassCounts {
   available: number;
   pending: number;
   in_use: number;
+  warning_limit?: number;
+  is_warning?: boolean;
 }
 
 export default function MonitoringPassPage() {
+  const { user, loading: authLoading } = useAuth();
+  const hasAccess = user?.permissions?.includes('*') || user?.permissions?.includes('pass.read');
+
   const [items, setItems] = useState<PassMonitoringItem[]>([]);
   const [counts, setCounts] = useState<PassCounts>({ available: 14, pending: 3, in_use: 2 });
   const [loading, setLoading] = useState(true);
@@ -39,6 +46,10 @@ export default function MonitoringPassPage() {
   const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
 
   const fetchMonitoringData = useCallback(async () => {
+    if (!hasAccess) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get<{
         success: boolean;
@@ -55,7 +66,7 @@ export default function MonitoringPassPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [hasAccess]);
 
   useEffect(() => {
     fetchMonitoringData();
@@ -122,6 +133,27 @@ export default function MonitoringPassPage() {
     return matchesSearch && matchesStatus && matchesReceptionist && matchesDate;
   });
 
+  if (!authLoading && !hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[450px] text-center p-8 bg-white rounded-2xl border border-gray-200 shadow-sm max-w-xl mx-auto mt-12 animate-fadeIn">
+        <div className="w-16 h-16 rounded-full bg-red-100 text-[#8A001A] flex items-center justify-center mb-4">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Akses Ditolak</h2>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+          Akun Anda tidak memiliki izin untuk mengakses halaman <strong>Monitoring Kartu Pass</strong>. Hubungi Administrator sistem jika Anda membutuhkan hak akses ini.
+        </p>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center space-x-2 bg-[#8A001A] hover:bg-[#6D0015] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Kembali ke Dashboard</span>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -141,12 +173,30 @@ export default function MonitoringPassPage() {
         </button>
       </div>
 
+      {counts.available <= (counts.warning_limit ?? 5) && (
+        <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 flex items-start space-x-3 shadow-2xs animate-fadeIn">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs md:text-sm leading-relaxed">
+            <span className="font-bold">Peringatan Stok Kartu Pass:</span> Sisa kartu pass yang tersedia di rak hanya tersisa <span className="font-extrabold text-[#8A001A]">{counts.available}</span> kartu (batas minimum: {counts.warning_limit ?? 5}). Harap segera ingatkan pengunjung untuk mengembalikan kartu pass.
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl">
-        <div className="bg-black text-white rounded-2xl py-4 px-6 shadow-md border-2 border-black flex items-center">
-          <div className="border-l-2 border-white/60 pl-4">
-            <span className="text-sm font-semibold italic text-gray-200 block">
-              Tersedia
-            </span>
+        <div className={`bg-black text-white rounded-2xl py-4 px-6 shadow-md border-2 flex items-center ${
+          counts.available <= (counts.warning_limit ?? 5) ? 'border-amber-500 ring-2 ring-amber-400/50' : 'border-black'
+        }`}>
+          <div className="border-l-2 border-white/60 pl-4 w-full">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold italic text-gray-200 block">
+                Tersedia
+              </span>
+              {counts.available <= (counts.warning_limit ?? 5) && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-black not-italic animate-pulse">
+                  Stok Menipis
+                </span>
+              )}
+            </div>
             <span className="text-4xl sm:text-5xl font-black text-white mt-1 block">
               {counts.available}
             </span>

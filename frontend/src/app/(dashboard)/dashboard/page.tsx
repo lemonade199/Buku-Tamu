@@ -13,6 +13,7 @@ import {
   Building,
   Clock,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -256,6 +257,15 @@ export default function DashboardPage() {
           <span>Segarkan</span>
         </button>
       </div>
+
+      {availablePass <= (metrics?.pass_warning_limit ?? 5) && (
+        <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 flex items-start space-x-3 shadow-2xs">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs md:text-sm leading-relaxed">
+            <span className="font-bold">Peringatan Stok Kartu Pass Menipis:</span> Sisa kartu pass yang tersedia di rak tersisa <span className="font-extrabold text-[#8A001A]">{availablePass}</span> kartu (batas minimum peringatan: {metrics?.pass_warning_limit ?? 5}). Harap segera ingatkan pengunjung untuk mengembalikan kartu pass setelah urusan kunjungan selesai.
+          </div>
+        </div>
+      )}
 
       {feedback && (
         <div
@@ -509,10 +519,19 @@ export default function DashboardPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-                Pass tersedia
-              </span>
+            <div className={`bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 ${
+              availablePass <= (metrics?.pass_warning_limit ?? 5) ? 'border-amber-500 ring-2 ring-amber-400/50' : 'border-black'
+            }`}>
+              <div className="flex items-center space-x-1.5">
+                <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+                  Pass tersedia
+                </span>
+                {availablePass <= (metrics?.pass_warning_limit ?? 5) && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-black not-italic animate-pulse">
+                    Menipis
+                  </span>
+                )}
+              </div>
               <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
                 {availablePass}
               </span>
