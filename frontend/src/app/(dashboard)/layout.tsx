@@ -46,9 +46,40 @@ export default function DashboardLayout({
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    // Idle session timeout based on settings
+    let sessionTimeoutHours = 8;
+    api.get('/settings/public')
+      .then((res) => {
+        if (res.data?.success && res.data?.data?.session_timeout_hours) {
+          sessionTimeoutHours = Number(res.data.data.session_timeout_hours) || 8;
+        }
+      })
+      .catch(() => {});
+
+    let lastActivityTime = Date.now();
+    const handleUserActivity = () => {
+      lastActivityTime = Date.now();
+    };
+
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach((ev) => window.addEventListener(ev, handleUserActivity, { passive: true }));
+
+    const idleTimer = setInterval(() => {
+      const elapsedMs = Date.now() - lastActivityTime;
+      const maxIdleMs = sessionTimeoutHours * 3600 * 1000;
+      if (elapsedMs > maxIdleMs) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_info');
+        router.push('/login?reason=session_timeout');
+      }
+    }, 15000);
+
     return () => {
       clearInterval(checkActiveInterval);
+      clearInterval(idleTimer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      activityEvents.forEach((ev) => window.removeEventListener(ev, handleUserActivity));
     };
   }, [isAuthenticated, router]);
 
