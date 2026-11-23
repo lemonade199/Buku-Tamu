@@ -633,3 +633,74 @@ def update_roles_matrix():
     finally:
         db.close()
 
+@auth_bp.route('/sso/config', methods=['GET'])
+def get_sso_config():
+    db = get_db_session()
+    try:
+        setting = db.query(Setting).first()
+        return jsonify({
+            'success': True,
+            'data': {
+                'enabled': bool(setting.sso_enabled) if setting else False,
+                'issuer': setting.sso_issuer if setting and setting.sso_issuer else 'https://accounts.google.com',
+                'client_id': setting.sso_client_id if setting else None
+            }
+        }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/sso/callback', methods=['POST'])
+def sso_callback():
+    data = request.get_json(silent=True) or {}
+    email = data.get('email')
+    token = data.get('credential') or data.get('id_token')
+
+    # If Google ID Token is provided, decode payload
+    if not email and token:
+        try:
+            import base64
+            parts = str(token).split('.')
+            if len(parts) >= 2:
+                payload_b64 = parts[1]
+                payload_b64 += '=' * (-len(payload_b64) % 4)
+                payload_json = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
+                email = payload_json.get('email')
+        except Exception:
+            pass
+
+    if not email:
+        return jsonify({
+            'success': False,
+            'message': 'Data autentikasi SSO tidak lengkap (alamat email tidak ditemukan).'
+        }), 400
+
+    db = get_db_session()
+    try:
+        setting = db.query(Setting).first()
+        if setting and not setting.sso_enabled:
+            return jsonify({
+                'success': False,
+                'message': 'Login SSO sedang dinonaktifkan oleh Administrator.'
+            }), 403
+
+        user_repo = UserRepository(db)
+        auth_service = AuthService(user_repo)
+        result = auth_service.authenticate_sso_user(email)
+        return jsonify({
+            'success': True,
+            'message': 'Autentikasi SSO berhasil.',
+            'data': result
+        }), 200
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Terjadi kesalahan saat memproses login SSO: {str(e)}"
+        }), 500
+    finally:
+        db.close()
+

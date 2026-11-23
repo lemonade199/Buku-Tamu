@@ -47,7 +47,10 @@ def get_public_settings():
                 'logo_url': logo_url,
                 'opening_time': setting.opening_time.strftime('%H:%M') if setting.opening_time else '07:30',
                 'closing_time': setting.closing_time.strftime('%H:%M') if setting.closing_time else '16:00',
-                'session_timeout_hours': setting.session_timeout_hours or 8
+                'session_timeout_hours': setting.session_timeout_hours or 8,
+                'sso_enabled': bool(setting.sso_enabled),
+                'sso_issuer': setting.sso_issuer or 'https://accounts.google.com',
+                'sso_client_id': setting.sso_client_id
             }
         }), 200
     except Exception as e:
