@@ -37,6 +37,11 @@ def create_app(config_name=None, db_url=None):
     CORS(app, resources={r"/api/*": {"origins": cors_origins}}, supports_credentials=True)
     jwt.init_app(app)
 
+    # Initialize Swagger UI API documentation
+    from flasgger import Swagger
+    from backend.app.docs.swagger_spec import SWAGGER_CONFIG, SWAGGER_TEMPLATE
+    Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
+
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         identity = jwt_payload.get('sub')
