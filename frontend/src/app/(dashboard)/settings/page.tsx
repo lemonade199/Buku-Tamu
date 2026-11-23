@@ -84,6 +84,8 @@ export default function SettingsPage() {
     currentVal: boolean;
   } | null>(null);
   const [showPermissionWarningModal, setShowPermissionWarningModal] = useState(false);
+  const [showSsoSecret, setShowSsoSecret] = useState(false);
+  const [copiedRedirectUri, setCopiedRedirectUri] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1143,7 +1145,7 @@ export default function SettingsPage() {
                           type="text"
                           value={formData.sso_client_id || ''}
                           onChange={(e) => setFormData({ ...formData, sso_client_id: e.target.value })}
-                          placeholder="bukutamu-seamolec"
+                          placeholder="Contoh: 123456789-abc.apps.googleusercontent.com"
                           className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
@@ -1151,15 +1153,79 @@ export default function SettingsPage() {
                         <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Client secret:
                         </label>
-                        <input
-                          type="password"
-                          value={formData.sso_client_secret || ''}
-                          onChange={(e) => setFormData({ ...formData, sso_client_secret: e.target.value })}
-                          placeholder="••••••••••••"
-                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showSsoSecret ? 'text' : 'password'}
+                            value={formData.sso_client_secret || ''}
+                            onChange={(e) => setFormData({ ...formData, sso_client_secret: e.target.value })}
+                            placeholder="GOCSPX-••••••••••••"
+                            className="w-full px-3.5 py-2 pr-10 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSsoSecret(!showSsoSecret)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                            title={showSsoSecret ? 'Sembunyikan secret' : 'Tampilkan secret'}
+                          >
+                            {showSsoSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
+
+                    {formData.sso_enabled && (
+                      <div className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/70 text-xs text-blue-900 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2 font-bold text-blue-950">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Integrasi Single Sign-On (SSO / OAuth 2.0) Siap Digunakan</span>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              formData.sso_client_id && formData.sso_client_id.trim() !== ''
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                            }`}
+                          >
+                            {formData.sso_client_id && formData.sso_client_id.trim() !== ''
+                              ? 'Client ID Terpasang'
+                              : 'Menunggu Pengisian Client ID'}
+                          </span>
+                        </div>
+
+                        <p className="text-blue-800 leading-relaxed">
+                          Sistem telah menyediakan endpoint otentikasi SSO dan tombol <strong>Masuk dengan Akun Google / SSO</strong> di halaman login. Daftarkan URL callback di bawah ini ke Google Cloud Console Anda:
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                          <div className="flex-1 bg-white px-3 py-1.5 rounded-lg border border-blue-200 font-mono text-[11px] text-gray-700 select-all overflow-x-auto">
+                            {typeof window !== 'undefined' ? `${window.location.origin}/login` : 'http://localhost:3000/login'}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof window !== 'undefined') {
+                                navigator.clipboard.writeText(`${window.location.origin}/login`);
+                                setCopiedRedirectUri(true);
+                                setTimeout(() => setCopiedRedirectUri(false), 2000);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition cursor-pointer text-center text-xs shrink-0"
+                          >
+                            {copiedRedirectUri ? 'Tersalin ✓' : 'Salin URI'}
+                          </button>
+                        </div>
+
+                        <div className="text-[11px] text-blue-700 space-y-1 pt-1 border-t border-blue-200/60">
+                          <p>
+                            • <strong>Authorized Redirect URI:</strong> Masukkan URI di atas pada Google Cloud Console (Credentials &gt; OAuth 2.0 Client ID &gt; Authorized redirect URIs).
+                          </p>
+                          <p>
+                            • <strong>Pencocokan Pengguna:</strong> Akun Google yang digunakan harus memiliki email yang sama dengan salah satu pengguna terdaftar di menu <em>Pengguna &amp; Role</em>.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

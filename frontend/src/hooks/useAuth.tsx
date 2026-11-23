@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  loginWithSso: (payload: { credential?: string; email?: string }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updated: Partial<User>) => void;
   refreshUser: () => Promise<void>;
@@ -72,6 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/dashboard');
   };
 
+  const loginWithSso = async (payload: { credential?: string; email?: string }) => {
+    const res = await api.post<{ success: boolean; data: AuthResponse }>('/auth/sso/callback', payload);
+    const authData = res.data.data;
+    localStorage.setItem('access_token', authData.access_token);
+    localStorage.setItem('refresh_token', authData.refresh_token);
+    localStorage.setItem('user_info', JSON.stringify(authData.user));
+    setUser(authData.user);
+    router.push('/dashboard');
+  };
+
   const updateUser = (updated: Partial<User>) => {
     if (!user) return;
     const merged = { ...user, ...updated };
@@ -94,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, refreshUser, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithSso, logout, updateUser, refreshUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
