@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
-import { CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 type TabType = 'umum' | 'smtp' | 'notifikasi' | 'role' | 'sso' | 'backup';
 
@@ -18,9 +18,11 @@ interface SettingsData {
   smtp_host?: string;
   smtp_port?: number;
   smtp_username?: string;
+  smtp_password?: string;
   smtp_encryption?: string;
   smtp_sender_name?: string;
   smtp_sender_email?: string;
+  smtp_status?: string;
   notify_app_checkin?: boolean;
   notify_app_backup_fail?: boolean;
   notify_email_monthly_report?: boolean;
@@ -69,6 +71,8 @@ export default function SettingsPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.jpg');
   const [testingEmail, setTestingEmail] = useState(false);
+  const [sendingMonthlyReport, setSendingMonthlyReport] = useState(false);
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleModalData, setRoleModalData] = useState({ name: '', description: '' });
   const [matrix, setMatrix] = useState(permissionsMatrix);
@@ -120,7 +124,19 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
+    fetchMatrix();
   }, []);
+
+  const fetchMatrix = async () => {
+    try {
+      const res = await api.get('/auth/roles/matrix');
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setMatrix(res.data.data);
+      }
+    } catch {
+      // fallback to permissionsMatrix
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -292,8 +308,16 @@ export default function SettingsPage() {
       const base64 = reader.result as string;
       setLogoPreview(base64);
       try {
-        await api.post('/settings/logo', { logo: base64 });
+        const res = await api.post('/settings/logo', { logo: base64 });
         setSuccessMessage('Logo instansi berhasil diperbarui.');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('institution-settings-updated', {
+            detail: {
+              logo_path: res.data?.logo_path,
+              logo_url: res.data?.logo_url || `/api/v1/settings/logo/${res.data?.logo_path}`
+            }
+          }));
+        }
         setTimeout(() => setSuccessMessage(''), 3000);
       } catch (err: any) {
         setErrorMessage(err.response?.data?.message || 'Gagal mengunggah logo.');
@@ -316,6 +340,11 @@ export default function SettingsPage() {
         jwt_refresh_token_expiry: (formData.jwt_refresh_token_expiry || 7) * 86400,
       });
       setSuccessMessage('Pengaturan berhasil disimpan.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('institution-settings-updated', {
+          detail: { institution_name: formData.institution_name }
+        }));
+      }
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menyimpan pengaturan.');
@@ -329,14 +358,42 @@ export default function SettingsPage() {
     setSuccessMessage('');
     setErrorMessage('');
     try {
-      const res = await api.post('/settings/smtp/test');
+      const res = await api.post('/settings/smtp/test', {
+        smtp_host: formData.smtp_host,
+        smtp_port: formData.smtp_port,
+        smtp_username: formData.smtp_username,
+        smtp_password: formData.smtp_password,
+        smtp_encryption: formData.smtp_encryption,
+        smtp_sender_name: formData.smtp_sender_name,
+        smtp_sender_email: formData.smtp_sender_email,
+      });
+      setFormData((prev) => ({ ...prev, smtp_status: 'CONNECTED' }));
       setSuccessMessage(res.data?.message || 'Koneksi ke server SMTP berhasil. Email uji telah berhasil dikirim.');
-      setTimeout(() => setSuccessMessage(''), 4000);
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: any) {
+      setFormData((prev) => ({ ...prev, smtp_status: 'ERROR' }));
       setErrorMessage(err.response?.data?.message || 'Gagal mengirim email uji.');
-      setTimeout(() => setErrorMessage(''), 4000);
+      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  const handleSendMonthlyReport = async () => {
+    setSendingMonthlyReport(true);
+    setSuccessMessage('');
+    setErrorMessage('');
+    try {
+      const res = await api.post('/settings/notifications/monthly-report', {
+        recipient_email: formData.admin_notification_email,
+      });
+      setSuccessMessage(res.data?.message || 'Rekap laporan bulanan berhasil dikirim ke email admin.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal mengirim rekap laporan bulanan.');
+      setTimeout(() => setErrorMessage(''), 5000);
+    } finally {
+      setSendingMonthlyReport(false);
     }
   };
 
@@ -357,23 +414,37 @@ export default function SettingsPage() {
     setShowPermissionWarningModal(true);
   };
 
-  const confirmPermissionChange = () => {
+  const confirmPermissionChange = async () => {
     if (!pendingPermissionChange) return;
     const { featureIndex, featureName, role, roleKey } = pendingPermissionChange;
 
-    setMatrix((prev) => {
-      const next = [...prev];
-      next[featureIndex] = {
-        ...next[featureIndex],
-        [roleKey]: !next[featureIndex][roleKey],
-      };
-      return next;
-    });
+    const nextMatrix = [...matrix];
+    nextMatrix[featureIndex] = {
+      ...nextMatrix[featureIndex],
+      [roleKey]: !nextMatrix[featureIndex][roleKey],
+    };
 
+    setMatrix(nextMatrix);
     setShowPermissionWarningModal(false);
-    setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
-    setTimeout(() => setSuccessMessage(''), 3500);
-    setPendingPermissionChange(null);
+
+    try {
+      const res = await api.put('/auth/roles/matrix', { matrix: nextMatrix });
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setMatrix(res.data.data);
+      }
+      setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
+      setTimeout(() => setSuccessMessage(''), 3500);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('permissions-updated'));
+      }
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan perubahan hak akses.');
+      setTimeout(() => setErrorMessage(''), 3500);
+      fetchMatrix();
+    } finally {
+      setPendingPermissionChange(null);
+    }
   };
 
   const tabs: { key: TabType; label: string }[] = [
@@ -585,7 +656,7 @@ export default function SettingsPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          No. pass ID:
+                          Nama instansi / institusi:
                         </label>
                         <input
                           type="text"
@@ -619,6 +690,24 @@ export default function SettingsPage() {
                           placeholder="16.00"
                           className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Batas peringatan kartu pass (stok minimum):
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={formData.pass_warning_limit ?? 5}
+                          onChange={(e) => setFormData({ ...formData, pass_warning_limit: Number(e.target.value) })}
+                          placeholder="5"
+                          className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                        <p className="text-[11px] text-gray-500 mt-1 max-w-[280px] leading-tight">
+                          Peringatan visual akan muncul di dashboard & monitoring jika sisa kartu pass di rak kurang dari atau sama dengan angka ini.
+                        </p>
                       </div>
                     </div>
 
@@ -681,6 +770,7 @@ export default function SettingsPage() {
                         type="text"
                         value={formData.smtp_host || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_host: e.target.value })}
+                        placeholder="contoh: email-smtp.ap-southeast-1.amazonaws.com"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -692,6 +782,7 @@ export default function SettingsPage() {
                         type="number"
                         value={formData.smtp_port || 587}
                         onChange={(e) => setFormData({ ...formData, smtp_port: Number(e.target.value) })}
+                        placeholder="587 / 465 / 25"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -704,6 +795,7 @@ export default function SettingsPage() {
                         type="text"
                         value={formData.smtp_username || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_username: e.target.value })}
+                        placeholder="Username atau akun SMTP"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -724,16 +816,43 @@ export default function SettingsPage() {
 
                     <div>
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        Password / App Password:
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSmtpPassword ? 'text' : 'password'}
+                          value={formData.smtp_password || ''}
+                          onChange={(e) => setFormData({ ...formData, smtp_password: e.target.value })}
+                          placeholder="••••••••••••"
+                          className="w-full px-3.5 py-1.5 pr-10 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                        >
+                          {showSmtpPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-1">
                         Nama Pengirim
                       </label>
                       <input
                         type="text"
                         value={formData.smtp_sender_name || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_sender_name: e.target.value })}
+                        placeholder="Contoh: buku tamu SEAMOLEC"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
-                    <div>
+
+                    <div className="md:col-span-2">
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
                         Email pengirim:
                       </label>
@@ -741,6 +860,7 @@ export default function SettingsPage() {
                         type="email"
                         value={formData.smtp_sender_email || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_sender_email: e.target.value })}
+                        placeholder="Contoh: buktam@seamolec.org"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -759,18 +879,38 @@ export default function SettingsPage() {
                       type="button"
                       onClick={handleTestEmail}
                       disabled={testingEmail}
-                      className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-6 py-2 rounded-xl font-medium text-sm shadow-sm transition disabled:opacity-50"
+                      className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-6 py-2 rounded-xl font-medium text-sm shadow-sm transition disabled:opacity-50 flex items-center space-x-1.5"
                     >
-                      {testingEmail ? 'Mengirim...' : 'Kirim email uji'}
+                      {testingEmail && (
+                        <div className="w-3.5 h-3.5 border-2 border-gray-800 border-t-transparent rounded-full animate-spin mr-1" />
+                      )}
+                      <span>{testingEmail ? 'Menguji & Mengirim...' : 'Kirim email uji'}</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="flex justify-end mt-8 pt-4">
-                  <div className="bg-[#2D6A4F] text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
-                    <span>✓</span>
-                    <span>Terhubung</span>
-                  </div>
+                  {testingEmail ? (
+                    <div className="bg-amber-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1.5 shadow-sm animate-pulse">
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menguji Koneksi...</span>
+                    </div>
+                  ) : formData.smtp_status === 'CONNECTED' ? (
+                    <div className="bg-[#2D6A4F] text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                      <span>✓</span>
+                      <span>Terhubung</span>
+                    </div>
+                  ) : formData.smtp_status === 'ERROR' ? (
+                    <div className="bg-red-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                      <span>✕</span>
+                      <span>Gagal Terhubung</span>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                      <span>○</span>
+                      <span>Belum Terhubung</span>
+                    </div>
+                  )}
                 </div>
               </form>
             )}
@@ -893,13 +1033,25 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end mt-8 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-8 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={handleSendMonthlyReport}
+                    disabled={sendingMonthlyReport}
+                    className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-5 py-2 rounded-xl font-medium text-xs sm:text-sm shadow-xs transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    {sendingMonthlyReport && (
+                      <div className="w-3.5 h-3.5 border-2 border-gray-800 border-t-transparent rounded-full animate-spin mr-1" />
+                    )}
+                    <span>{sendingMonthlyReport ? 'Mengirim Laporan...' : 'Kirim Rekap Laporan Bulanan ke Email'}</span>
+                  </button>
+
                   <button
                     type="submit"
                     disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
+                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-7 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50 cursor-pointer"
                   >
-                    Simpan pengaturan
+                    {saving ? 'Menyimpan...' : 'Simpan pengaturan'}
                   </button>
                 </div>
               </form>

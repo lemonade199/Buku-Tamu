@@ -1,18 +1,20 @@
 import os
 import time
+import json
 from collections import defaultdict
 from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import User, Role
+from backend.app.models.entities import User, Role, Setting
 from backend.app.repositories.user_repository import UserRepository
 from backend.app.services.auth_service import AuthService
 from backend.app.schemas.auth import LoginRequest, RefreshRequest
 from backend.app.utils.security import verify_password, hash_password
 from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
 from backend.app.middleware.auth import role_required
+from backend.app.services.email_service import send_new_account_email, send_password_reset_email
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 
@@ -137,6 +139,7 @@ def get_current_user():
                 'message': 'Pengguna tidak ditemukan atau tidak aktif.'
             }), 404
 
+        perms = user.role.permissions if isinstance(user.role.permissions, list) else json.loads(user.role.permissions or '[]')
         return jsonify({
             'success': True,
             'data': {
@@ -147,7 +150,7 @@ def get_current_user():
                 'role_code': user.role.code,
                 'role_name': user.role.name,
                 'telephone': user.telephone,
-                'permissions': claims.get('permissions', [])
+                'permissions': perms
             }
         }), 200
     finally:
@@ -332,6 +335,12 @@ def create_user():
         db.commit()
         db.refresh(new_user)
 
+        # Trigger new account email notification if enabled
+        try:
+            send_new_account_email(db, new_user, password)
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
             'message': 'Pengguna baru berhasil ditambahkan.',
@@ -478,6 +487,12 @@ def reset_user_password(user_id: int):
         user_repo.revoke_all_user_tokens(user.id_user)
         db.commit()
 
+        # Trigger password reset email notification if enabled
+        try:
+            send_password_reset_email(db, user, new_password)
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
             'message': f'Password untuk {user.fullname} (@{user.username}) berhasil diatur ulang menjadi "{new_password}".',
@@ -512,3 +527,109 @@ def get_user_avatar(user_id: int):
         return send_file(photo_path, mimetype='image/jpeg')
     finally:
         db.close()
+
+DEFAULT_PERMISSIONS_MATRIX = [
+    {"id": "dashboard", "feature": "Dashboard", "perm": "dashboard.read", "admin": True, "receptionist": True},
+    {"id": "checkin", "feature": "Penerimaan tamu", "perm": "visitors.create", "admin": False, "receptionist": True},
+    {"id": "pass_handover", "feature": "Serahkan kartu", "perm": "visitors.checkin", "admin": False, "receptionist": True},
+    {"id": "checkout", "feature": "Pengembalian akses", "perm": "visitors.checkout", "admin": False, "receptionist": True},
+    {"id": "pass_monitoring", "feature": "Monitoring kartu pass", "perm": "pass.read", "admin": True, "receptionist": True},
+    {"id": "reports", "feature": "Laporan & ekspor", "perm": "reports.read", "admin": True, "receptionist": True},
+    {"id": "master", "feature": "Master data (kartu pass & pengguna", "perm": "master.manage", "admin": True, "receptionist": False},
+    {"id": "users", "feature": "Pengguna & role", "perm": "users.manage", "admin": True, "receptionist": False},
+    {"id": "settings", "feature": "Pengaturan sistem", "perm": "settings.manage", "admin": True, "receptionist": False},
+]
+
+FEATURE_PERMS_MAP = {
+    "dashboard": ["dashboard.read"],
+    "checkin": ["visitors.read", "visitors.create"],
+    "pass_handover": ["visitors.checkin", "visitors.approve"],
+    "checkout": ["visitors.checkout"],
+    "pass_monitoring": ["pass.read", "pass.manage"],
+    "reports": ["reports.read"],
+    "master": ["master.manage"],
+    "users": ["users.manage"],
+    "settings": ["settings.manage"],
+}
+
+@auth_bp.route('/roles/matrix', methods=['GET'])
+@jwt_required()
+def get_roles_matrix():
+    db = get_db_session()
+    try:
+        setting = db.query(Setting).first()
+        matrix = setting.permissions_matrix if setting and setting.permissions_matrix else DEFAULT_PERMISSIONS_MATRIX
+        return jsonify({
+            'success': True,
+            'data': matrix
+        }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/roles/matrix', methods=['PUT'])
+@role_required('ADMIN')
+def update_roles_matrix():
+    data = request.get_json() or {}
+    new_matrix = data.get('matrix')
+    if not isinstance(new_matrix, list):
+        return jsonify({'success': False, 'message': 'Format data matriks tidak valid.'}), 400
+
+    db = get_db_session()
+    try:
+        setting = db.query(Setting).first()
+        if not setting:
+            setting = Setting()
+            db.add(setting)
+
+        setting.permissions_matrix = new_matrix
+
+        # Compute dynamic permissions for PETUGAS and ADMIN
+        petugas_perms = set()
+        admin_perms = set()
+        all_admin_enabled = True
+
+        for item in new_matrix:
+            fid = item.get('id')
+            if not fid:
+                fname = item.get('feature', '').lower()
+                for def_item in DEFAULT_PERMISSIONS_MATRIX:
+                    if def_item['feature'].lower() in fname or fname in def_item['feature'].lower():
+                        fid = def_item['id']
+                        break
+
+            perms = FEATURE_PERMS_MAP.get(fid, [item.get('perm')] if item.get('perm') else [])
+
+            if item.get('receptionist'):
+                petugas_perms.update(perms)
+
+            if item.get('admin'):
+                admin_perms.update(perms)
+            else:
+                all_admin_enabled = False
+
+        # Update PETUGAS role
+        petugas_role = db.query(Role).filter(Role.code == 'PETUGAS').first()
+        if petugas_role:
+            petugas_role.permissions = sorted(list(petugas_perms))
+
+        # Update ADMIN role
+        admin_role = db.query(Role).filter(Role.code == 'ADMIN').first()
+        if admin_role:
+            if all_admin_enabled:
+                admin_role.permissions = ["*"]
+            else:
+                admin_role.permissions = sorted(list(admin_perms))
+
+        db.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Matriks hak akses berhasil diperbarui.',
+            'data': new_matrix
+        }), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+

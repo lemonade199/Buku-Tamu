@@ -158,9 +158,11 @@ class Setting(Base):
     smtp_host = Column(String(255), nullable=True)
     smtp_port = Column(Integer, nullable=True)
     smtp_username = Column(String(255), nullable=True)
+    smtp_password = Column(String(255), nullable=True)
     smtp_encryption = Column(String(10), nullable=False, default='tls')
     smtp_sender_name = Column(String(150), nullable=True)
     smtp_sender_email = Column(String(255), nullable=True)
+    smtp_status = Column(String(50), nullable=False, default='DISCONNECTED')
     notify_app_checkin = Column(Boolean, nullable=False, default=True)
     notify_app_backup_fail = Column(Boolean, nullable=False, default=True)
     notify_email_monthly_report = Column(Boolean, nullable=False, default=False)
@@ -178,6 +180,7 @@ class Setting(Base):
     visit_data_retention_years = Column(Integer, nullable=False, default=5)
     auto_backup_enabled = Column(Boolean, nullable=False, default=False)
     auto_backup_schedule = Column(String(100), nullable=True)
+    permissions_matrix = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_now)
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
@@ -192,9 +195,11 @@ class Setting(Base):
             'smtp_host': self.smtp_host,
             'smtp_port': self.smtp_port,
             'smtp_username': self.smtp_username,
+            'smtp_password': self.smtp_password,
             'smtp_encryption': self.smtp_encryption,
             'smtp_sender_name': self.smtp_sender_name,
             'smtp_sender_email': self.smtp_sender_email,
+            'smtp_status': self.smtp_status,
             'notify_app_checkin': self.notify_app_checkin,
             'notify_app_backup_fail': self.notify_app_backup_fail,
             'notify_email_monthly_report': self.notify_email_monthly_report,
@@ -212,6 +217,7 @@ class Setting(Base):
             'visit_data_retention_years': self.visit_data_retention_years,
             'auto_backup_enabled': self.auto_backup_enabled,
             'auto_backup_schedule': self.auto_backup_schedule,
+            'permissions_matrix': self.permissions_matrix,
         }
 
 class RefreshToken(Base):
@@ -252,3 +258,23 @@ class AuditLog(Base):
     created_at = Column(DateTime, nullable=False, default=utc_now, index=True)
 
     user = relationship('User')
+
+class AppNotification(Base):
+    __tablename__ = 'app_notifications'
+
+    id_notification = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    type = Column(String(50), nullable=False, default='GENERAL')
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+
+    def to_dict(self):
+        return {
+            'id_notification': self.id_notification,
+            'type': self.type,
+            'title': self.title,
+            'message': self.message,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

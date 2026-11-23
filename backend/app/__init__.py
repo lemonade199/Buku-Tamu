@@ -93,6 +93,9 @@ def create_app(config_name=None, db_url=None):
                 CREATE INDEX IF NOT EXISTS ix_visitors_status ON visitors(status);
                 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sso_client_secret VARCHAR(255);
                 ALTER TABLE settings ADD COLUMN IF NOT EXISTS session_timeout_hours INTEGER DEFAULT 8;
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS permissions_matrix JSON;
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS smtp_password VARCHAR(255);
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS smtp_status VARCHAR(50) DEFAULT 'DISCONNECTED';
             """))
             conn.commit()
 
