@@ -11,6 +11,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updated: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -20,6 +21,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const refreshUser = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      if (!token) return;
+      const res = await api.get('/auth/me');
+      if (res.data?.success && res.data?.data) {
+        setUser(res.data.data);
+        localStorage.setItem('user_info', JSON.stringify(res.data.data));
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user_info');
@@ -32,6 +45,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setLoading(false);
+
+    if (token) {
+      refreshUser();
+    }
+
+    const handlePermissionsUpdated = () => {
+      refreshUser();
+    };
+    window.addEventListener('permissions-updated', handlePermissionsUpdated);
+    return () => {
+      window.removeEventListener('permissions-updated', handlePermissionsUpdated);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -69,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, refreshUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

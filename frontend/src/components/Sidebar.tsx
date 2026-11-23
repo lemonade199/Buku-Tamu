@@ -8,29 +8,41 @@ import { useAuth } from '@/hooks/useAuth';
 interface NavItem {
   name: string;
   href: string;
+  permission?: string;
 }
 
 const adminNavItems: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Monitoring Kartu Pass', href: '/pass' },
-  { name: 'Laporan', href: '/reports' },
-  { name: 'Master data', href: '/master' },
-  { name: 'Pengaturan', href: '/settings' },
+  { name: 'Dashboard', href: '/dashboard', permission: 'dashboard.read' },
+  { name: 'Monitoring Kartu Pass', href: '/pass', permission: 'pass.read' },
+  { name: 'Laporan', href: '/reports', permission: 'reports.read' },
+  { name: 'Master data', href: '/master', permission: 'master.manage' },
+  { name: 'Pengaturan', href: '/settings', permission: 'settings.manage' },
 ];
 
 const receptionistNavItems: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Penerimaan Tamu', href: '/checkin' },
-  { name: 'Pengembalian Akses', href: '/checkout' },
-  { name: 'Kontrol Pass Aktif', href: '/pass' },
-  { name: 'Laporan', href: '/reports' },
+  { name: 'Dashboard', href: '/dashboard', permission: 'dashboard.read' },
+  { name: 'Penerimaan Tamu', href: '/checkin', permission: 'visitors.create' },
+  { name: 'Pengembalian Akses', href: '/checkout', permission: 'visitors.checkout' },
+  { name: 'Kontrol Pass Aktif', href: '/pass', permission: 'pass.read' },
+  { name: 'Laporan', href: '/reports', permission: 'reports.read' },
 ];
-
+  
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const isAdmin = user?.role_code === 'ADMIN';
-  const navItems = isAdmin ? adminNavItems : receptionistNavItems;
+
+  const userPerms = user?.permissions || [];
+  const hasWildcard = userPerms.includes('*');
+  const hasPermission = (perm?: string) => {
+    if (!perm) return true;
+    if (hasWildcard) return true;
+    return userPerms.includes(perm);
+  };
+
+  const navItems = (isAdmin ? adminNavItems : receptionistNavItems).filter((item) =>
+    hasPermission(item.permission)
+  );
 
   return (
     <aside className="w-64 bg-[#8A001A] text-white flex flex-col justify-start shrink-0 border-r border-black/40 pt-8 pb-6 px-4">
