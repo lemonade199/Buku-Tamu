@@ -13,10 +13,32 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [institutionName, setInstitutionName] = useState('SEAMOLEC');
+  const [logoUrl, setLogoUrl] = useState('/seamolec-logo.jpg');
 
   useEffect(() => {
-    if (searchParams.get('reason') === 'inactive') {
+    const fetchPublicSettings = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        const res = await fetch(`${apiUrl}/settings/public`);
+        const json = await res.json();
+        if (json?.success && json?.data) {
+          if (json.data.institution_name) setInstitutionName(json.data.institution_name);
+          if (json.data.logo_url) setLogoUrl(json.data.logo_url);
+        }
+      } catch {
+        // Fallback to default
+      }
+    };
+    fetchPublicSettings();
+  }, []);
+
+  useEffect(() => {
+    const reason = searchParams.get('reason');
+    if (reason === 'inactive') {
       setErrorMessage('Akun Anda telah dinonaktifkan oleh administrator. Anda otomatis dikeluarkan dari sistem.');
+    } else if (reason === 'session_timeout') {
+      setErrorMessage('Sesi antarmuka Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.');
     }
   }, [searchParams]);
 
@@ -40,10 +62,11 @@ function LoginForm() {
 
       <div className="relative w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-200 p-8 z-10">
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-16 h-16 rounded-full bg-white p-1 border-2 border-[#8A001A] shadow-md mb-3 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-white p-1 border-2 border-[#8A001A] shadow-md mb-3 flex items-center justify-center overflow-hidden">
             <img
-              src="/seamolec-logo.jpg"
-              alt="SEAMOLEC Logo"
+              src={logoUrl}
+              alt={`${institutionName} Logo`}
+              onError={() => setLogoUrl('/seamolec-logo.jpg')}
               className="w-full h-full object-contain rounded-full"
             />
           </div>
@@ -51,7 +74,7 @@ function LoginForm() {
             Sistem Buku Tamu Digital
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            Masuk untuk mengakses portal resepsionis & operasional
+            Masuk untuk mengakses portal {institutionName}
           </p>
         </div>
 
