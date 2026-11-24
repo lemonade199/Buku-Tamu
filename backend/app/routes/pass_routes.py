@@ -7,7 +7,7 @@ from backend.app.models.base import get_db_session
 from backend.app.models.entities import Pass, Visitor, AuditLog, Setting
 from backend.app.schemas.pass_schema import PassCreateRequest, PassStatusUpdateRequest
 from backend.app.middleware.auth import role_required, permission_required
-from backend.app.utils.datetime_utils import utc_now
+from backend.app.utils.datetime_utils import utc_now, to_wib
 
 pass_bp = Blueprint('pass', __name__, url_prefix='/api/v1/pass')
 
@@ -146,8 +146,10 @@ def get_pass_monitoring():
 
             raw_no = v.pass_card.no_pass if v.pass_card else str(v.id_pass)
             pass_no = raw_no.zfill(2)
-            check_in_time = v.check_in_at.strftime('%H.%M') if v.status == 'APPROVED' and v.check_in_at else '-'
-            check_out_time = v.check_out_at.strftime('%H.%M') if v.check_out_at else '-'
+            cin_wib = to_wib(v.check_in_at)
+            cout_wib = to_wib(v.check_out_at)
+            check_in_time = cin_wib.strftime('%H.%M') if v.status == 'APPROVED' and cin_wib else '-'
+            check_out_time = cout_wib.strftime('%H.%M') if cout_wib else '-'
             handed_over_by = v.approved_by.fullname if v.approved_by and v.status == 'APPROVED' else '-'
             received_by = checkout_map.get(str(v.id_visitor)) or (handed_over_by if v.check_out_at else '-')
 
@@ -161,7 +163,7 @@ def get_pass_monitoring():
                 'handed_over_by': handed_over_by,
                 'received_by': received_by if v.check_out_at else '-',
                 'status': status_label,
-                'date': v.check_in_at.strftime('%Y-%m-%d') if v.check_in_at else None
+                'date': cin_wib.strftime('%Y-%m-%d') if cin_wib else None
             })
 
         return jsonify({

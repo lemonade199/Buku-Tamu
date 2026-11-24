@@ -1,8 +1,8 @@
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.app.models.entities import Visitor
-from backend.app.utils.datetime_utils import utc_now
+from backend.app.utils.datetime_utils import utc_now, to_wib, get_today_range_utc, WIB_TZ
 
 class VisitorRepository:
     def __init__(self, db: Session):
@@ -12,11 +12,10 @@ class VisitorRepository:
         return self.db.query(func.count(Visitor.id_visitor)).filter(Visitor.status == 'APPROVED').scalar() or 0
 
     def count_today(self) -> int:
-        today_start = datetime.combine(date.today(), time.min)
-        today_end = datetime.combine(date.today(), time.max)
+        today_start_utc, today_end_utc = get_today_range_utc()
         return self.db.query(func.count(Visitor.id_visitor)).filter(
             Visitor.status == 'APPROVED',
-            Visitor.check_in_at.between(today_start, today_end)
+            Visitor.check_in_at.between(today_start_utc, today_end_utc)
         ).scalar() or 0
 
     def count_active(self) -> int:
@@ -36,12 +35,11 @@ class VisitorRepository:
         ).order_by(Visitor.check_in_at.asc()).all()
 
     def count_completed_today(self) -> int:
-        today_start = datetime.combine(date.today(), time.min)
-        today_end = datetime.combine(date.today(), time.max)
+        today_start_utc, today_end_utc = get_today_range_utc()
         return self.db.query(func.count(Visitor.id_visitor)).filter(
             Visitor.status == 'APPROVED',
             Visitor.check_out_at.isnot(None),
-            Visitor.check_in_at.between(today_start, today_end)
+            Visitor.check_in_at.between(today_start_utc, today_end_utc)
         ).scalar() or 0
 
     def get_recent(self, limit: int = 5):
@@ -50,17 +48,17 @@ class VisitorRepository:
         ).order_by(Visitor.check_in_at.desc()).limit(limit).all()
 
     def get_hourly_stats_today(self) -> list:
-        today_start = datetime.combine(date.today(), time.min)
-        today_end = datetime.combine(date.today(), time.max)
+        today_start_utc, today_end_utc = get_today_range_utc()
         visitors_today = self.db.query(Visitor.check_in_at).filter(
             Visitor.status == 'APPROVED',
-            Visitor.check_in_at.between(today_start, today_end)
+            Visitor.check_in_at.between(today_start_utc, today_end_utc)
         ).all()
 
         hourly_map = {f"{h:02d}:00": 0 for h in range(8, 18)}
         for (cin,) in visitors_today:
             if cin:
-                hour_key = f"{cin.hour:02d}:00"
+                cin_wib = to_wib(cin)
+                hour_key = f"{cin_wib.hour:02d}:00"
                 if hour_key in hourly_map:
                     hourly_map[hour_key] += 1
                 else:
@@ -71,15 +69,19 @@ class VisitorRepository:
     def get_weekly_trend(self) -> list:
         days_name = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
         results = []
-        today = date.today()
+        now_wib = datetime.now(WIB_TZ)
+        today_wib = now_wib.date()
 
         for i in range(6, -1, -1):
-            target_date = today - timedelta(days=i)
-            start_dt = datetime.combine(target_date, time.min)
-            end_dt = datetime.combine(target_date, time.max)
+            target_date = today_wib - timedelta(days=i)
+            start_wib = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=WIB_TZ)
+            end_wib = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59, 999999, tzinfo=WIB_TZ)
+            start_utc = start_wib.astimezone(timezone.utc).replace(tzinfo=None)
+            end_utc = end_wib.astimezone(timezone.utc).replace(tzinfo=None)
+
             count = self.db.query(func.count(Visitor.id_visitor)).filter(
                 Visitor.status == 'APPROVED',
-                Visitor.check_in_at.between(start_dt, end_dt)
+                Visitor.check_in_at.between(start_utc, end_utc)
             ).scalar() or 0
 
             results.append({
@@ -91,11 +93,12 @@ class VisitorRepository:
         return results
 
     def count_this_month(self) -> int:
-        now = utc_now()
-        month_start = datetime(now.year, now.month, 1)
+        now_wib = datetime.now(WIB_TZ)
+        month_start_wib = datetime(now_wib.year, now_wib.month, 1, 0, 0, 0, tzinfo=WIB_TZ)
+        month_start_utc = month_start_wib.astimezone(timezone.utc).replace(tzinfo=None)
         return self.db.query(func.count(Visitor.id_visitor)).filter(
             Visitor.status == 'APPROVED',
-            Visitor.check_in_at >= month_start
+            Visitor.check_in_at >= month_start_utc
         ).scalar() or 0
 
     def get_monthly_stats(self) -> list:
