@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import api, { getUserAvatarUrl } from '@/lib/api';
-import { Camera, LogOut, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
+import { Camera, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [fullname, setFullname] = useState('');
   const [telephone, setTelephone] = useState('');
@@ -22,7 +22,16 @@ export default function ProfilePage() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Foto yang baru dipilih, belum dikirim ke server sampai "Simpan Perubahan" ditekan.
+  const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Data login tidak menyertakan info foto, jadi foto selalu dicoba dimuat dari server (sama dengan Topbar).
+  const serverAvatarUrl = (): string | null => {
+    if (!user) return null;
+    const base = getUserAvatarUrl(user.id_user);
+    return `${base}${base.includes('?') ? '&' : '?'}v=${encodeURIComponent(user.avatar || 'awal')}`;
+  };
 
   useEffect(() => {
     if (user) {
@@ -30,40 +39,22 @@ export default function ProfilePage() {
       setTelephone(user.telephone || '');
       setUsername(user.username || '');
       setEmail(user.email || '');
-
-      if (user.avatar) {
-        setPhotoPreview(getUserAvatarUrl(user.id_user));
-      }
+      setPhotoPreview(serverAvatarUrl());
     }
-    const savedPhoto = localStorage.getItem('profile_avatar');
-    if (savedPhoto && !user?.avatar) {
-      setPhotoPreview(savedPhoto);
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const result = reader.result as string;
-        setPhotoPreview(result);
-        localStorage.setItem('profile_avatar', result);
-        try {
-          await api.put('/auth/profile', {
-            fullname: fullname || user?.fullname || '',
-            telephone: telephone || user?.telephone || '',
-            username: username || user?.username || '',
-            email: email || user?.email || '',
-            avatar: result,
-          });
-          setFeedback({ type: 'success', text: 'Foto profil berhasil disimpan ke server.' });
-        } catch {
-          setFeedback({ type: 'error', text: 'Foto disimpan lokal, gagal sinkron ke server.' });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setPhotoPreview(result);
+      setPendingAvatar(result);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -86,6 +77,7 @@ export default function ProfilePage() {
         telephone,
         username,
         email,
+        ...(pendingAvatar ? { avatar: pendingAvatar } : {}),
       });
 
       updateUser({
@@ -93,10 +85,17 @@ export default function ProfilePage() {
         username: res.data.data.username,
         email: res.data.data.email,
         telephone: res.data.data.telephone,
+        // Backend tidak mengembalikan nama file foto, jadi beri penanda baru agar foto dimuat ulang.
+        ...(pendingAvatar ? { avatar: `diperbarui-${Date.now()}` } : {}),
       });
 
+      const savedPhoto = Boolean(pendingAvatar);
+      setPendingAvatar(null);
       setIsEditing(false);
-      setFeedback({ type: 'success', text: res.data.message || 'Profil berhasil disimpan.' });
+      setFeedback({
+        type: 'success',
+        text: savedPhoto ? 'Perubahan berhasil disimpan.' : res.data.message || 'Profil berhasil disimpan.',
+      });
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Gagal menyimpan perubahan profil.';
       setFeedback({ type: 'error', text: msg });
@@ -140,7 +139,7 @@ export default function ProfilePage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-extrabold italic text-[#3B0A11] tracking-tight">
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">
         Profil
       </h1>
 
@@ -173,7 +172,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="bg-white rounded-3xl border-4 border-[#7A0017] shadow-xl overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#E8DCCB] shadow-sm overflow-hidden">
         <div className="p-6 sm:p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-4 flex flex-col items-center justify-center text-center">
@@ -184,6 +183,9 @@ export default function ProfilePage() {
                       src={photoPreview}
                       alt={fullname}
                       className="w-full h-full object-cover"
+                      onError={() => {
+                        if (!pendingAvatar) setPhotoPreview(null);
+                      }}
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-full bg-[#9CA3AF] flex items-center justify-center text-white">
@@ -200,11 +202,13 @@ export default function ProfilePage() {
                   className="hidden"
                 />
 
+                {/* Sama dengan kolom data diri: foto baru bisa diganti setelah tombol Edit ditekan. */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#4A000E] hover:bg-[#38000A] text-white text-[11px] font-bold px-4 py-1.5 rounded-full flex items-center space-x-1.5 shadow-md transition-colors cursor-pointer whitespace-nowrap"
-                  title="Ganti foto profil"
+                  disabled={!isEditing}
+                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#4A000E] hover:bg-[#38000A] disabled:bg-gray-500 disabled:hover:bg-gray-500 disabled:cursor-not-allowed text-white text-[11px] font-bold px-4 py-1.5 rounded-full flex items-center space-x-1.5 shadow-md transition-colors cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4A000E]"
+                  title={isEditing ? 'Ganti foto profil' : 'Tekan Edit terlebih dahulu untuk mengganti foto'}
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>Ganti foto</span>
@@ -212,7 +216,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="mt-5 space-y-1 w-full">
-                <h2 className="text-xl font-extrabold italic text-[#4A000E] tracking-tight">
+                <h2 className="text-xl font-bold text-[#4A000E] tracking-tight">
                   {fullname || 'Nama Pengguna'}
                 </h2>
                 <div>
@@ -238,7 +242,7 @@ export default function ProfilePage() {
                     onChange={(e) => setFullname(e.target.value)}
                     disabled={!isEditing}
                     required
-                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 transition-all"
+                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                   />
                 </div>
 
@@ -251,7 +255,7 @@ export default function ProfilePage() {
                     value={telephone}
                     onChange={(e) => setTelephone(e.target.value)}
                     disabled={!isEditing}
-                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 transition-all"
+                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                   />
                 </div>
 
@@ -265,7 +269,7 @@ export default function ProfilePage() {
                     onChange={(e) => setUsername(e.target.value)}
                     disabled={!isEditing}
                     required
-                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 transition-all"
+                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                   />
                 </div>
 
@@ -279,7 +283,7 @@ export default function ProfilePage() {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={!isEditing}
                     required
-                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 transition-all"
+                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium disabled:opacity-80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                   />
                 </div>
 
@@ -289,9 +293,12 @@ export default function ProfilePage() {
                     onClick={() => {
                       if (isEditing && user) {
                         setFullname(user.fullname || '');
-                        setTelephone(user.telephone || '081298765432');
+                        setTelephone(user.telephone || '');
                         setUsername(user.username || '');
                         setEmail(user.email || '');
+                        // Batal juga membuang foto yang belum disimpan.
+                        setPendingAvatar(null);
+                        setPhotoPreview(serverAvatarUrl());
                       }
                       setIsEditing(!isEditing);
                     }}
@@ -314,7 +321,7 @@ export default function ProfilePage() {
           <div className="border-b-2 border-[#8A001A] my-6" />
 
           <div className="space-y-4">
-            <h3 className="text-base font-extrabold italic text-gray-900">
+            <h3 className="text-base font-bold text-gray-900">
               Ubah Password
             </h3>
 
@@ -329,7 +336,7 @@ export default function ProfilePage() {
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
                     placeholder="Masukkan password lama"
-                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 transition-all"
+                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                   />
                 </div>
 
@@ -342,7 +349,7 @@ export default function ProfilePage() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Minimal 6 karakter"
-                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 transition-all"
+                    className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-xs text-gray-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                   />
                 </div>
               </div>
@@ -360,16 +367,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="bg-[#8A001A] px-6 py-4 flex justify-end items-center">
-          <button
-            type="button"
-            onClick={() => logout()}
-            className="bg-[#1A0005] hover:bg-black text-white px-5 py-2 rounded-xl text-xs font-bold inline-flex items-center space-x-2 border border-white/20 shadow-md transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 text-white" />
-            <span>Keluar (Logout)</span>
-          </button>
-        </div>
       </div>
     </div>
   );

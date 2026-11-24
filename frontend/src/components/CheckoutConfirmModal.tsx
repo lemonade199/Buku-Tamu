@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { formatJam } from '@/lib/datetime';
 import { LogOut, CheckCircle2, AlertTriangle, User, Building, Clock, CreditCard, X } from 'lucide-react';
 
 export interface ActiveVisitor {
@@ -34,12 +35,6 @@ export default function CheckoutConfirmModal({
 
   if (!isOpen || !visitor) return null;
 
-  const checkinTime = new Date(visitor.check_in_at);
-  const now = new Date();
-  const diffMinutes = Math.max(1, Math.round((now.getTime() - checkinTime.getTime()) / (1000 * 60)));
-  const hours = Math.floor(diffMinutes / 60);
-  const minutes = diffMinutes % 60;
-  const durationStr = hours > 0 ? `${hours} jam ${minutes} menit` : `${minutes} menit`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +52,7 @@ export default function CheckoutConfirmModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-white">Konfirmasi Check-Out Tamu</h2>
-              <p className="text-[11px] text-white/80">Pastikan kartu pass fisik telah diterima kembali</p>
+            
             </div>
           </div>
           <button
@@ -77,7 +72,7 @@ export default function CheckoutConfirmModal({
             <div className="text-xs text-amber-900 leading-relaxed">
               <p className="font-bold">Verifikasi Kartu Pass Fisik:</p>
               <p className="mt-0.5">
-                Pastikan kartu pass nomor <strong className="font-mono text-sm text-[#8A001A] bg-amber-100 px-1.5 py-0.5 rounded">#{visitor.no_pass || visitor.id_pass}</strong> telah diserahkan kembali oleh pengunjung ke meja resepsionis sebelum menyelesaikan proses ini.
+                Pastikan kartu pass nomor <strong className="font-mono text-sm text-[#8A001A] bg-amber-100 px-1.5 py-0.5 rounded">#{visitor.no_pass || visitor.id_pass}</strong> telah diserahkan kembali ke meja resepsionis.
               </p>
             </div>
           </div>
@@ -102,15 +97,10 @@ export default function CheckoutConfirmModal({
             <div className="flex items-center justify-between pb-2 border-b border-gray-200">
               <span className="text-gray-600 flex items-center">
                 <Clock className="w-3.5 h-3.5 mr-2 text-[#8A001A]" />
-                Waktu Masuk & Durasi
+                Jam Masuk
               </span>
               <div className="text-right">
-                <span className="font-mono text-gray-900 font-medium">
-                  {checkinTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
-                </span>
-                <span className="ml-1.5 text-[10px] bg-[#8A001A]/10 text-[#8A001A] font-semibold px-2 py-0.5 rounded-full">
-                  {durationStr}
-                </span>
+                <span className="text-gray-900 font-medium tabular-nums">{formatJam(visitor.check_in_at)} WIB</span>
               </div>
             </div>
 
@@ -123,20 +113,6 @@ export default function CheckoutConfirmModal({
                 Pass #{visitor.no_pass || visitor.id_pass}
               </span>
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="checkout-notes" className="block text-xs font-semibold text-gray-700 mb-1">
-              Catatan Kepulangan (Opsional):
-            </label>
-            <textarea
-              id="checkout-notes"
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Contoh: Tamu telah selesai konsultasi, berkas diserahkan..."
-              className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/20 focus:border-[#8A001A]"
-            />
           </div>
 
           <div className="flex space-x-3 pt-2">

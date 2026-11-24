@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { parseServerDate } from '@/lib/datetime';
 import api, { getUserAvatarUrl } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -412,8 +413,8 @@ export default function MasterDataPage() {
   const formatLastLogin = (dateStr?: string) => {
     if (!dateStr) return '-';
     try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '-';
+      const d = parseServerDate(dateStr);
+      if (!d) return '-';
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const hours = String(d.getHours()).padStart(2, '0');
@@ -460,7 +461,7 @@ export default function MasterDataPage() {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-black text-[#1A1A1A] tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">
           Master Data
         </h1>
       </div>
@@ -500,8 +501,8 @@ export default function MasterDataPage() {
           onClick={() => setActiveTab('pass')}
           className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'pass'
-              ? 'bg-black text-white shadow-md'
-              : 'bg-white border-2 border-black text-gray-800 hover:bg-gray-100'
+              ? 'bg-[#8A001A] text-white shadow-sm'
+              : 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-100'
           }`}
         >
           Data Pass
@@ -511,8 +512,8 @@ export default function MasterDataPage() {
           onClick={() => setActiveTab('user')}
           className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'user'
-              ? 'bg-black text-white shadow-md'
-              : 'bg-white border-2 border-black text-gray-800 hover:bg-gray-100'
+              ? 'bg-[#8A001A] text-white shadow-sm'
+              : 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-100'
           }`}
         >
           Data Pengguna
@@ -531,7 +532,7 @@ export default function MasterDataPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Cari no. pass"
                   aria-label="Cari nomor pass"
-                  className="w-full bg-white border-2 border-black rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
+                  className="w-full bg-white border border-gray-300 rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] shadow-xs font-medium"
                 />
               </div>
 
@@ -539,7 +540,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setConditionFilterOpen(!conditionFilterOpen)}
-                  className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <span>{conditionFilter}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
@@ -577,20 +578,20 @@ export default function MasterDataPage() {
                 className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Tambah pass</span>
+                <span>Tambah pass</span>
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto pt-2">
+          <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-400">
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">No. pass</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Slot KTP</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Kondisi</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aktif</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">No. pass</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Slot KTP</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Kondisi</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Aktif</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
@@ -694,7 +695,7 @@ export default function MasterDataPage() {
                   onChange={(e) => setUserSearchTerm(e.target.value)}
                   placeholder="Cari nama / username"
                   aria-label="Cari nama atau username"
-                  className="w-full bg-white border-2 border-black rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
+                  className="w-full bg-white border border-gray-300 rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] shadow-xs font-medium"
                 />
               </div>
 
@@ -702,7 +703,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setUserRoleFilterOpen(!userRoleFilterOpen)}
-                  className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <span>{userRoleFilter}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
@@ -747,23 +748,23 @@ export default function MasterDataPage() {
                 className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Tambah pengguna</span>
+                <span>Tambah pengguna</span>
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto pt-2">
+          <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-400">
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] w-14">Foto</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Nama</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Username</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Peran</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">No. HP</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Terakhir login</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aktif</th>
-                  <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Aksi</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 w-14">Foto</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Nama</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Username</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Peran</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">No. HP</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Terakhir login</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Aktif</th>
+                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
@@ -903,7 +904,7 @@ export default function MasterDataPage() {
                     value={editNomor}
                     onChange={(e) => setEditNomor(e.target.value)}
                     required
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
 
@@ -915,7 +916,7 @@ export default function MasterDataPage() {
                     type="text"
                     value={editSlot}
                     onChange={(e) => setEditSlot(e.target.value)}
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -929,7 +930,7 @@ export default function MasterDataPage() {
                     <select
                       value={editKondisi}
                       onChange={(e) => setEditKondisi(e.target.value)}
-                      className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 appearance-none cursor-pointer"
+                      className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] appearance-none cursor-pointer"
                     >
                       <option value="Baik">Baik</option>
                       <option value="Perlu Perbaikan">Perlu Perbaikan</option>
@@ -970,7 +971,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setEditingPass(null)}
-                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="px-6 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -1016,7 +1017,7 @@ export default function MasterDataPage() {
                     onChange={(e) => setAddNomor(e.target.value)}
                     required
                     placeholder="Contoh: 17"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
 
@@ -1029,7 +1030,7 @@ export default function MasterDataPage() {
                     value={addSlot}
                     onChange={(e) => setAddSlot(e.target.value)}
                     placeholder="Contoh: Slot 17"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -1040,7 +1041,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="px-6 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -1114,7 +1115,7 @@ export default function MasterDataPage() {
                     onChange={(e) => setAddUserForm({ ...addUserForm, fullname: e.target.value })}
                     required
                     placeholder="Contoh: Dimas Prakoso"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
 
@@ -1128,7 +1129,7 @@ export default function MasterDataPage() {
                     onChange={(e) => setAddUserForm({ ...addUserForm, username: e.target.value })}
                     required
                     placeholder="dimas.resepsionis"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -1144,7 +1145,7 @@ export default function MasterDataPage() {
                     onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
                     required
                     placeholder="dimas@seamolec.org"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
 
@@ -1157,7 +1158,7 @@ export default function MasterDataPage() {
                     value={addUserForm.telephone}
                     onChange={(e) => setAddUserForm({ ...addUserForm, telephone: e.target.value })}
                     placeholder="081377788899"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -1171,7 +1172,7 @@ export default function MasterDataPage() {
                     <select
                       value={addUserForm.role_code}
                       onChange={(e) => setAddUserForm({ ...addUserForm, role_code: e.target.value })}
-                      className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 appearance-none cursor-pointer"
+                      className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] appearance-none cursor-pointer"
                     >
                       <option value="PETUGAS">Resepsionis</option>
                       <option value="ADMIN">Admin</option>
@@ -1189,7 +1190,7 @@ export default function MasterDataPage() {
                     value={addUserForm.password}
                     onChange={(e) => setAddUserForm({ ...addUserForm, password: e.target.value })}
                     placeholder="Default: 123456"
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -1200,7 +1201,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddUserModal(false)}
-                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="px-6 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -1273,7 +1274,7 @@ export default function MasterDataPage() {
                     value={editUserForm.fullname}
                     onChange={(e) => setEditUserForm({ ...editUserForm, fullname: e.target.value })}
                     required
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
 
@@ -1286,7 +1287,7 @@ export default function MasterDataPage() {
                     value={editUserForm.username}
                     onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })}
                     required
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -1301,7 +1302,7 @@ export default function MasterDataPage() {
                     value={editUserForm.email}
                     onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
                     required
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
 
@@ -1313,7 +1314,7 @@ export default function MasterDataPage() {
                     type="text"
                     value={editUserForm.telephone}
                     onChange={(e) => setEditUserForm({ ...editUserForm, telephone: e.target.value })}
-                    className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                 </div>
               </div>
@@ -1327,7 +1328,7 @@ export default function MasterDataPage() {
                     <select
                       value={editUserForm.role_code}
                       onChange={(e) => setEditUserForm({ ...editUserForm, role_code: e.target.value })}
-                      className="w-full bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 appearance-none cursor-pointer"
+                      className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] appearance-none cursor-pointer"
                     >
                       <option value="PETUGAS">Resepsionis</option>
                       <option value="ADMIN">Admin</option>
@@ -1367,7 +1368,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="px-6 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -1425,7 +1426,7 @@ export default function MasterDataPage() {
                     required
                     minLength={6}
                     placeholder="Minimal 6 karakter"
-                    className="w-full bg-white border-2 border-black rounded-full pl-4 pr-20 py-2 text-xs text-gray-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30"
+                    className="w-full bg-white border border-gray-300 rounded-full pl-4 pr-20 py-2 text-xs text-gray-900 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
                   />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
                     <button
@@ -1466,7 +1467,7 @@ export default function MasterDataPage() {
                 <button
                   type="button"
                   onClick={() => setResetPasswordUser(null)}
-                  className="px-6 py-1.5 bg-white border-2 border-black rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="px-6 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-bold text-gray-800 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { Search, Calendar, ChevronDown, RefreshCw } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import PassRack from '@/components/PassRack';
 
 interface PassMonitoringItem {
   id_visitor: number;
@@ -23,7 +25,7 @@ interface PassCounts {
   in_use: number;
 }
 
-export default function MonitoringPassPage() {
+function MonitoringPassPage() {
   const [items, setItems] = useState<PassMonitoringItem[]>([]);
   const [counts, setCounts] = useState<PassCounts>({ available: 14, pending: 3, in_use: 2 });
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ export default function MonitoringPassPage() {
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold italic text-[#3B0A11] tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">
           Monitoring Kartu Pass
         </h1>
         <button
@@ -142,34 +144,34 @@ export default function MonitoringPassPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl">
-        <div className="bg-black text-white rounded-2xl py-4 px-6 shadow-md border-2 border-black flex items-center">
-          <div className="border-l-2 border-white/60 pl-4">
-            <span className="text-sm font-semibold italic text-gray-200 block">
+        <div className="bg-white rounded-2xl py-4 px-5 border border-gray-200 shadow-sm flex items-center">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-gray-600 block">
               Tersedia
             </span>
-            <span className="text-4xl sm:text-5xl font-black text-white mt-1 block">
+            <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 block tabular-nums">
               {counts.available}
             </span>
           </div>
         </div>
 
-        <div className="bg-black text-white rounded-2xl py-4 px-6 shadow-md border-2 border-black flex items-center">
-          <div className="border-l-2 border-white/60 pl-4">
-            <span className="text-sm font-semibold italic text-gray-200 block">
+        <div className="bg-white rounded-2xl py-4 px-5 border border-gray-200 shadow-sm flex items-center">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-gray-600 block">
               Menunggu
             </span>
-            <span className="text-4xl sm:text-5xl font-black text-white mt-1 block">
+            <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 block tabular-nums">
               {counts.pending}
             </span>
           </div>
         </div>
 
-        <div className="bg-black text-white rounded-2xl py-4 px-6 shadow-md border-2 border-black flex items-center">
-          <div className="border-l-2 border-white/60 pl-4">
-            <span className="text-sm font-semibold italic text-gray-200 block">
+        <div className="bg-white rounded-2xl py-4 px-5 border border-gray-200 shadow-sm flex items-center">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-gray-600 block">
               Dipakai
             </span>
-            <span className="text-4xl sm:text-5xl font-black text-white mt-1 block">
+            <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 block tabular-nums">
               {counts.in_use}
             </span>
           </div>
@@ -185,7 +187,7 @@ export default function MonitoringPassPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Cari nama / no. pass"
             aria-label="Cari nama atau nomor pass"
-            className="w-full bg-white border-2 border-black rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 shadow-xs font-medium"
+            className="w-full bg-white border border-gray-300 rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] shadow-xs font-medium"
           />
         </div>
 
@@ -193,7 +195,7 @@ export default function MonitoringPassPage() {
           <button
             type="button"
             onClick={() => setDateFilterOpen(!dateFilterOpen)}
-            className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+            className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5 text-gray-700" />
             <span>{selectedDate}</span>
@@ -223,7 +225,7 @@ export default function MonitoringPassPage() {
           <button
             type="button"
             onClick={() => setStatusFilterOpen(!statusFilterOpen)}
-            className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+            className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
           >
             <span>{selectedStatus}</span>
             <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
@@ -252,7 +254,7 @@ export default function MonitoringPassPage() {
           <button
             type="button"
             onClick={() => setReceptionistFilterOpen(!receptionistFilterOpen)}
-            className="inline-flex items-center space-x-2 bg-white border-2 border-black rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
+            className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
           >
             <span>{selectedReceptionist}</span>
             <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
@@ -278,18 +280,18 @@ export default function MonitoringPassPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto pt-2">
+      <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-400">
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">No. pass</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Tamu</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Instansi</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Jam masuk</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Jam keluar</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Diserahkan oleh</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E]">Diterima oleh</th>
-              <th scope="col" className="py-2.5 px-3 text-sm font-bold italic underline text-[#4A000E] text-center">Status</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">No. pass</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Tamu</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Instansi</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Jam masuk</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Jam keluar</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Diserahkan oleh</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Diterima oleh</th>
+              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
@@ -362,4 +364,10 @@ export default function MonitoringPassPage() {
       </div>
     </div>
   );
+}
+
+// Resepsionis melihat rak kartu pass, admin tetap melihat tabel monitoring.
+export default function PassPage() {
+  const { user } = useAuth();
+  return user?.role_code === 'ADMIN' ? <MonitoringPassPage /> : <PassRack />;
 }

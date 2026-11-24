@@ -293,5 +293,20 @@ def seed_initial_data(db: Session, is_testing: bool = False):
             )
             db.add(v5)
 
+            # Tamu contoh dianggap sudah disetujui; tanpa ini mereka ikut default model PENDING.
+            for seeded in (v1, v2, v3, v4, v5):
+                seeded.status = 'APPROVED'
+                seeded.approved_at = seeded.check_in_at
+                seeded.approved_by_id = petugas_user.id_user if petugas_user else None
+
+        # Perbaiki database yang sudah terlanjur berisi tamu contoh berstatus PENDING dari seed versi lama.
+        stale_seed_visitors = db.query(Visitor).filter(
+            Visitor.capture_id.like('visitor_seed_%'),
+            Visitor.status == 'PENDING',
+        ).all()
+        for seeded in stale_seed_visitors:
+            seeded.status = 'APPROVED'
+            seeded.approved_at = seeded.approved_at or seeded.check_in_at
+
     db.commit()
     print("Initial seed data successfully checked/loaded.")

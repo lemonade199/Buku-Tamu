@@ -140,3 +140,26 @@ def test_visitor_photo_protection(client):
     auth_query_res = client.get(f'/api/v1/visitors/{visitor_id}/photo?token={token}')
     assert auth_query_res.status_code == 200
     assert auth_query_res.mimetype == 'image/jpeg'
+
+
+def test_public_checkin_skips_pass_still_held_by_visitor(client):
+    from backend.app.models.entities import Visitor
+
+    # Kartu 01 berstatus AVAILABLE tetapi masih terikat tamu PENDING (data tidak sinkron).
+    db = get_db_session()
+    try:
+        pass_01 = db.query(Pass).filter(Pass.no_pass == '01').first()
+        db.add(Visitor(id_pass=pass_01.id_pass, fullname='Tamu Lama', status='PENDING', capture_id='x.jpg'))
+        db.commit()
+    finally:
+        db.close()
+
+    available = client.get('/api/v1/pass/available').get_json()
+    assert '01' not in [p['no_pass'] for p in available['data']]
+
+    res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Kiosk',
+        'photo_base64': SAMPLE_PHOTO_BASE64,
+    })
+    assert res.status_code == 201, res.get_json()
+    assert res.get_json()['data']['no_pass'] == '02'

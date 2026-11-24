@@ -7,6 +7,7 @@ from backend.app.models.base import get_db_session
 from backend.app.models.entities import Pass, Visitor, AuditLog
 from backend.app.schemas.pass_schema import PassCreateRequest, PassStatusUpdateRequest
 from backend.app.middleware.auth import role_required
+from backend.app.services.checkin_service import assignable_pass_query
 from backend.app.utils.datetime_utils import utc_now
 
 pass_bp = Blueprint('pass', __name__, url_prefix='/api/v1/pass')
@@ -58,7 +59,7 @@ def get_all_passes():
 def get_available_passes():
     db = get_db_session()
     try:
-        passes = db.query(Pass).filter(Pass.status == 'AVAILABLE').order_by(Pass.no_pass.asc()).all()
+        passes = assignable_pass_query(db).all()
         return jsonify({
             'success': True,
             'data': [p.to_dict() for p in passes],

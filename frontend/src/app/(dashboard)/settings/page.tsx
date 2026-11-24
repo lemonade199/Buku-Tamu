@@ -67,7 +67,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.jpg');
+  const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.png');
   const [testingEmail, setTestingEmail] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [roleModalData, setRoleModalData] = useState({ name: '', description: '' });
@@ -162,7 +162,7 @@ export default function SettingsPage() {
         }
       }
     } catch {
-      setLogoPreview('/seamolec-logo.jpg');
+      setLogoPreview('/seamolec-logo.png');
     } finally {
       setLoading(false);
     }
@@ -387,7 +387,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-extrabold text-[#3B0207] tracking-tight">Pengaturan</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">Pengaturan</h1>
 
       {successMessage && (
         <div className="p-3.5 bg-green-50 border border-green-200 text-green-800 rounded-xl text-sm flex items-center space-x-2 animate-fadeIn max-w-4xl">
@@ -404,8 +404,8 @@ export default function SettingsPage() {
       )}
 
       <div className="flex flex-col md:flex-row gap-6 items-start">
-        <div className="w-full md:w-56 shrink-0 bg-[#FAF7F0] border border-gray-300 rounded-2xl p-4 shadow-sm">
-          <div className="flex flex-col space-y-3">
+        <div className="w-full md:w-56 shrink-0 bg-white border border-[#E8DCCB] rounded-2xl p-2 shadow-sm">
+          <div className="flex flex-col space-y-1">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
               return (
@@ -413,10 +413,11 @@ export default function SettingsPage() {
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveTab(tab.key)}
-                  className={`w-full text-center py-2 px-3 text-xs md:text-sm rounded-lg border transition-all ${
+                  aria-pressed={isActive}
+                  className={`w-full text-left py-2 px-3 text-sm rounded-xl transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A] ${
                     isActive
-                      ? 'bg-[#E5E7EB] border-gray-400 font-semibold text-gray-900 shadow-sm'
-                      : 'bg-white/80 hover:bg-gray-100 border-gray-300 font-medium text-gray-800'
+                      ? 'bg-[#8A001A] text-white font-semibold'
+                      : 'text-gray-700 font-medium hover:bg-[#FAF2EA] active:bg-[#F3E6D8]'
                   }`}
                 >
                   {tab.label}
@@ -509,9 +510,9 @@ export default function SettingsPage() {
             </div>
 
             <div className="bg-[#3B0207] p-2 rounded-2xl shadow-xl">
-              <div className="bg-white rounded-xl border-2 border-[#8A001A] p-6">
+              <div className="bg-white rounded-2xl border border-[#E8DCCB] shadow-sm p-6">
                 <div className="mb-4">
-                  <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                  <span className="text-[#3B0A11] text-lg font-semibold inline-block">
                     Hak akses per role
                   </span>
                 </div>
@@ -570,13 +571,13 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 w-full max-w-2xl bg-[#3B0207] p-2 rounded-2xl shadow-xl">
-            <div className="bg-white rounded-xl border-2 border-[#8A001A] p-6 md:p-8 min-h-[360px] flex flex-col justify-between">
+          <div className="flex-1 w-full max-w-2xl">
+            <div className="bg-white rounded-2xl border border-[#E8DCCB] shadow-sm p-6 md:p-8 min-h-[360px] flex flex-col justify-between">
               {activeTab === 'umum' && (
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
                   <div className="mb-6">
-                    <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                    <span className="text-[#3B0A11] text-lg font-semibold inline-block">
                       Identitas instansi
                     </span>
                   </div>
@@ -667,7 +668,7 @@ export default function SettingsPage() {
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
                   <div className="mb-6">
-                    <span className="text-[#8A001A] text-lg font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                    <span className="text-[#3B0A11] text-lg font-semibold inline-block">
                       Server email (SMTP)
                     </span>
                   </div>
@@ -779,7 +780,7 @@ export default function SettingsPage() {
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
                   <div className="mb-4">
-                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                    <span className="text-[#3B0A11] text-lg font-semibold inline-block">
                       Notifikasi di aplikasi
                     </span>
                   </div>
@@ -821,7 +822,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="mb-4">
-                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                    <span className="text-[#3B0A11] text-lg font-semibold inline-block">
                       Notifikasi email
                     </span>
                   </div>
@@ -1028,14 +1029,14 @@ export default function SettingsPage() {
               <div className="flex flex-col h-full justify-between space-y-6">
                 <div>
                   <div className="mb-5">
-                    <span className="text-[#8A001A] text-base font-bold border-b border-[#8A001A] pb-0.5 inline-block">
+                    <span className="text-[#3B0A11] text-lg font-semibold inline-block">
                       Data & Cadangan Sistem
                     </span>
                   </div>
 
                   {/* Action Buttons: Instant Backup & Restore from file */}
                   <div className="bg-[#FAF3F0] border border-[#DEB887] rounded-xl p-4 mb-6">
-                    <h4 className="text-xs font-bold text-[#8A001A] uppercase tracking-wide mb-2">
+                    <h4 className="text-xs font-bold text-[#8A001A] mb-2">
                       Operasi Cadangan & Pemulihan
                     </h4>
                     <p className="text-xs text-gray-600 mb-3">
@@ -1093,7 +1094,7 @@ export default function SettingsPage() {
                   {/* List of Backups */}
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                      <h4 className="text-xs font-bold text-gray-800">
                         Daftar Salinan Database Tersedia
                       </h4>
                       <button
@@ -1173,7 +1174,7 @@ export default function SettingsPage() {
 
                   {/* Retention Form */}
                   <form onSubmit={handleSubmit} className="border-t border-gray-200 pt-4">
-                    <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-3">
+                    <h4 className="text-xs font-bold text-gray-800 mb-3">
                       Kebijakan Retensi & Otomasi
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

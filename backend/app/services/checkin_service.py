@@ -1,9 +1,22 @@
 import os
 from datetime import datetime
+from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
 from backend.app.models.entities import Visitor, Pass, AuditLog
 from backend.app.utils.photo_storage import save_visitor_photo
 from backend.app.utils.datetime_utils import utc_now
+
+
+def assignable_pass_query(db: Session):
+    """Kartu AVAILABLE yang tidak sedang terikat tamu PENDING atau tamu aktif yang belum check-out."""
+    still_held = exists().where(and_(
+        Visitor.id_pass == Pass.id_pass,
+        or_(
+            Visitor.status == 'PENDING',
+            and_(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None)),
+        ),
+    ))
+    return db.query(Pass).filter(Pass.status == 'AVAILABLE', ~still_held).order_by(Pass.no_pass.asc())
 
 class CheckinService:
     def __init__(self, db: Session):
@@ -23,7 +36,10 @@ class CheckinService:
         elif no_pass:
             pass_card = self.db.query(Pass).filter(Pass.no_pass == str(no_pass).strip()).with_for_update().first()
         else:
-            pass_card = self.db.query(Pass).filter(Pass.status == 'AVAILABLE').order_by(Pass.no_pass.asc()).with_for_update().first()
+            # skip_locked: dua kiosk yang mengirim bersamaan mendapat kartu berbeda, bukan saling menunggu.
+            pass_card = assignable_pass_query(self.db).with_for_update(skip_locked=True).first()
+            if not pass_card:
+                raise ValueError("Kartu pass sedang habis. Silakan hubungi meja resepsionis.")
 
         if not pass_card:
             raise ValueError("Kartu pass yang dipilih tidak ditemukan.")

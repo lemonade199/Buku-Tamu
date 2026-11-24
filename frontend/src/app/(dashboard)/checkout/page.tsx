@@ -2,26 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
-import {
-  LogOut,
-  Search,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle,
-  CreditCard,
-  User,
-  Sparkles,
-  Eye,
-  X,
-} from 'lucide-react';
+import { formatJam } from '@/lib/datetime';
+import { LogOut, Search, RefreshCw, CheckCircle2, AlertCircle, User, X } from 'lucide-react';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 export default function CheckoutPage() {
   const [activeVisitors, setActiveVisitors] = useState<ActiveVisitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [quickPassNo, setQuickPassNo] = useState('');
-  const [quickError, setQuickError] = useState('');
 
   const [selectedVisitor, setSelectedVisitor] = useState<ActiveVisitor | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,29 +50,15 @@ export default function CheckoutPage() {
     };
   }, [fetchActiveVisitors]);
 
-  const handleQuickCheckout = (e: React.FormEvent) => {
-    e.preventDefault();
-    setQuickError('');
-
-    const query = quickPassNo.trim().replace(/^pass\s*#?/i, '');
-    if (!query) {
-      setQuickError('Masukkan nomor pass');
-      return;
-    }
-
-    const matched = activeVisitors.find(
-      (v) => (v.no_pass && v.no_pass.toLowerCase() === query.toLowerCase()) || String(v.id_pass) === query
-    );
-
-    if (!matched) {
-      setQuickError(`Tidak ditemukan kunjungan aktif dengan kartu pass #${query}`);
-      return;
-    }
-
-    setSelectedVisitor(matched);
-    setIsModalOpen(true);
-    setQuickPassNo('');
-  };
+  // Pratinjau foto bisa ditutup dengan tombol Escape.
+  useEffect(() => {
+    if (!previewPhotoUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreviewPhotoUrl(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [previewPhotoUrl]);
 
   const handleConfirmCheckout = async (visitorId: number, notes?: string) => {
     setProcessingCheckout(true);
@@ -106,226 +80,171 @@ export default function CheckoutPage() {
     }
   };
 
+  // "pass #01", "#01", dan "01" sama-sama cocok dengan nomor pass 01.
+  const term = searchTerm.trim().toLowerCase().replace(/^pass\s*#?|^#/, '');
   const filteredVisitors = activeVisitors.filter((v) => {
-    const term = searchTerm.toLowerCase();
-    const nameMatch = v.fullname.toLowerCase().includes(term);
-    const passMatch = (v.no_pass || '').toLowerCase().includes(term);
-    const instMatch = (v.institution || '').toLowerCase().includes(term);
-    const repMatch = (v.representing || '').toLowerCase().includes(term);
-    return nameMatch || passMatch || instMatch || repMatch;
+    if (!term) return true;
+    const passNo = (v.no_pass || String(v.id_pass)).toLowerCase();
+    return (
+      v.fullname.toLowerCase().includes(term) ||
+      passNo.includes(term) ||
+      (v.institution || '').toLowerCase().includes(term) ||
+      (v.representing || '').toLowerCase().includes(term) ||
+      (v.purpose || '').toLowerCase().includes(term)
+    );
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-charcoal tracking-tight flex items-center space-x-2">
-            <LogOut className="w-5 h-5 text-brand-500" />
-            <span>Check-Out Pengunjung</span>
-          </h2>
-          <p className="text-xs text-charcoal-muted mt-0.5">
-            Pencatatan kepulangan tamu dan penerimaan kembali kartu pass fisik ke rak
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={fetchActiveVisitors}
-            disabled={loading}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-white border border-ivory-200 text-charcoal text-xs font-semibold rounded-lg shadow-sm hover:bg-ivory-100 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-brand-500' : ''}`} />
-            <span>Segarkan</span>
-          </button>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">Pengembalian Akses</h1>
+        <button
+          type="button"
+          onClick={fetchActiveVisitors}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${loading ? 'animate-spin motion-reduce:animate-none text-[#8A001A]' : ''}`}
+            aria-hidden="true"
+          />
+          <span>Segarkan</span>
+        </button>
       </div>
 
       {feedback && (
         <div
-          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-center justify-between shadow-sm animate-fadeIn ${
+          role="status"
+          aria-live="polite"
+          className={`p-3.5 rounded-xl border text-xs sm:text-sm flex items-center justify-between ${
             feedback.type === 'success'
               ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
               : 'bg-red-50 border-red-200 text-red-800'
           }`}
         >
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             {feedback.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" aria-hidden="true" />
             )}
             <span className="font-medium">{feedback.message}</span>
           </div>
           <button
+            type="button"
             onClick={() => setFeedback(null)}
-            className="text-xs font-semibold text-gray-500 hover:text-gray-800"
+            className="text-gray-500 hover:text-gray-700 cursor-pointer p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+            aria-label="Tutup notifikasi"
           >
-            Tutup
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-5 border border-ivory-200 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-charcoal flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-brand-500" />
-              <span>Check-Out Cepat Berdasarkan Nomor Pass</span>
-            </h3>
-            <p className="text-xs text-charcoal-muted">
-              Pindai atau masukkan nomor kartu pass fisik yang dikembalikan pengunjung di loket
-            </p>
-          </div>
-
-          <form onSubmit={handleQuickCheckout} className="flex items-center space-x-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <CreditCard className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={quickPassNo}
-                onChange={(e) => {
-                  setQuickPassNo(e.target.value);
-                  setQuickError('');
-                }}
-                placeholder="Contoh: 01 atau pass #01"
-                className="w-full pl-9 pr-3 py-2 text-xs font-mono border border-ivory-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow transition-colors shrink-0 flex items-center space-x-1.5"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Proses Check-Out</span>
-            </button>
-          </form>
-        </div>
-
-        {quickError && (
-          <p className="text-xs text-red-600 mt-2 font-medium flex items-center space-x-1">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>{quickError}</span>
-          </p>
-        )}
+      <div className="relative w-full max-w-xl">
+        <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" aria-hidden="true" />
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Cari nama / instansi / no. pass"
+          aria-label="Cari nama, instansi, atau nomor pass tamu"
+          className="w-full bg-white border border-gray-300 rounded-full pl-11 pr-4 py-2 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] font-medium"
+        />
       </div>
 
-      <div className="bg-white rounded-2xl border border-ivory-200 shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-ivory-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-ivory-50/50">
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold text-charcoal uppercase tracking-wider">
-              Tamu di Lokasi Saat Ini
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800">
-              {activeVisitors.length} Orang
-            </span>
-          </div>
-
-          <div className="relative w-full sm:w-72">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari nama, instansi, pass..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-ivory-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
-            />
-          </div>
+      <section aria-labelledby="active-heading" className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 id="active-heading" className="text-lg font-semibold text-[#3B0A11]">
+            Tamu di Lokasi Saat Ini
+          </h2>
+          <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-[#8A001A] text-white text-xs font-bold">
+            {activeVisitors.length}
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
+          {/* Lebar kolom tetap supaya header dan isi selalu sejajar, sama dengan tabel di Dashboard. */}
+          <table className="w-full min-w-[760px] table-fixed text-left border-collapse">
+            <colgroup>
+              <col className="w-[72px]" />
+              <col className="w-[18%]" />
+              <col className="w-[20%]" />
+              <col />
+              <col className="w-[96px]" />
+              <col className="w-[104px]" />
+              <col className="w-[148px]" />
+            </colgroup>
             <thead>
-              <tr className="bg-ivory-100/70 text-[11px] uppercase tracking-wider text-charcoal-muted font-bold border-b border-ivory-200">
-                <th className="py-3 px-4">No. Pass</th>
-                <th className="py-3 px-4">Pengunjung</th>
-                <th className="py-3 px-4">Instansi</th>
-                <th className="py-3 px-4">Pihak Dituju & Keperluan</th>
-                <th className="py-3 px-4">Waktu Masuk & Durasi</th>
-                <th className="py-3 px-4 text-center">Aksi</th>
+              <tr className="border-b border-gray-200 bg-[#FAF7F0]">
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Foto</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Nama</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Instansi</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Keperluan</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">No. pass</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Jam masuk</th>
+                <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-ivory-200 text-xs">
-              {loading ? (
+            <tbody className="divide-y divide-gray-100">
+              {loading && activeVisitors.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-charcoal-muted">
-                    <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                    <span>Memuat data pengunjung aktif...</span>
+                  <td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-500">
+                    Memuat data pengunjung aktif...
                   </td>
                 </tr>
               ) : filteredVisitors.length > 0 ? (
                 filteredVisitors.map((visitor) => {
-                  const checkinDate = new Date(visitor.check_in_at);
-                  const now = new Date();
-                  const diffMinutes = Math.max(1, Math.round((now.getTime() - checkinDate.getTime()) / (1000 * 60)));
-                  const hours = Math.floor(diffMinutes / 60);
-                  const minutes = diffMinutes % 60;
-                  const durationStr = hours > 0 ? `${hours}j ${minutes}m` : `${minutes}m`;
-
+                  const passNo = (visitor.no_pass || String(visitor.id_pass)).padStart(2, '0');
                   return (
-                    <tr key={visitor.id_visitor} className="hover:bg-ivory-50/80 transition-colors">
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold bg-brand-50 text-brand-900 border border-brand-200 shadow-sm">
-                          pass #{visitor.no_pass || visitor.id_pass}
-                        </span>
+                    <tr key={visitor.id_visitor} className="hover:bg-gray-50/70 transition-colors">
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPhotoUrl(getVisitorPhotoUrl(visitor.id_visitor))}
+                          aria-label={`Lihat foto ${visitor.fullname}`}
+                          className="relative w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A] hover:ring-2 hover:ring-[#8A001A]/40"
+                        >
+                          <User className="w-5 h-5 text-white absolute" aria-hidden="true" />
+                          <img
+                            src={getVisitorPhotoUrl(visitor.id_visitor)}
+                            alt=""
+                            width={36}
+                            height={36}
+                            className="w-full h-full object-cover relative"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        </button>
                       </td>
-
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            onClick={() => setPreviewPhotoUrl(getVisitorPhotoUrl(visitor.id_visitor))}
-                            className="w-10 h-10 rounded-xl bg-ivory-100 overflow-hidden border border-ivory-200 relative group cursor-pointer shrink-0 shadow-sm flex items-center justify-center"
-                            title="Klik untuk melihat foto lebih besar"
-                          >
-                            <User className="w-5 h-5 text-gray-400 absolute" />
-                            <img
-                              src={getVisitorPhotoUrl(visitor.id_visitor)}
-                              alt={visitor.fullname}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform relative z-10"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white z-20">
-                              <Eye className="w-3.5 h-3.5" />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="font-bold text-charcoal">{visitor.fullname}</div>
-                          </div>
-                        </div>
+                      <td className="px-4 py-3 text-xs font-bold text-gray-900 truncate" title={visitor.fullname}>
+                        {visitor.fullname}
                       </td>
-
-                      <td className="py-3 px-4 text-charcoal font-medium">
+                      <td className="px-4 py-3 text-xs text-gray-700 truncate" title={visitor.institution || '-'}>
                         {visitor.institution || '-'}
                       </td>
-
-                      <td className="py-3 px-4 max-w-xs">
-                        <div className="text-charcoal font-semibold">{visitor.representing || '-'}</div>
-                        <div className="text-[11px] text-charcoal-muted truncate" title={visitor.purpose}>
-                          {visitor.purpose || '-'}
-                        </div>
+                      <td className="px-4 py-3 text-xs text-gray-700 truncate" title={visitor.purpose || '-'}>
+                        {visitor.purpose || '-'}
                       </td>
-
-                      <td className="py-3 px-4">
-                        <div className="font-mono text-charcoal font-medium">
-                          {checkinDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
-                        </div>
-                        <span className="inline-block mt-0.5 text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">
-                          Durasi: {durationStr}
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-block px-3 py-0.5 bg-[#4A000E] text-white text-xs font-bold rounded-full tabular-nums">
+                          {passNo}
                         </span>
                       </td>
-
-                      <td className="py-3 px-4 text-center">
+                      <td className="px-4 py-3 text-xs text-gray-700 text-center tabular-nums">
+                        {formatJam(visitor.check_in_at)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedVisitor(visitor);
                             setIsModalOpen(true);
                           }}
-                          className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white text-xs font-bold rounded-lg shadow-sm transition-all inline-flex items-center space-x-1.5"
+                          className="px-4 py-1.5 bg-[#8A001A] hover:bg-[#700015] active:bg-[#5A0011] text-white text-xs font-bold rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
                         >
-                          <LogOut className="w-3.5 h-3.5" />
+                          <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                           <span>Check-Out</span>
                         </button>
                       </td>
@@ -334,21 +253,15 @@ export default function CheckoutPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-xs text-charcoal-muted">
-                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-                      <CheckCircle2 className="w-6 h-6" />
-                    </div>
-                    <p className="font-bold text-charcoal">Tidak ada pengunjung aktif di lokasi.</p>
-                    <p className="text-[11px] text-charcoal-muted mt-0.5">
-                      {searchTerm ? 'Coba ubah kata kunci pencarian Anda.' : 'Semua tamu telah menyelesaikan kunjungan dan check-out.'}
-                    </p>
+                  <td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-500">
+                    {term ? 'Tidak ada tamu yang cocok dengan pencarian.' : 'Tidak ada pengunjung aktif di lokasi.'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       <CheckoutConfirmModal
         isOpen={isModalOpen}
@@ -364,38 +277,37 @@ export default function CheckoutPage() {
       {previewPhotoUrl && (
         <div
           onClick={() => setPreviewPhotoUrl(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Foto pengunjung"
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full border border-white/20 p-4 space-y-3"
+            className="relative bg-white rounded-2xl overflow-hidden shadow-2xl max-w-sm w-full p-4 space-y-3"
           >
-            <div className="flex items-center justify-between pb-2 border-b border-ivory-200">
-              <h4 className="text-xs font-bold text-charcoal">Foto Pengunjung</h4>
+            <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+              <h4 className="text-xs font-bold text-gray-900">Foto Pengunjung</h4>
               <button
+                type="button"
                 onClick={() => setPreviewPhotoUrl(null)}
-                className="p-1 rounded-full text-gray-500 hover:text-gray-800"
+                aria-label="Tutup pratinjau foto"
+                className="p-1 rounded-full text-gray-500 hover:text-gray-800 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-ivory-100 border border-ivory-200 flex items-center justify-center relative">
-              <User className="w-12 h-12 text-gray-300 absolute" />
+            <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center relative">
+              <User className="w-12 h-12 text-gray-300 absolute" aria-hidden="true" />
               <img
                 src={previewPhotoUrl}
-                alt="Foto Pengunjung"
-                className="w-full h-full object-cover relative z-10"
+                alt="Foto pengunjung"
+                className="w-full h-full object-cover relative"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
             </div>
-            <button
-              onClick={() => setPreviewPhotoUrl(null)}
-              className="w-full py-2 bg-ivory-100 hover:bg-ivory-200 text-charcoal text-xs font-semibold rounded-xl"
-            >
-              Tutup Pratinjau
-            </button>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
+import { formatJam } from '@/lib/datetime';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardMetrics, VisitorItem, RecentActivity } from '@/types';
 import {
@@ -15,18 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
+import { ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 export default function DashboardPage() {
@@ -50,6 +40,18 @@ export default function DashboardPage() {
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Modal detail dan modal tolak bisa ditutup dengan tombol Escape.
+  useEffect(() => {
+    if (!detailVisitor && !rejectTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (rejectTarget && !rejecting) setRejectTarget(null);
+      else if (detailVisitor) setDetailVisitor(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailVisitor, rejectTarget, rejecting]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -188,22 +190,8 @@ export default function DashboardPage() {
   const inactivePass = metrics?.inactive_pass ?? metrics?.pass_stats?.INACTIVE ?? 0;
   const activePassCount = metrics?.active_pass_count ?? Math.max(0, totalPass - inactivePass);
 
-  const monthlyChartData = metrics?.monthly_stats && metrics.monthly_stats.length > 0
-    ? metrics.monthly_stats
-    : [
-        { month: 'Jan', count: 18 },
-        { month: 'Feb', count: 24 },
-        { month: 'Mart', count: 21 },
-        { month: 'Apr', count: 30 },
-        { month: 'Mei', count: 4 },
-        { month: 'Jun', count: 10 },
-        { month: 'Jul', count: 17 },
-        { month: 'Agu', count: 20 },
-        { month: 'Sep', count: 24 },
-        { month: 'Okt', count: 27 },
-        { month: 'Nov', count: 19 },
-        { month: 'Des', count: 6 },
-      ];
+  const topInstitutions = metrics?.top_institutions ?? [];
+  const topInstitutionMax = Math.max(1, ...topInstitutions.map((i) => i.count));
 
   const adminPassPieData = [
     { name: 'Tersedia', value: availablePass, color: '#FFFFFF' },
@@ -212,39 +200,12 @@ export default function DashboardPage() {
     ...(inactivePass > 0 ? [{ name: 'Nonaktif', value: inactivePass, color: '#9CA3AF' }] : []),
   ];
 
-  const recentActivities: RecentActivity[] = metrics?.recent_activities && metrics.recent_activities.length > 0
-    ? metrics.recent_activities
-    : [
-        {
-          id: 1,
-          date: 'Rabu, 11/11/2026',
-          time: '14.20',
-          description: 'Siti Rahma (SMKN 2 Depok) check in dan menunggu kartu pass 08',
-        },
-        {
-          id: 2,
-          date: 'Rabu, 11/11/2026',
-          time: '10.45',
-          description: 'Rina menyerahkan kartu pass 09 kepada Diman Ferdiana (PT Telkom)',
-        },
-        {
-          id: 3,
-          date: 'Rabu, 11/11/2026',
-          time: '08.56',
-          description: 'Rina menyerahkan kartu pass 10 kepada Annisa A. Faza (Kemendikbud)',
-        },
-        {
-          id: 4,
-          date: 'Rabu, 11/11/2026',
-          time: '07.55',
-          description: 'Rina login ke sistem',
-        },
-      ];
+  const recentActivities: RecentActivity[] = metrics?.recent_activities ?? [];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold italic text-[#3B0A11] tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">
           Dashboard
         </h1>
         <button
@@ -289,91 +250,70 @@ export default function DashboardPage() {
       {isAdmin ? (
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-                Pass aktif
-              </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-                {inUsePass} / {activePassCount}
-              </span>
-            </div>
-
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-                Tamu hari ini
-              </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">Tamu hari ini</span>
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
                 {metrics?.total_visitors_today ?? 0}
               </span>
             </div>
 
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-                Tamu dalam gedung
-              </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">Dalam gedung</span>
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
                 {metrics?.active_visitors ?? 0}
               </span>
             </div>
 
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
-                Tamu bulan ini
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">Menunggu</span>
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
+                {metrics?.pending_registrations_count ?? pendingVisitors.length}
               </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
-                {metrics?.visitors_this_month ?? 0}
+            </div>
+
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">Selesai hari ini</span>
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
+                {metrics?.completed_visitors_today ?? 0}
               </span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-            <div className="lg:col-span-8 bg-white rounded-2xl border-2 border-[#4A000E] p-5 shadow-sm flex flex-col justify-between">
-              <div className="border-b border-gray-200 pb-2 mb-2">
-                <h3 className="text-sm font-bold italic underline decoration-gray-400 text-[#3B0A11]">
-                  Grafik tamu per bulan
-                </h3>
+            <section aria-labelledby="top-institutions-heading" className="lg:col-span-8 bg-white rounded-2xl border border-[#E8DCCB] p-5 shadow-sm">
+              <div className="flex items-baseline justify-between gap-3 mb-4">
+                <h2 id="top-institutions-heading" className="text-lg font-semibold text-[#3B0A11]">
+                  5 instansi teratas
+                </h2>
+                <span className="text-xs text-gray-600">Berdasarkan jumlah kunjungan yang disetujui</span>
               </div>
-
-              <div className="h-64 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyChartData} margin={{ top: 15, right: 15, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 10, fill: '#6B7280' }}
-                      tickLine={false}
-                      axisLine={{ stroke: '#E5E7EB' }}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{ fontSize: 10, fill: '#6B7280' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1F2937',
-                        color: '#FFFFFF',
-                        borderRadius: '8px',
-                        fontSize: '11px',
-                        border: 'none',
-                      }}
-                      formatter={(val: any) => [`${val} Tamu`, 'Jumlah']}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="#8A001A"
-                      radius={[4, 4, 0, 0]}
-                      label={{ position: 'top', fill: '#1F2937', fontSize: 10, fontWeight: 700 }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+              {topInstitutions.length === 0 ? (
+                <p className="py-6 text-center text-xs text-gray-500">Belum ada data instansi.</p>
+              ) : (
+                <ol className="space-y-3">
+                  {topInstitutions.map((inst, index) => (
+                    <li key={inst.name} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3">
+                      <span className="w-7 h-7 rounded-full bg-[#FAF2EA] text-[#8A001A] text-xs font-bold flex items-center justify-center tabular-nums">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate" title={inst.name}>
+                          {inst.name}
+                        </p>
+                        <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden" aria-hidden="true">
+                          <div className="h-full rounded-full bg-[#8A001A]" style={{ width: `${(inst.count / topInstitutionMax) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold text-[#8A001A] tabular-nums">{inst.count} kunjungan</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
 
             <div className="lg:col-span-4 flex flex-col">
               <div className="mb-2">
-                <h3 className="text-sm font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                <h3 className="text-sm font-semibold text-[#3B0A11]">
                   Status pass
                 </h3>
               </div>
@@ -452,7 +392,7 @@ export default function DashboardPage() {
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+                <h2 className="text-lg font-semibold text-[#3B0A11]">
                   Aktivitas terbaru
                 </h2>
                 <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[#8A001A] text-white text-xs font-bold not-italic">
@@ -464,38 +404,33 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
+              <table className="w-full min-w-[640px] table-fixed text-left border-collapse">
+                <colgroup>
+                  <col className="w-[200px]" />
+                  <col className="w-[96px]" />
+                  <col />
+                </colgroup>
                 <thead>
-                  <tr className="border-b border-gray-300">
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] underline uppercase tracking-wider w-44">
-                      Hari/tanggal
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] underline uppercase tracking-wider w-24">
-                      Jam
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] underline uppercase tracking-wider">
-                      Isi
-                    </th>
+                  <tr className="border-b border-gray-200 bg-[#FAF7F0]">
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Hari/tanggal</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Jam</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Isi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 text-xs">
+                <tbody className="divide-y divide-gray-100 text-xs">
                   {recentActivities.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-8 text-center text-gray-500">
+                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
                         Belum ada aktivitas tercatat.
                       </td>
                     </tr>
                   ) : (
                     recentActivities.map((act) => (
                       <tr key={act.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="py-3 text-gray-800 font-medium whitespace-nowrap">
-                          {act.date}
-                        </td>
-                        <td className="py-3 text-gray-700 whitespace-nowrap">
-                          {act.time}
-                        </td>
-                        <td className="py-3 text-gray-900 font-medium">
+                        <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{act.date}</td>
+                        <td className="px-4 py-3 text-gray-700 text-center tabular-nums">{act.time}</td>
+                        <td className="px-4 py-3 text-gray-900 truncate" title={act.description}>
                           {act.description}
                         </td>
                       </tr>
@@ -509,73 +444,85 @@ export default function DashboardPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">
                 Pass tersedia
               </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
                 {availablePass}
               </span>
             </div>
 
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">
                 Jumlah antrian
               </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
                 {pendingVisitors.length}
               </span>
             </div>
 
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">
                 Tamu dalam gedung
               </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
                 {activeVisitors.length}
               </span>
             </div>
 
-            <div className="bg-black text-white rounded-2xl py-5 px-4 flex flex-col items-center justify-center text-center shadow-md border-2 border-black">
-              <span className="text-sm sm:text-base font-semibold italic text-gray-200">
+            <div className="bg-white rounded-2xl py-5 px-5 flex flex-col justify-center border border-gray-200 shadow-sm">
+              <span className="text-sm font-medium text-gray-600">
                 Tamu hari ini
               </span>
-              <span className="text-4xl sm:text-5xl font-black text-white mt-1.5">
+              <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 tabular-nums">
                 {metrics?.total_visitors_today ?? 0}
               </span>
             </div>
           </div>
 
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
-                Menunggu
-              </h2>
-              <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[#8A001A] text-white text-xs font-bold not-italic">
-                {pendingVisitors.length}
-              </span>
+          {/* Kartu pembungkus antrean: tingginya tetap, kartu tamu bergeser ke samping saat antrean bertambah. */}
+          <section aria-labelledby="pending-heading" className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h2 id="pending-heading" className="text-lg font-semibold text-[#3B0A11]">
+                  Menunggu
+                </h2>
+                <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[#8A001A] text-white text-xs font-bold">
+                  {pendingVisitors.length}
+                </span>
+              </div>
+              {pendingVisitors.length > 1 && (
+                <span className="text-xs text-gray-600">Geser ke samping untuk melihat antrean lain</span>
+              )}
             </div>
 
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+
             {pendingVisitors.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">
+              <div className="p-8 text-center bg-[#FAF7F0] rounded-xl border border-dashed border-gray-300 text-xs text-gray-600 font-medium">
                 Tidak ada antrian tamu yang menunggu persetujuan kartu pass.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Daftar antrean tamu, bisa digeser ke samping"
+                className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-4 pt-1 px-1 -mx-1 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+              >
                 {pendingVisitors.map((v) => {
                   const passNum = v.no_pass || String(v.id_pass);
                   const formattedPass = passNum.padStart(2, '0');
-                  const timeStr = v.check_in_at
-                    ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}:${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
-                    : '-';
+                  const timeStr = formatJam(v.check_in_at, ':');
 
                   return (
+                    // Bingkai maroon dan bayangan tebal mengikuti kartu form registrasi tamu.
                     <div
                       key={v.id_visitor}
-                      className="bg-white border border-gray-300 rounded-lg p-3 shadow-2xs flex flex-col justify-between"
+                      className="w-[260px] shrink-0 snap-start bg-white rounded-[24px] border-[3px] border-[#650015] shadow-[0_8px_0_0_#650015] p-4 flex flex-col justify-between"
                     >
                       <div>
-                        <div className="w-full h-32 bg-[#D1D5DB] rounded flex items-center justify-center overflow-hidden mb-2.5">
+                        <div className="w-full aspect-[4/3] bg-[#D9D9D9] rounded-2xl flex items-center justify-center overflow-hidden mb-3">
                           {v.capture_id ? (
                             <img
                               src={getVisitorPhotoUrl(v.id_visitor)}
@@ -606,35 +553,28 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-1.5 pt-1">
+                      <div className="space-y-2 pt-1">
                         <button
                           type="button"
                           onClick={() => handleConfirmApprove(v)}
                           disabled={approving}
-                          className="w-full py-1.5 bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 text-white text-xs font-bold rounded transition-colors cursor-pointer text-center"
+                          className="w-full py-2 bg-[#650015] hover:bg-[#80001B] active:bg-[#4F0011] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-full shadow-[0_3px_0_0_#3F000D] transition-colors cursor-pointer text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#650015]"
                         >
                           Serahkan kartu pass
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setDetailVisitor(v)}
-                          className="w-full py-1.5 bg-[#6B7280] hover:bg-[#555C68] text-white text-xs font-bold rounded transition-colors cursor-pointer text-center"
-                        >
-                          Detail
-                        </button>
+                      
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
-
-          <hr className="border-t border-gray-200/80 my-2" />
+            </div>
+          </section>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold italic underline decoration-gray-400 text-[#3B0A11]">
+              <h2 className="text-lg font-semibold text-[#3B0A11]">
                 Tamu penerima kartu pass
               </h2>
               <Link href="/reports" className="text-xs font-bold text-[#8A001A] hover:underline">
@@ -642,37 +582,33 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
+              {/* Lebar kolom tetap supaya header dan isi selalu sejajar. */}
+              <table className="w-full min-w-[760px] table-fixed text-left border-collapse">
+                <colgroup>
+                  <col className="w-[72px]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[20%]" />
+                  <col />
+                  <col className="w-[96px]" />
+                  <col className="w-[104px]" />
+                  <col className="w-[148px]" />
+                </colgroup>
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                      Foto
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                      Nama
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                      Instansi
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider">
-                      Keperluan
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
-                      No. pass
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
-                      Jam masuk
-                    </th>
-                    <th className="pb-3 text-xs italic font-bold text-[#3B0A11] uppercase tracking-wider text-center">
-                      Aksi
-                    </th>
+                  <tr className="border-b border-gray-200 bg-[#FAF7F0]">
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Foto</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Nama</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Instansi</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Keperluan</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">No. pass</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Jam masuk</th>
+                    <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {activeVisitors.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-xs text-gray-500 font-medium">
+                      <td colSpan={7} className="px-4 py-8 text-center text-xs text-gray-500 font-medium">
                         Tidak ada tamu yang sedang memegang kartu pass di dalam gedung.
                       </td>
                     </tr>
@@ -680,45 +616,45 @@ export default function DashboardPage() {
                     activeVisitors.map((v) => {
                       const passNum = v.no_pass || String(v.id_pass);
                       const formattedPass = passNum.padStart(2, '0');
-                      const timeStr = v.check_in_at
-                        ? `${String(new Date(v.check_in_at).getHours()).padStart(2, '0')}.${String(new Date(v.check_in_at).getMinutes()).padStart(2, '0')}`
-                        : '-';
+                      const timeStr = formatJam(v.check_in_at);
 
                       return (
                         <tr key={v.id_visitor} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="py-2.5">
-                            <div className="w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center shrink-0">
+                          <td className="px-4 py-3">
+                            <div className="w-9 h-9 rounded-full bg-gray-400 overflow-hidden flex items-center justify-center">
                               {v.capture_id ? (
                                 <img
                                   src={getVisitorPhotoUrl(v.id_visitor)}
                                   alt={v.fullname}
+                                  width={36}
+                                  height={36}
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <User className="w-5 h-5 text-white" />
+                                <User className="w-5 h-5 text-white" aria-hidden="true" />
                               )}
                             </div>
                           </td>
-                          <td className="py-2.5 text-xs font-bold text-gray-900 pr-3">
+                          <td className="px-4 py-3 text-xs font-bold text-gray-900 truncate" title={v.fullname}>
                             {v.fullname}
                           </td>
-                          <td className="py-2.5 text-xs text-gray-700 pr-3">
+                          <td className="px-4 py-3 text-xs text-gray-700 truncate" title={v.institution || '-'}>
                             {v.institution || '-'}
                           </td>
-                          <td className="py-2.5 text-xs text-gray-700 pr-3 max-w-xs truncate" title={v.purpose || '-'}>
+                          <td className="px-4 py-3 text-xs text-gray-700 truncate" title={v.purpose || '-'}>
                             {v.purpose || '-'}
                           </td>
-                          <td className="py-2.5 text-xs font-semibold text-gray-900 text-center">
+                          <td className="px-4 py-3 text-xs font-semibold text-gray-900 text-center tabular-nums">
                             {formattedPass}
                           </td>
-                          <td className="py-2.5 text-xs text-gray-700 text-center">
+                          <td className="px-4 py-3 text-xs text-gray-700 text-center tabular-nums">
                             {timeStr}
                           </td>
-                          <td className="py-2.5 text-center">
+                          <td className="px-4 py-3 text-center">
                             <button
                               type="button"
                               onClick={() => handleInitiateCheckout(v)}
-                              className="px-4 py-1 bg-[#8A001A] hover:bg-[#700015] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
+                              className="px-4 py-1.5 bg-[#8A001A] hover:bg-[#700015] active:bg-[#5A0011] text-white text-xs font-bold rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
                             >
                               Pengembalian
                             </button>
@@ -783,9 +719,7 @@ export default function DashboardPage() {
                   <Clock className="w-4 h-4 text-gray-400 shrink-0" />
                   <span className="font-semibold">Waktu Registrasi:</span>
                   <span>
-                    {detailVisitor.check_in_at
-                      ? new Date(detailVisitor.check_in_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
-                      : '-'}
+                    {detailVisitor.check_in_at ? `${formatJam(detailVisitor.check_in_at)} WIB` : '-'}
                   </span>
                 </div>
                 <div className="pt-1 text-gray-700 border-t border-gray-200/80">
