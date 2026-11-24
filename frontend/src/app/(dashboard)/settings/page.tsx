@@ -93,6 +93,7 @@ export default function SettingsPage() {
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [triggeringBackup, setTriggeringBackup] = useState(false);
   const [restoringBackup, setRestoringBackup] = useState(false);
+  const [cleaningRetention, setCleaningRetention] = useState(false);
 
   const [formData, setFormData] = useState<SettingsData>({
     institution_name: 'SEAMOLEC',
@@ -298,6 +299,34 @@ export default function SettingsPage() {
     } finally {
       setRestoringBackup(false);
       if (backupFileInputRef.current) backupFileInputRef.current.value = '';
+    }
+  };
+
+  const handleExecuteRetention = async () => {
+    if (
+      !window.confirm(
+        `Jalankan pembersihan data sekarang berdasarkan kebijakan retensi (${formData.guest_photo_retention_months || 6} bulan foto & ${formData.visit_data_retention_years || 5} tahun kunjungan)? Tindakan ini akan menghapus foto tamu dan riwayat kunjungan yang telah melampaui batas retensi.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setCleaningRetention(true);
+      const res = await api.post('/settings/retention/cleanup', {
+        guest_photo_retention_months: formData.guest_photo_retention_months,
+        visit_data_retention_years: formData.visit_data_retention_years,
+      });
+      const data = res.data?.data;
+      setSuccessMessage(
+        res.data?.message ||
+          `Pembersihan retensi selesai: ${data?.photos_cleaned || 0} file foto dibersihkan, ${data?.visits_purged || 0} riwayat kunjungan kedaluwarsa dihapus.`
+      );
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menjalankan pembersihan retensi data.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setCleaningRetention(false);
     }
   };
 
@@ -1291,16 +1320,16 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => backupFileInputRef.current?.click()}
                         disabled={restoringBackup}
-                        className="border border-[#8A001A] text-[#8A001A] hover:bg-[#8A001A]/10 px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50 flex items-center space-x-1.5"
+                        className="border border-[#0284C7] text-[#0284C7] bg-white hover:bg-sky-50 px-4 py-2 rounded-lg text-xs font-semibold shadow-2xs transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
                       >
                         {restoringBackup ? (
                           <>
-                            <div className="w-3.5 h-3.5 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mr-1" />
+                            <div className="w-3.5 h-3.5 border-2 border-[#0284C7] border-t-transparent rounded-full animate-spin mr-1" />
                             <span>Memulihkan data...</span>
                           </>
                         ) : (
                           <>
-                            <span>🔄</span>
+                            <span className="text-[#0284C7]">📥</span>
                             <span>Pulihkan dari File (.json)</span>
                           </>
                         )}
@@ -1432,11 +1461,31 @@ export default function SettingsPage() {
                       </label>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleExecuteRetention}
+                        disabled={cleaningRetention}
+                        className="border border-[#8A001A] text-[#8A001A] hover:bg-[#8A001A]/10 px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition disabled:opacity-50 flex items-center justify-center space-x-1.5 cursor-pointer"
+                        title="Hapus foto dan riwayat kunjungan yang melebihi batas retensi sekarang"
+                      >
+                        {cleaningRetention ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mr-1" />
+                            <span>Membersihkan data...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🧹</span>
+                            <span>Jalankan Pembersihan Retensi Sekarang</span>
+                          </>
+                        )}
+                      </button>
+
                       <button
                         type="submit"
                         disabled={saving}
-                        className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center space-x-1.5"
+                        className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center justify-center space-x-1.5 cursor-pointer"
                       >
                         <span>✓</span>
                         <span>Simpan pengaturan</span>
