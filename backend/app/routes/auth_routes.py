@@ -547,7 +547,7 @@ FEATURE_PERMS_MAP = {
     "pass_handover": ["visitors.checkin", "visitors.approve"],
     "checkout": ["visitors.checkout"],
     "pass_monitoring": ["pass.read", "pass.manage"],
-    "reports": ["reports.read"],
+    "reports": ["reports.read", "reports.export"],
     "master": ["master.manage"],
     "users": ["users.manage"],
     "settings": ["settings.manage"],

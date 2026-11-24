@@ -12,7 +12,7 @@ from backend.app.models.entities import Visitor
 from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest, RejectRegistrationRequest
 from backend.app.services.checkin_service import CheckinService
 from backend.app.services.checkout_service import CheckoutService
-from backend.app.middleware.auth import role_required
+from backend.app.middleware.auth import role_required, permission_required
 from backend.app.utils.photo_storage import get_photo_path
 from backend.app.utils.export_service import generate_excel, generate_pdf
 
@@ -90,7 +90,7 @@ def checkin_visitor():
         db.close()
 
 @visitor_bp.route('/pending', methods=['GET'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('visitors.read', 'visitors.create')
 def list_pending_registrations():
     db = get_db_session()
     try:
@@ -107,7 +107,7 @@ def list_pending_registrations():
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/approve', methods=['POST'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('visitors.approve', 'visitors.checkin', 'pass.manage')
 def approve_visitor_registration(id_visitor: int):
     user_id = int(get_jwt_identity())
     ip_addr = request.remote_addr
@@ -135,7 +135,7 @@ def approve_visitor_registration(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/reject', methods=['POST'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('visitors.approve', 'visitors.checkin', 'pass.manage')
 def reject_visitor_registration(id_visitor: int):
     data = request.get_json(silent=True) or {}
     try:
@@ -274,7 +274,7 @@ def list_visitors():
         db.close()
 
 @visitor_bp.route('/export/excel', methods=['GET'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('reports.read', 'reports.export')
 def export_visitors_excel():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
@@ -333,7 +333,7 @@ def export_visitors_excel():
         db.close()
 
 @visitor_bp.route('/export/pdf', methods=['GET'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('reports.read', 'reports.export')
 def export_visitors_pdf():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()

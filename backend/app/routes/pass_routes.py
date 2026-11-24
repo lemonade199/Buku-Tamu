@@ -382,7 +382,7 @@ def update_pass_status(id_pass: int):
         db.close()
 
 @pass_bp.route('/<int:id_pass>/approve', methods=['POST'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('pass.manage', 'visitors.approve', 'visitors.checkin')
 def approve_pass(id_pass: int):
     user_id = int(get_jwt_identity())
     db = get_db_session()
@@ -445,7 +445,7 @@ def approve_pass(id_pass: int):
         db.close()
 
 @pass_bp.route('/<int:id_pass>/reject', methods=['POST'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('pass.manage', 'visitors.approve', 'visitors.checkin')
 def reject_pass(id_pass: int):
     user_id = int(get_jwt_identity())
     data = request.get_json() or {}
