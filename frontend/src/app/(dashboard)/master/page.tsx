@@ -69,8 +69,6 @@ export default function MasterDataPage() {
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [conditionFilter, setConditionFilter] = useState('Semua kondisi');
-  const [conditionFilterOpen, setConditionFilterOpen] = useState(false);
 
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('Semua peran');
@@ -444,16 +442,7 @@ export default function MasterDataPage() {
     const formattedPass = (p.no_pass || String(p.id_pass)).padStart(2, '0');
     const slotStr = (p.slot || `Slot ${formattedPass}`).toLowerCase();
 
-    const matchesSearch = !term || formattedPass.includes(term) || slotStr.includes(term);
-
-    let kondisiLabel = 'Baik';
-    if (p.status === 'MAINTENANCE') kondisiLabel = 'Perlu Perbaikan';
-    if (p.status === 'LOST') kondisiLabel = 'Hilang';
-
-    const matchesCondition =
-      conditionFilter === 'Semua kondisi' || kondisiLabel === conditionFilter;
-
-    return matchesSearch && matchesCondition;
+    return !term || formattedPass.includes(term) || slotStr.includes(term);
   });
 
   const getRoleDisplayName = (roleCode: string) => {
@@ -465,7 +454,6 @@ export default function MasterDataPage() {
   };
 
   const filteredUsers = users
-    .filter((u) => !['admin', 'petugas'].includes(u.username.toLowerCase()))
     .filter((u) => {
       const term = userSearchTerm.toLowerCase().trim();
       const matchesSearch =
@@ -546,7 +534,7 @@ export default function MasterDataPage() {
 
       {activeTab === 'pass' ? (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="max-w-3xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -558,35 +546,6 @@ export default function MasterDataPage() {
                   aria-label="Cari nomor pass"
                   className="w-full bg-white border border-gray-300 rounded-full pl-11 pr-4 py-1.5 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] shadow-xs font-medium"
                 />
-              </div>
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setConditionFilterOpen(!conditionFilterOpen)}
-                  className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  <span>{conditionFilter}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
-                </button>
-
-                {conditionFilterOpen && (
-                  <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-44 text-xs">
-                    {['Semua kondisi', 'Baik', 'Perlu Perbaikan', 'Hilang'].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => {
-                          setConditionFilter(c);
-                          setConditionFilterOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 cursor-pointer"
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -607,21 +566,23 @@ export default function MasterDataPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
-            <table className="w-full text-left border-collapse">
+          {/* Tabel dua kolom dengan lebar sedang; isi diratakan tengah supaya seimbang. */}
+          <div className="max-w-3xl overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
+            <table className="w-full table-fixed text-center border-collapse">
+              <colgroup>
+                <col className="w-1/2" />
+                <col className="w-1/2" />
+              </colgroup>
               <thead>
-                <tr className="border-b border-gray-400">
-                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">No. pass</th>
-                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Slot KTP</th>
-                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Kondisi</th>
-                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Aktif</th>
-                  <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
+                <tr className="border-b border-gray-200 bg-[#FAF7F0]">
+                  <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">No. pass</th>
+                  <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Slot KTP</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
+              <tbody className="divide-y divide-gray-100 text-xs text-gray-800">
                 {loading && passes.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={2} className="py-12 text-center text-gray-500 font-medium">
                       <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       <span>Memuat data master pass...</span>
                     </td>
@@ -630,75 +591,23 @@ export default function MasterDataPage() {
                   filteredPasses.map((p) => {
                     const formattedPass = (p.no_pass || String(p.id_pass)).padStart(2, '0');
                     const slotDisplay = p.slot || `Slot ${formattedPass}`;
-                    const isActive = p.status !== 'INACTIVE';
-
-                    let kondisiBadge = (
-                      <span className="inline-block px-4 py-0.5 bg-[#1E5631] text-white text-[11px] font-bold rounded-full min-w-[70px] text-center shadow-2xs">
-                        Baik
-                      </span>
-                    );
-                    if (p.status === 'MAINTENANCE') {
-                      kondisiBadge = (
-                        <span className="inline-block px-4 py-0.5 bg-[#D97706] text-white text-[11px] font-bold rounded-full min-w-[70px] text-center shadow-2xs">
-                          Perlu Perbaikan
-                        </span>
-                      );
-                    } else if (p.status === 'LOST') {
-                      kondisiBadge = (
-                        <span className="inline-block px-4 py-0.5 bg-[#BE123C] text-white text-[11px] font-bold rounded-full min-w-[70px] text-center shadow-2xs">
-                          Hilang
-                        </span>
-                      );
-                    }
 
                     return (
-                      <tr key={p.id_pass} className="hover:bg-black/5 transition-colors">
-                        <td className="py-3 px-3">
-                          <span className="inline-block bg-[#4A000E] text-white font-extrabold text-xs px-3.5 py-0.5 rounded-full shadow-2xs min-w-[36px] text-center">
+                      <tr key={p.id_pass} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="inline-block bg-[#4A000E] text-white font-bold text-xs px-3 py-0.5 rounded-full min-w-[36px] text-center tabular-nums">
                             {formattedPass}
                           </span>
                         </td>
-
-                        <td className="py-3 px-3 font-semibold text-gray-900 whitespace-nowrap">
+                        <td className="px-4 py-2.5 font-medium text-gray-900 text-center truncate" title={slotDisplay}>
                           {slotDisplay}
-                        </td>
-
-                        <td className="py-3 px-3 text-center whitespace-nowrap">
-                          {kondisiBadge}
-                        </td>
-
-                        <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePassActive(p)}
-                            title={isActive ? 'Nonaktifkan kartu pass' : 'Aktifkan kartu pass'}
-                            className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center cursor-pointer p-0.5 ${
-                              isActive ? 'bg-[#1E5631]' : 'bg-gray-300'
-                            }`}
-                          >
-                            <span
-                              className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                                isActive ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </td>
-
-                        <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(p)}
-                            className="px-4 py-1 bg-[#5B6367] hover:bg-[#484F52] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
-                          >
-                            Edit
-                          </button>
                         </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={2} className="py-12 text-center text-gray-500 font-medium">
                       Tidak ada data kartu pass yang cocok.
                     </td>
                   </tr>
