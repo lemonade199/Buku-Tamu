@@ -234,6 +234,7 @@ def update_pass_details(id_pass: int):
 
         pass_card.slot = slot if slot else None
 
+        old_status = pass_card.status
         if not is_active:
             pass_card.status = 'INACTIVE'
         else:
@@ -244,7 +245,41 @@ def update_pass_details(id_pass: int):
             elif pass_card.status in ['MAINTENANCE', 'LOST', 'INACTIVE']:
                 pass_card.status = 'AVAILABLE'
 
-        pass_card.updated_at = utc_now()
+        new_status = pass_card.status
+        now = utc_now()
+        user_id = int(get_jwt_identity())
+
+        if old_status == 'PENDING' and new_status in ['AVAILABLE', 'MAINTENANCE', 'LOST', 'INACTIVE']:
+            pending_visitors = db.query(Visitor).filter(
+                Visitor.id_pass == pass_card.id_pass,
+                Visitor.status == 'PENDING'
+            ).with_for_update().all()
+
+            reason_mapping = {
+                'MAINTENANCE': 'Dibatalkan otomatis: Kartu pass rusak atau sedang dalam perbaikan.',
+                'INACTIVE': 'Dibatalkan otomatis: Kartu pass dinonaktifkan.',
+                'LOST': 'Dibatalkan otomatis: Kartu pass dilaporkan hilang.',
+                'AVAILABLE': 'Dibatalkan melalui perubahan status kartu pass oleh petugas.',
+            }
+            cancel_reason = reason_mapping.get(new_status, f"Dibatalkan otomatis: Status kartu diubah menjadi {new_status}.")
+
+            for pv in pending_visitors:
+                pv.status = 'REJECTED'
+                pv.rejection_reason = cancel_reason
+                pv.rejected_by_id = user_id
+                pv.rejected_at = now
+                pv.updated_at = now
+
+                reject_audit = AuditLog(
+                    id_user=user_id,
+                    action='VISITOR_REGISTRATION_REJECTED',
+                    entity='visitors',
+                    entity_id=str(pv.id_visitor),
+                    description=f"Auto reject permohonan tamu {pv.fullname} saat status pass #{pass_card.no_pass} diubah dari {old_status} menjadi {new_status} via edit data pass. Alasan: {cancel_reason}"
+                )
+                db.add(reject_audit)
+
+        pass_card.updated_at = now
         db.commit()
 
         return jsonify({
@@ -332,28 +367,40 @@ def update_pass_status(id_pass: int):
             pass_card.handled_over_id = user_id
             pass_card.handled_over_at = now
 
-        if old_status == 'PENDING' and new_status == 'AVAILABLE':
-            pending_visitor = db.query(Visitor).filter(
+        if old_status == 'PENDING' and new_status in ['AVAILABLE', 'MAINTENANCE', 'LOST', 'INACTIVE']:
+            pending_visitors = db.query(Visitor).filter(
                 Visitor.id_pass == pass_card.id_pass,
                 Visitor.status == 'PENDING'
-            ).with_for_update().first()
+            ).with_for_update().all()
 
-            if pending_visitor:
+            reason_mapping = {
+                'MAINTENANCE': 'Dibatalkan otomatis: Kartu pass rusak atau sedang dalam perbaikan.',
+                'INACTIVE': 'Dibatalkan otomatis: Kartu pass dinonaktifkan.',
+                'LOST': 'Dibatalkan otomatis: Kartu pass dilaporkan hilang.',
+                'AVAILABLE': 'Dibatalkan melalui perubahan status kartu pass oleh petugas.',
+            }
+            default_cancel_reason = reason_mapping.get(new_status, f"Dibatalkan otomatis: Status kartu diubah menjadi {new_status}.")
+            final_reason = req.notes.strip() if req.notes and req.notes.strip() else default_cancel_reason
+
+            for pending_visitor in pending_visitors:
                 pending_visitor.status = 'REJECTED'
-                pending_visitor.rejection_reason = req.notes or 'Dibatalkan melalui perubahan status kartu pass oleh petugas.'
+                pending_visitor.rejection_reason = final_reason
                 pending_visitor.rejected_by_id = user_id
                 pending_visitor.rejected_at = now
                 pending_visitor.updated_at = now
-                auto_action_message = f"Permohonan registrasi pending tamu ({pending_visitor.fullname}) telah otomatis dibatalkan/ditolak."
 
                 reject_audit = AuditLog(
                     id_user=user_id,
                     action='VISITOR_REGISTRATION_REJECTED',
                     entity='visitors',
                     entity_id=str(pending_visitor.id_visitor),
-                    description=f"Auto reject permohonan tamu {pending_visitor.fullname} saat status pass #{pass_card.no_pass} diubah dari PENDING ke AVAILABLE."
+                    description=f"Auto reject permohonan tamu {pending_visitor.fullname} saat status pass #{pass_card.no_pass} diubah dari {old_status} menjadi {new_status}. Alasan: {final_reason}"
                 )
                 db.add(reject_audit)
+
+            if pending_visitors:
+                names = ", ".join([pv.fullname for pv in pending_visitors])
+                auto_action_message = f"Permohonan registrasi pending tamu ({names}) telah otomatis dibatalkan/ditolak."
 
         pass_card.status = new_status
         if new_status == 'AVAILABLE':

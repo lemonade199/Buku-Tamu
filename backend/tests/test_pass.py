@@ -101,3 +101,89 @@ def test_change_pass_in_use_to_available_auto_checkouts_visitor(client):
     visitor_detail = client.get(f'/api/v1/visitors/{visitor_id}', headers={'Authorization': f'Bearer {token}'})
     assert visitor_detail.status_code == 200
     assert visitor_detail.get_json()['data']['check_out_at'] is not None
+
+def test_pending_pass_status_maintenance_cancels_visitor(client):
+    import io
+    from PIL import Image
+    import base64
+
+    img = Image.new('RGB', (100, 100), color=(100, 150, 200))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    raw_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    photo_b64 = f"data:image/jpeg;base64,{raw_b64}"
+
+    # Checkin with pass 3
+    checkin_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Kartu Rusak',
+        'institution': 'Instansi Pengujian',
+        'representing': 'Audit',
+        'purpose': 'Testing auto-reject on pass maintenance',
+        'id_pass': 3,
+        'photo_base64': photo_b64
+    })
+    assert checkin_res.status_code == 201
+    visitor_id = checkin_res.get_json()['data']['id_visitor']
+
+    login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_admin.get_json()['data']['access_token']
+
+    # Pass 3 is PENDING
+    pass_res = client.get('/api/v1/pass', headers={'Authorization': f'Bearer {token}'})
+    pass_3 = next(p for p in pass_res.get_json()['data'] if p['id_pass'] == 3)
+    assert pass_3['status'] == 'PENDING'
+
+    # Admin marks pass 3 as MAINTENANCE (damaged/broken)
+    update_res = client.put('/api/v1/pass/3/status', json={
+        'status': 'MAINTENANCE',
+        'notes': 'Kartu chip rusak tergores'
+    }, headers={'Authorization': f'Bearer {token}'})
+    assert update_res.status_code == 200
+    assert update_res.get_json()['data']['status'] == 'MAINTENANCE'
+
+    # Visitor must now be REJECTED with proper rejection reason
+    vis_res = client.get(f'/api/v1/visitors/{visitor_id}', headers={'Authorization': f'Bearer {token}'})
+    assert vis_res.status_code == 200
+    vis_data = vis_res.get_json()['data']
+    assert vis_data['status'] == 'REJECTED'
+    assert 'Kartu chip rusak tergores' in vis_data['rejection_reason']
+
+def test_pending_pass_status_inactive_cancels_visitor(client):
+    import io
+    from PIL import Image
+    import base64
+
+    img = Image.new('RGB', (100, 100), color=(80, 80, 80))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    raw_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    photo_b64 = f"data:image/jpeg;base64,{raw_b64}"
+
+    # Checkin with pass 4
+    checkin_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Kartu Nonaktif',
+        'institution': 'Instansi Uji 2',
+        'representing': 'Audit 2',
+        'purpose': 'Testing auto-reject on pass deactivation',
+        'id_pass': 4,
+        'photo_base64': photo_b64
+    })
+    assert checkin_res.status_code == 201
+    visitor_id = checkin_res.get_json()['data']['id_visitor']
+
+    login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_admin.get_json()['data']['access_token']
+
+    # Admin marks pass 4 as INACTIVE
+    update_res = client.put('/api/v1/pass/4/status', json={
+        'status': 'INACTIVE'
+    }, headers={'Authorization': f'Bearer {token}'})
+    assert update_res.status_code == 200
+    assert update_res.get_json()['data']['status'] == 'INACTIVE'
+
+    # Visitor must now be REJECTED cleanly
+    vis_res = client.get(f'/api/v1/visitors/{visitor_id}', headers={'Authorization': f'Bearer {token}'})
+    assert vis_res.status_code == 200
+    vis_data = vis_res.get_json()['data']
+    assert vis_data['status'] == 'REJECTED'
+    assert 'dinonaktifkan' in vis_data['rejection_reason'].lower()
