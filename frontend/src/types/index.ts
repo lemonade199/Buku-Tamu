@@ -41,7 +41,6 @@ export interface VisitorItem {
   id_pass: number;
   no_pass?: string;
   fullname: string;
-  telephone?: string;
   institution?: string;
   representing?: string;
   purpose?: string;
@@ -100,6 +99,10 @@ export interface DashboardMetrics {
   inactive_pass?: number;
   lost_pass?: number;
   maintenance_pass?: number;
+  pass_warning_limit?: number;
+  is_pass_warning?: boolean;
+  opening_time?: string;
+  closing_time?: string;
   pass_stats: {
     AVAILABLE: number;
     PENDING?: number;

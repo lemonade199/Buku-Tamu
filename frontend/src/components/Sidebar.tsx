@@ -9,24 +9,25 @@ import { useAuth } from '@/hooks/useAuth';
 interface NavItem {
   name: string;
   href: string;
+  permission?: string;
   // Rute lain yang tetap menandai menu ini sebagai aktif.
   alsoActiveOn?: string[];
 }
 
 const adminNavItems: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Monitoring Kartu Pass', href: '/pass' },
-  { name: 'Laporan', href: '/reports' },
-  { name: 'Master Data', href: '/master' },
-  { name: 'Pengaturan', href: '/settings', alsoActiveOn: ['/profile'] },
+  { name: 'Dashboard', href: '/dashboard', permission: 'dashboard.read' },
+  { name: 'Monitoring Kartu Pass', href: '/pass', permission: 'pass.read' },
+  { name: 'Laporan', href: '/reports', permission: 'reports.read' },
+  { name: 'Master Data', href: '/master', permission: 'master.manage' },
+  { name: 'Pengaturan', href: '/settings', permission: 'settings.manage', alsoActiveOn: ['/profile'] },
 ];
 
 const receptionistNavItems: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Penerimaan Tamu', href: '/checkin' },
-  { name: 'Pengembalian Akses', href: '/checkout' },
-  { name: 'Kontrol Pass Aktif', href: '/pass' },
-  { name: 'Laporan', href: '/reports' },
+  { name: 'Dashboard', href: '/dashboard', permission: 'dashboard.read' },
+  { name: 'Penerimaan Tamu', href: '/checkin', permission: 'visitors.create' },
+  { name: 'Pengembalian Akses', href: '/checkout', permission: 'visitors.checkout' },
+  { name: 'Kontrol Pass Aktif', href: '/pass', permission: 'pass.read' },
+  { name: 'Laporan', href: '/reports', permission: 'reports.read' },
 ];
 
 function isItemActive(item: NavItem, pathname: string) {
@@ -44,7 +45,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const isAdmin = user?.role_code === 'ADMIN';
-  const navItems = isAdmin ? adminNavItems : receptionistNavItems;
+
+  const userPerms = user?.permissions || [];
+  const hasWildcard = userPerms.includes('*');
+  const hasPermission = (perm?: string) => {
+    if (!perm) return true;
+    if (hasWildcard) return true;
+    return userPerms.includes(perm);
+  };
+
+  const navItems = (isAdmin ? adminNavItems : receptionistNavItems).filter((item) =>
+    hasPermission(item.permission)
+  );
 
   // Menu di layar kecil menutup sendiri saat pindah halaman.
   useEffect(() => {

@@ -4,16 +4,16 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import Pass, Visitor, AuditLog
+from backend.app.models.entities import Pass, Visitor, AuditLog, Setting
 from backend.app.schemas.pass_schema import PassCreateRequest, PassStatusUpdateRequest
-from backend.app.middleware.auth import role_required
+from backend.app.middleware.auth import role_required, permission_required
 from backend.app.services.checkin_service import assignable_pass_query
 from backend.app.utils.datetime_utils import utc_now
 
 pass_bp = Blueprint('pass', __name__, url_prefix='/api/v1/pass')
 
 @pass_bp.route('', methods=['GET'])
-@jwt_required()
+@permission_required('pass.read')
 def get_all_passes():
     db = get_db_session()
     try:
@@ -69,7 +69,7 @@ def get_available_passes():
         db.close()
 
 @pass_bp.route('/rack', methods=['GET'])
-@jwt_required()
+@permission_required('pass.read')
 def get_pass_rack_view():
     db = get_db_session()
     try:
@@ -114,13 +114,17 @@ def get_pass_rack_view():
         db.close()
 
 @pass_bp.route('/monitoring', methods=['GET'])
-@jwt_required()
+@permission_required('pass.read')
 def get_pass_monitoring():
     db = get_db_session()
     try:
         available_count = db.query(Pass).filter(Pass.status == 'AVAILABLE').count()
         pending_count = db.query(Pass).filter(Pass.status == 'PENDING').count()
         in_use_count = db.query(Pass).filter(Pass.status == 'IN_USE').count()
+
+        setting = db.query(Setting).first()
+        warning_limit = setting.pass_warning_limit if setting and setting.pass_warning_limit else 5
+        is_warning = available_count <= warning_limit
 
         visitors = db.query(Visitor).order_by(Visitor.check_in_at.desc()).limit(150).all()
 
@@ -166,7 +170,9 @@ def get_pass_monitoring():
             'counts': {
                 'available': available_count,
                 'pending': pending_count,
-                'in_use': in_use_count
+                'in_use': in_use_count,
+                'warning_limit': warning_limit,
+                'is_warning': is_warning
             },
             'data': records
         }), 200

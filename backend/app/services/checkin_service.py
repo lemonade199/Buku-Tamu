@@ -1,8 +1,9 @@
 import os
-from datetime import datetime
+from datetime import datetime, time, timedelta, timezone
+from flask import current_app
 from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
-from backend.app.models.entities import Visitor, Pass, AuditLog
+from backend.app.models.entities import Visitor, Pass, AuditLog, Setting, AppNotification
 from backend.app.utils.photo_storage import save_visitor_photo
 from backend.app.utils.datetime_utils import utc_now
 
@@ -23,6 +24,27 @@ class CheckinService:
         self.db = db
 
     def process_checkin(self, data: dict, handled_by_user_id: int = None, ip_address: str = None, user_agent: str = None) -> dict:
+        # Check operational hours for self-service / kiosk registrations
+        is_testing = bool(current_app and current_app.config.get('TESTING'))
+        if not is_testing and handled_by_user_id is None and not data.get('bypass_operational_hours'):
+            setting = self.db.query(Setting).first()
+            if setting and setting.opening_time and setting.closing_time:
+                # Jam server Docker memakai UTC; jam operasional diatur dalam WIB (UTC+7, tanpa musim panas).
+                now_time = datetime.now(timezone(timedelta(hours=7))).time()
+                op_open = setting.opening_time
+                op_close = setting.closing_time
+                if op_open <= op_close:
+                    is_open = op_open <= now_time <= op_close
+                else:
+                    is_open = now_time >= op_open or now_time <= op_close
+
+                if not is_open:
+                    raise ValueError(
+                        f"Pendaftaran tamu mandiri saat ini ditutup di luar jam operasional "
+                        f"({op_open.strftime('%H:%M')} - {op_close.strftime('%H:%M')} WIB). "
+                        f"Silakan hubungi petugas resepsionis di meja informasi."
+                    )
+
         photo_base64 = data.get('photo_base64')
         if not photo_base64:
             raise ValueError("Foto pengunjung wajib diambil melalui kamera sebelum registrasi.")
@@ -68,7 +90,6 @@ class CheckinService:
             raise ValueError(f"Gagal memproses foto pengunjung: {str(e)}")
 
         now = utc_now()
-        telephone_val = (data.get('telephone') or '').strip() or None
         institution_val = (data.get('institution') or '').strip() or None
         representing_val = (data.get('representing') or '').strip() or None
         purpose_val = (data.get('purpose') or '').strip() or None
@@ -76,7 +97,6 @@ class CheckinService:
         visitor = Visitor(
             id_pass=pass_card.id_pass,
             fullname=data['fullname'].strip(),
-            telephone=telephone_val,
             institution=institution_val,
             representing=representing_val,
             purpose=purpose_val,
@@ -98,12 +118,21 @@ class CheckinService:
             user_agent=user_agent
         )
         self.db.add(audit)
+
+        setting = self.db.query(Setting).first()
+        if setting and setting.notify_app_checkin:
+            notif = AppNotification(
+                type='CHECKIN',
+                title='Tamu Check-In Baru',
+                message=f"{visitor.fullname} ({visitor.institution or 'Umum'}) check-in dengan kartu #{pass_card.no_pass}."
+            )
+            self.db.add(notif)
+
         self.db.commit()
 
         return {
             'id_visitor': visitor.id_visitor,
             'fullname': visitor.fullname,
-            'telephone': visitor.telephone,
             'id_pass': pass_card.id_pass,
             'no_pass': pass_card.no_pass,
             'slot': pass_card.slot,

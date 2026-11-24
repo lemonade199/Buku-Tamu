@@ -37,6 +37,11 @@ def create_app(config_name=None, db_url=None):
     CORS(app, resources={r"/api/*": {"origins": cors_origins}}, supports_credentials=True)
     jwt.init_app(app)
 
+    # Initialize Swagger UI API documentation
+    from flasgger import Swagger
+    from backend.app.docs.swagger_spec import SWAGGER_CONFIG, SWAGGER_TEMPLATE
+    Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
+
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         identity = jwt_payload.get('sub')
@@ -78,7 +83,8 @@ def create_app(config_name=None, db_url=None):
         with engine.connect() as conn:
             conn.execute(text("""
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
-                ALTER TABLE visitors ADD COLUMN IF NOT EXISTS telephone VARCHAR(25);
+                ALTER TABLE visitors DROP COLUMN IF EXISTS telephone;
+                DROP INDEX IF EXISTS idx_visitors_telephone;
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS approved_by_id BIGINT REFERENCES users(id_user) ON DELETE SET NULL;
                 ALTER TABLE visitors ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
@@ -87,6 +93,9 @@ def create_app(config_name=None, db_url=None):
                 CREATE INDEX IF NOT EXISTS ix_visitors_status ON visitors(status);
                 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sso_client_secret VARCHAR(255);
                 ALTER TABLE settings ADD COLUMN IF NOT EXISTS session_timeout_hours INTEGER DEFAULT 8;
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS permissions_matrix JSON;
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS smtp_password VARCHAR(255);
+                ALTER TABLE settings ADD COLUMN IF NOT EXISTS smtp_status VARCHAR(50) DEFAULT 'DISCONNECTED';
             """))
             conn.commit()
 

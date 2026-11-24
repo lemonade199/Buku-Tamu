@@ -4,10 +4,11 @@ from datetime import time
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import Setting
+from backend.app.models.entities import Setting, AppNotification
 from backend.app.middleware.auth import role_required
-from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
+from backend.app.utils.photo_storage import get_photo_path, save_institution_logo, save_user_avatar
 from backend.app.services.backup_service import BackupService
+from backend.app.services.email_service import test_smtp_connection, send_monthly_report_email
 
 setting_bp = Blueprint('setting_bp', __name__, url_prefix='/api/v1/settings')
 
@@ -19,6 +20,46 @@ def parse_time_str(time_str: str) -> time:
     h = int(parts[0]) if len(parts) > 0 else 8
     m = int(parts[1]) if len(parts) > 1 else 0
     return time(h, m)
+
+@setting_bp.route('/public', methods=['GET'])
+def get_public_settings():
+    db = get_db_session()
+    try:
+        setting = db.query(Setting).first()
+        if not setting:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'institution_name': 'SEAMOLEC',
+                    'logo_path': None,
+                    'logo_url': None,
+                    'opening_time': '07:30',
+                    'closing_time': '16:00'
+                }
+            }), 200
+
+        logo_url = f"/api/v1/settings/logo/{setting.logo_path}" if setting.logo_path else None
+        return jsonify({
+            'success': True,
+            'data': {
+                'institution_name': setting.institution_name or 'SEAMOLEC',
+                'logo_path': setting.logo_path,
+                'logo_url': logo_url,
+                'opening_time': setting.opening_time.strftime('%H:%M') if setting.opening_time else '07:30',
+                'closing_time': setting.closing_time.strftime('%H:%M') if setting.closing_time else '16:00',
+                'session_timeout_hours': setting.session_timeout_hours or 8,
+                'sso_enabled': bool(setting.sso_enabled),
+                'sso_issuer': setting.sso_issuer or 'https://accounts.google.com',
+                'sso_client_id': setting.sso_client_id
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+    finally:
+        db.close()
 
 @setting_bp.route('', methods=['GET'])
 @role_required('ADMIN')
@@ -74,12 +115,16 @@ def update_settings():
             setting.smtp_port = int(data['smtp_port']) if data['smtp_port'] else None
         if 'smtp_username' in data:
             setting.smtp_username = data['smtp_username']
+        if 'smtp_password' in data:
+            setting.smtp_password = data['smtp_password']
         if 'smtp_encryption' in data:
             setting.smtp_encryption = data['smtp_encryption']
         if 'smtp_sender_name' in data:
             setting.smtp_sender_name = data['smtp_sender_name']
         if 'smtp_sender_email' in data:
             setting.smtp_sender_email = data['smtp_sender_email']
+        if 'smtp_status' in data:
+            setting.smtp_status = data['smtp_status']
         if 'notify_app_checkin' in data:
             setting.notify_app_checkin = bool(data['notify_app_checkin'])
         if 'notify_app_backup_fail' in data:
@@ -145,7 +190,7 @@ def upload_logo():
                 'message': 'Data logo tidak ditemukan.'
             }), 400
 
-        filename = save_user_avatar(photo_base64)
+        filename = save_institution_logo(photo_base64)
 
         setting = db.query(Setting).first()
         if not setting:
@@ -175,30 +220,87 @@ def test_smtp():
     db = get_db_session()
     try:
         setting = db.query(Setting).first()
-        host = setting.smtp_host if setting else None
+        data = request.get_json(silent=True) or {}
+
+        host = data.get('smtp_host') or (setting.smtp_host if setting else None)
+        port = data.get('smtp_port') or (setting.smtp_port if setting else 587)
+        username = data.get('smtp_username') if 'smtp_username' in data else (setting.smtp_username if setting else None)
+        password = data.get('smtp_password') if 'smtp_password' in data else (setting.smtp_password if setting else None)
+        encryption = data.get('smtp_encryption') or (setting.smtp_encryption if setting else 'STARTTLS')
+        sender_name = data.get('smtp_sender_name') or (setting.smtp_sender_name if setting else 'Buku Tamu Digital')
+        sender_email = data.get('smtp_sender_email') or (setting.smtp_sender_email if setting else None)
+        recipient_email = data.get('recipient_email') or sender_email or (setting.admin_notification_email if setting else None)
+
         if not host:
             return jsonify({
                 'success': False,
+                'status': 'error',
                 'message': 'Konfigurasi host SMTP belum diatur.'
             }), 400
 
-        return jsonify({
-            'success': True,
-            'message': 'Koneksi ke server SMTP berhasil. Email uji telah berhasil dikirim.',
-            'status': 'connected'
-        }), 200
+        ok, msg = test_smtp_connection(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            encryption=encryption,
+            sender_name=sender_name,
+            sender_email=sender_email,
+            recipient_email=recipient_email
+        )
+
+        if setting:
+            setting.smtp_status = 'CONNECTED' if ok else 'ERROR'
+            db.commit()
+
+        if ok:
+            return jsonify({
+                'success': True,
+                'status': 'connected',
+                'message': msg
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'status': 'error',
+                'message': msg
+            }), 400
     except Exception as e:
+        if 'setting' in locals() and setting:
+            try:
+                setting.smtp_status = 'ERROR'
+                db.commit()
+            except Exception:
+                db.rollback()
         return jsonify({
             'success': False,
-            'message': str(e)
+            'status': 'error',
+            'message': f"Gagal menguji koneksi SMTP: {str(e)}"
         }), 500
     finally:
         db.close()
 
 @setting_bp.route('/logo/<filename>', methods=['GET'])
 def get_logo(filename: str):
+    clean_filename = os.path.basename(filename)
+
+    # Strictly block attempts to access visitor photos or staff avatars via logo endpoint
+    if clean_filename.startswith(('visitor_', 'avatar_')):
+        return jsonify({'success': False, 'message': 'Akses ditolak: File bukan logo institusi.'}), 403
+
+    db = get_db_session()
     try:
-        photo_path = get_photo_path(filename)
+        setting = db.query(Setting).first()
+        active_logo = setting.logo_path if setting else None
+    finally:
+        db.close()
+
+    is_allowed = clean_filename.startswith('logo_') or (active_logo and clean_filename == active_logo)
+    if not is_allowed:
+        return jsonify({'success': False, 'message': 'Akses ditolak: File bukan logo institusi yang sah.'}), 403
+
+    try:
+        photo_path = get_photo_path(clean_filename)
         if not os.path.exists(photo_path):
             return jsonify({'success': False, 'message': 'File logo tidak ditemukan.'}), 404
         return send_file(photo_path)
@@ -324,5 +426,91 @@ def restore_database():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': f"Gagal memulihkan database: {str(e)}"}), 500
+    finally:
+        db.close()
+
+@setting_bp.route('/retention/cleanup', methods=['POST'])
+@role_required('ADMIN')
+def execute_retention_cleanup():
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+
+    data = request.get_json(silent=True) or {}
+    guest_photo_months = data.get('guest_photo_retention_months')
+    visit_data_years = data.get('visit_data_retention_years')
+
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        result = service.execute_retention_cleanup(
+            user_id=user_id,
+            ip_address=ip_addr,
+            guest_photo_months=guest_photo_months,
+            visit_data_years=visit_data_years
+        )
+        return jsonify({
+            'success': True,
+            'message': f"Pembersihan retensi selesai: {result['photos_cleaned']} foto dibersihkan, {result['visits_purged']} riwayat kunjungan dihapus.",
+            'data': result
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Gagal menjalankan pembersihan retensi: {str(e)}"}), 500
+    finally:
+        db.close()
+
+@setting_bp.route('/notifications', methods=['GET'])
+@jwt_required()
+def get_in_app_notifications():
+    db = get_db_session()
+    try:
+        notifications = db.query(AppNotification).order_by(AppNotification.created_at.desc()).limit(30).all()
+        unread_count = db.query(AppNotification).filter(AppNotification.is_read == False).count()
+        return jsonify({
+            'success': True,
+            'unread_count': unread_count,
+            'data': [n.to_dict() for n in notifications]
+        }), 200
+    finally:
+        db.close()
+
+@setting_bp.route('/notifications/<int:id_notif>/read', methods=['POST'])
+@jwt_required()
+def mark_notification_read(id_notif: int):
+    db = get_db_session()
+    try:
+        notif = db.query(AppNotification).filter(AppNotification.id_notification == id_notif).first()
+        if notif:
+            notif.is_read = True
+            db.commit()
+        return jsonify({'success': True}), 200
+    finally:
+        db.close()
+
+@setting_bp.route('/notifications/read-all', methods=['POST'])
+@jwt_required()
+def mark_all_notifications_read():
+    db = get_db_session()
+    try:
+        db.query(AppNotification).filter(AppNotification.is_read == False).update({'is_read': True})
+        db.commit()
+        return jsonify({'success': True}), 200
+    finally:
+        db.close()
+
+@setting_bp.route('/notifications/monthly-report', methods=['POST'])
+@role_required('ADMIN')
+def trigger_monthly_report_email():
+    db = get_db_session()
+    try:
+        data = request.get_json(silent=True) or {}
+        target_email = data.get('recipient_email')
+        ok, msg = send_monthly_report_email(db, target_email=target_email)
+        if ok:
+            return jsonify({'success': True, 'message': msg}), 200
+        else:
+            return jsonify({'success': False, 'message': msg}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         db.close()

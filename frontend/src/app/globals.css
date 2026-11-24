@@ -29,3 +29,12 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #92001E;
 }
+
+/* Sembunyikan ikon mata bawaan browser (Edge/IE) agar tidak dobel dengan tombol custom */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+  width: 0;
+  height: 0;
+}
+

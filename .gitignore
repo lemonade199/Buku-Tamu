@@ -71,6 +71,7 @@ frontend/.next/
 frontend/out/
 out/
 frontend/build/
+*.tsbuildinfo
 
 # Local Storage / Uploads & Backups
 storage/photos/*

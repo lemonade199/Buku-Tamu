@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
-import { CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 type TabType = 'umum' | 'smtp' | 'notifikasi' | 'role' | 'sso' | 'backup';
 
@@ -18,9 +18,11 @@ interface SettingsData {
   smtp_host?: string;
   smtp_port?: number;
   smtp_username?: string;
+  smtp_password?: string;
   smtp_encryption?: string;
   smtp_sender_name?: string;
   smtp_sender_email?: string;
+  smtp_status?: string;
   notify_app_checkin?: boolean;
   notify_app_backup_fail?: boolean;
   notify_email_monthly_report?: boolean;
@@ -38,6 +40,23 @@ interface SettingsData {
   visit_data_retention_years?: number;
   auto_backup_enabled?: boolean;
   auto_backup_schedule?: string;
+}
+
+interface RoleItem {
+  id_role: number;
+  code: string;
+  name: string;
+  description: string;
+  user_count: number;
+  display_name: string;
+  role_key: string;
+}
+
+interface RoleMeta {
+  id_role: number;
+  code: string;
+  name: string;
+  key: string;
 }
 
 const permissionsMatrix = [
@@ -69,17 +88,28 @@ export default function SettingsPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.png');
   const [testingEmail, setTestingEmail] = useState(false);
+  const [sendingMonthlyReport, setSendingMonthlyReport] = useState(false);
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
-  const [roleModalData, setRoleModalData] = useState({ name: '', description: '' });
-  const [matrix, setMatrix] = useState(permissionsMatrix);
+  const [roleModalData, setRoleModalData] = useState<{ id_role?: number; name: string; description: string }>({
+    name: '',
+    description: '',
+  });
+  const [roleModalError, setRoleModalError] = useState('');
+  const [savingRole, setSavingRole] = useState(false);
+  const [rolesList, setRolesList] = useState<RoleItem[]>([]);
+  const [rolesMeta, setRolesMeta] = useState<RoleMeta[]>([]);
+  const [matrix, setMatrix] = useState<any[]>(permissionsMatrix);
   const [pendingPermissionChange, setPendingPermissionChange] = useState<{
     featureIndex: number;
     featureName: string;
-    role: 'Admin' | 'Resepsionis';
-    roleKey: 'admin' | 'receptionist';
+    role: string;
+    roleKey: string;
     currentVal: boolean;
   } | null>(null);
   const [showPermissionWarningModal, setShowPermissionWarningModal] = useState(false);
+  const [showSsoSecret, setShowSsoSecret] = useState(false);
+  const [copiedRedirectUri, setCopiedRedirectUri] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +117,7 @@ export default function SettingsPage() {
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [triggeringBackup, setTriggeringBackup] = useState(false);
   const [restoringBackup, setRestoringBackup] = useState(false);
+  const [cleaningRetention, setCleaningRetention] = useState(false);
 
   const [formData, setFormData] = useState<SettingsData>({
     institution_name: 'SEAMOLEC',
@@ -120,7 +151,104 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
+    fetchMatrix();
+    fetchRoles();
   }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const res = await api.get('/auth/roles');
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setRolesList(res.data.data);
+      }
+    } catch {
+      // fallback
+    }
+  };
+
+  const fetchMatrix = async () => {
+    try {
+      const res = await api.get('/auth/roles/matrix');
+      if (res.data?.success) {
+        if (Array.isArray(res.data?.data)) {
+          setMatrix(res.data.data);
+        }
+        if (Array.isArray(res.data?.roles)) {
+          setRolesMeta(res.data.roles);
+        }
+      }
+    } catch {
+      // fallback to permissionsMatrix
+    }
+  };
+
+  const handleOpenAddRole = () => {
+    setRoleModalData({ id_role: undefined, name: '', description: '' });
+    setRoleModalError('');
+    setShowRoleModal(true);
+  };
+
+  const handleOpenEditRole = (role: RoleItem) => {
+    setRoleModalData({
+      id_role: role.id_role,
+      name: role.display_name || role.name,
+      description: role.description || '',
+    });
+    setRoleModalError('');
+    setShowRoleModal(true);
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleModalData.name.trim()) {
+      setRoleModalError('Nama role wajib diisi.');
+      return;
+    }
+    setSavingRole(true);
+    setRoleModalError('');
+    try {
+      if (roleModalData.id_role) {
+        const res = await api.put(`/auth/roles/${roleModalData.id_role}`, {
+          name: roleModalData.name,
+          description: roleModalData.description,
+        });
+        setSuccessMessage(res.data?.message || 'Data role berhasil diperbarui.');
+      } else {
+        const res = await api.post('/auth/roles', {
+          name: roleModalData.name,
+          description: roleModalData.description,
+        });
+        setSuccessMessage(res.data?.message || 'Role baru berhasil ditambahkan.');
+      }
+      setShowRoleModal(false);
+      setRoleModalData({ name: '', description: '' });
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchRoles();
+      fetchMatrix();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menyimpan role.';
+      setRoleModalError(msg);
+      setErrorMessage(msg);
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async (role: RoleItem) => {
+    if (!window.confirm(`Yakin ingin menghapus role "${role.display_name || role.name}"?`)) {
+      return;
+    }
+    try {
+      const res = await api.delete(`/auth/roles/${role.id_role}`);
+      setSuccessMessage(res.data?.message || `Role "${role.name}" berhasil dihapus.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchRoles();
+      fetchMatrix();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menghapus role.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -283,6 +411,34 @@ export default function SettingsPage() {
     }
   };
 
+  const handleExecuteRetention = async () => {
+    if (
+      !window.confirm(
+        `Jalankan pembersihan data sekarang berdasarkan kebijakan retensi (${formData.guest_photo_retention_months || 6} bulan foto & ${formData.visit_data_retention_years || 5} tahun kunjungan)? Tindakan ini akan menghapus foto tamu dan riwayat kunjungan yang telah melampaui batas retensi.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setCleaningRetention(true);
+      const res = await api.post('/settings/retention/cleanup', {
+        guest_photo_retention_months: formData.guest_photo_retention_months,
+        visit_data_retention_years: formData.visit_data_retention_years,
+      });
+      const data = res.data?.data;
+      setSuccessMessage(
+        res.data?.message ||
+          `Pembersihan retensi selesai: ${data?.photos_cleaned || 0} file foto dibersihkan, ${data?.visits_purged || 0} riwayat kunjungan kedaluwarsa dihapus.`
+      );
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menjalankan pembersihan retensi data.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setCleaningRetention(false);
+    }
+  };
+
   const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -292,8 +448,16 @@ export default function SettingsPage() {
       const base64 = reader.result as string;
       setLogoPreview(base64);
       try {
-        await api.post('/settings/logo', { logo: base64 });
+        const res = await api.post('/settings/logo', { logo: base64 });
         setSuccessMessage('Logo instansi berhasil diperbarui.');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('institution-settings-updated', {
+            detail: {
+              logo_path: res.data?.logo_path,
+              logo_url: res.data?.logo_url || `/api/v1/settings/logo/${res.data?.logo_path}`
+            }
+          }));
+        }
         setTimeout(() => setSuccessMessage(''), 3000);
       } catch (err: any) {
         setErrorMessage(err.response?.data?.message || 'Gagal mengunggah logo.');
@@ -316,6 +480,11 @@ export default function SettingsPage() {
         jwt_refresh_token_expiry: (formData.jwt_refresh_token_expiry || 7) * 86400,
       });
       setSuccessMessage('Pengaturan berhasil disimpan.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('institution-settings-updated', {
+          detail: { institution_name: formData.institution_name }
+        }));
+      }
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menyimpan pengaturan.');
@@ -329,22 +498,50 @@ export default function SettingsPage() {
     setSuccessMessage('');
     setErrorMessage('');
     try {
-      const res = await api.post('/settings/smtp/test');
+      const res = await api.post('/settings/smtp/test', {
+        smtp_host: formData.smtp_host,
+        smtp_port: formData.smtp_port,
+        smtp_username: formData.smtp_username,
+        smtp_password: formData.smtp_password,
+        smtp_encryption: formData.smtp_encryption,
+        smtp_sender_name: formData.smtp_sender_name,
+        smtp_sender_email: formData.smtp_sender_email,
+      });
+      setFormData((prev) => ({ ...prev, smtp_status: 'CONNECTED' }));
       setSuccessMessage(res.data?.message || 'Koneksi ke server SMTP berhasil. Email uji telah berhasil dikirim.');
-      setTimeout(() => setSuccessMessage(''), 4000);
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: any) {
+      setFormData((prev) => ({ ...prev, smtp_status: 'ERROR' }));
       setErrorMessage(err.response?.data?.message || 'Gagal mengirim email uji.');
-      setTimeout(() => setErrorMessage(''), 4000);
+      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  const handleSendMonthlyReport = async () => {
+    setSendingMonthlyReport(true);
+    setSuccessMessage('');
+    setErrorMessage('');
+    try {
+      const res = await api.post('/settings/notifications/monthly-report', {
+        recipient_email: formData.admin_notification_email,
+      });
+      setSuccessMessage(res.data?.message || 'Rekap laporan bulanan berhasil dikirim ke email admin.');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal mengirim rekap laporan bulanan.');
+      setTimeout(() => setErrorMessage(''), 5000);
+    } finally {
+      setSendingMonthlyReport(false);
     }
   };
 
   const handlePermissionClick = (
     index: number,
     featureName: string,
-    role: 'Admin' | 'Resepsionis',
-    roleKey: 'admin' | 'receptionist',
+    role: string,
+    roleKey: string,
     currentVal: boolean
   ) => {
     setPendingPermissionChange({
@@ -357,23 +554,37 @@ export default function SettingsPage() {
     setShowPermissionWarningModal(true);
   };
 
-  const confirmPermissionChange = () => {
+  const confirmPermissionChange = async () => {
     if (!pendingPermissionChange) return;
     const { featureIndex, featureName, role, roleKey } = pendingPermissionChange;
 
-    setMatrix((prev) => {
-      const next = [...prev];
-      next[featureIndex] = {
-        ...next[featureIndex],
-        [roleKey]: !next[featureIndex][roleKey],
-      };
-      return next;
-    });
+    const nextMatrix = [...matrix];
+    nextMatrix[featureIndex] = {
+      ...nextMatrix[featureIndex],
+      [roleKey]: !nextMatrix[featureIndex][roleKey],
+    };
 
+    setMatrix(nextMatrix);
     setShowPermissionWarningModal(false);
-    setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
-    setTimeout(() => setSuccessMessage(''), 3500);
-    setPendingPermissionChange(null);
+
+    try {
+      const res = await api.put('/auth/roles/matrix', { matrix: nextMatrix });
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setMatrix(res.data.data);
+      }
+      setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
+      setTimeout(() => setSuccessMessage(''), 3500);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('permissions-updated'));
+      }
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan perubahan hak akses.');
+      setTimeout(() => setErrorMessage(''), 3500);
+      fetchMatrix();
+    } finally {
+      setPendingPermissionChange(null);
+    }
   };
 
   const tabs: { key: TabType; label: string }[] = [
@@ -428,22 +639,19 @@ export default function SettingsPage() {
         </div>
 
         {activeTab === 'role' ? (
-          <div className="flex-1 w-full max-w-2xl space-y-6">
+          <div className="flex-1 w-full max-w-3xl space-y-6">
             <div>
               <div className="flex justify-end mb-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setRoleModalData({ name: '', description: '' });
-                    setShowRoleModal(true);
-                  }}
-                  className="bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-sm transition"
+                  onClick={handleOpenAddRole}
+                  className="bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-sm transition cursor-pointer"
                 >
                   + Tambah role
                 </button>
               </div>
 
-              <div className="w-full">
+              <div className="w-full overflow-x-auto">
                 <table className="w-full text-left text-xs md:text-sm">
                   <thead>
                     <tr className="text-[#3B0207] font-bold">
@@ -454,56 +662,50 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    <tr>
-                      <td className="py-3 pr-4">
-                        <span className="bg-black text-white px-4 py-1 rounded-full text-xs font-semibold inline-block">
-                          Admin
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
-                        Mengatur sistem, master data, pengguna, dan laporan
-                      </td>
-                      <td className="py-3 px-4 text-center font-semibold text-gray-800">
-                        1
-                      </td>
-                      <td className="py-3 pl-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRoleModalData({ name: 'Admin', description: 'Mengatur sistem, master data, pengguna, dan laporan' });
-                            setShowRoleModal(true);
-                          }}
-                          className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-3 pr-4">
-                        <span className="bg-[#8A001A] text-white px-3 py-1 rounded-full text-xs font-semibold inline-block">
-                          Resepsionis
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
-                        Melayani penerimaan dan pengembalian tamu
-                      </td>
-                      <td className="py-3 px-4 text-center font-semibold text-gray-800">
-                        3
-                      </td>
-                      <td className="py-3 pl-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRoleModalData({ name: 'Resepsionis', description: 'Melayani penerimaan dan pengembalian tamu' });
-                            setShowRoleModal(true);
-                          }}
-                          className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
+                    {rolesList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-gray-500 text-xs">
+                          Memuat data role...
+                        </td>
+                      </tr>
+                    ) : (
+                      rolesList.map((role) => (
+                        <tr key={role.id_role}>
+                          <td className="py-3 pr-4">
+                            <span className={`px-3.5 py-1 rounded-full text-xs font-semibold inline-block ${
+                              role.code === 'ADMIN' ? 'bg-black text-white' : 'bg-[#8A001A] text-white'
+                            }`}>
+                              {role.display_name || role.name}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
+                            {role.description || '—'}
+                          </td>
+                          <td className="py-3 px-4 text-center font-semibold text-gray-800">
+                            {role.user_count}
+                          </td>
+                          <td className="py-3 pl-4 text-center space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditRole(role)}
+                              className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            {role.code !== 'ADMIN' && role.code !== 'PETUGAS' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRole(role)}
+                                className="bg-red-600 hover:bg-red-700 text-white text-xs px-2.5 py-1 rounded-md font-medium transition cursor-pointer"
+                                title="Hapus Role"
+                              >
+                                Hapus
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -517,56 +719,61 @@ export default function SettingsPage() {
                   </span>
                 </div>
 
-                <div className="w-full">
-                  <table className="w-full text-left text-xs md:text-sm">
-                    <thead>
-                      <tr className="text-[#3B0207] font-bold">
-                        <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Fitur</span></th>
-                        <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Admin</span></th>
-                        <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Resepsionis</span></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {matrix.map((item, index) => (
-                        <tr key={item.feature}>
-                          <td className="py-2.5 text-xs text-gray-800 font-medium">{item.feature}</td>
-                          <td className="py-2.5 text-center">
-                            <div className="flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => handlePermissionClick(index, item.feature, 'Admin', 'admin', item.admin)}
-                                className="group relative focus:outline-none cursor-pointer"
-                                title={`Klik untuk mengubah izin fitur ${item.feature} untuk Admin`}
-                              >
-                                {item.admin ? (
-                                  <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2.5 text-center">
-                            <div className="flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => handlePermissionClick(index, item.feature, 'Resepsionis', 'receptionist', item.receptionist)}
-                                className="group relative focus:outline-none cursor-pointer"
-                                title={`Klik untuk mengubah izin fitur ${item.feature} untuk Resepsionis`}
-                              >
-                                {item.receptionist ? (
-                                  <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {(() => {
+                  const displayRoles: RoleMeta[] = rolesMeta.length > 0 ? rolesMeta : (
+                    rolesList.length > 0
+                      ? rolesList.map(r => ({ id_role: r.id_role, code: r.code, name: r.display_name || r.name, key: r.role_key }))
+                      : [
+                          { id_role: 1, code: 'ADMIN', name: 'Admin', key: 'admin' },
+                          { id_role: 2, code: 'PETUGAS', name: 'Resepsionis', key: 'receptionist' }
+                        ]
+                  );
+
+                  return (
+                    <div className="w-full overflow-x-auto">
+                      <table className="w-full text-left text-xs md:text-sm">
+                        <thead>
+                          <tr className="text-[#3B0207] font-bold">
+                            <th className="pb-2 font-bold min-w-[170px]"><span className="border-b border-[#3B0207] pb-0.5">Fitur</span></th>
+                            {displayRoles.map((r) => (
+                              <th key={r.key} className="pb-2 font-bold text-center px-3 min-w-[95px]">
+                                <span className="border-b border-[#3B0207] pb-0.5">{r.name}</span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {matrix.map((item, index) => (
+                            <tr key={item.feature || index}>
+                              <td className="py-2.5 text-xs text-gray-800 font-medium">{item.feature}</td>
+                              {displayRoles.map((r) => {
+                                const isGranted = Boolean(item[r.key]);
+                                return (
+                                  <td key={r.key} className="py-2.5 text-center px-3">
+                                    <div className="flex justify-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePermissionClick(index, item.feature, r.name, r.key, isGranted)}
+                                        className="group relative focus:outline-none cursor-pointer"
+                                        title={`Klik untuk mengubah izin fitur ${item.feature} untuk ${r.name}`}
+                                      >
+                                        {isGranted ? (
+                                          <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
+                                        ) : (
+                                          <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -586,7 +793,7 @@ export default function SettingsPage() {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          No. pass ID:
+                          Nama instansi / institusi:
                         </label>
                         <input
                           type="text"
@@ -620,6 +827,24 @@ export default function SettingsPage() {
                           placeholder="16.00"
                           className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Batas peringatan kartu pass (stok minimum):
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={formData.pass_warning_limit ?? 5}
+                          onChange={(e) => setFormData({ ...formData, pass_warning_limit: Number(e.target.value) })}
+                          placeholder="5"
+                          className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                        <p className="text-[11px] text-gray-500 mt-1 max-w-[280px] leading-tight">
+                          Peringatan visual akan muncul di dashboard & monitoring jika sisa kartu pass di rak kurang dari atau sama dengan angka ini.
+                        </p>
                       </div>
                     </div>
 
@@ -682,6 +907,7 @@ export default function SettingsPage() {
                         type="text"
                         value={formData.smtp_host || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_host: e.target.value })}
+                        placeholder="contoh: email-smtp.ap-southeast-1.amazonaws.com"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -693,6 +919,7 @@ export default function SettingsPage() {
                         type="number"
                         value={formData.smtp_port || 587}
                         onChange={(e) => setFormData({ ...formData, smtp_port: Number(e.target.value) })}
+                        placeholder="587 / 465 / 25"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -705,6 +932,7 @@ export default function SettingsPage() {
                         type="text"
                         value={formData.smtp_username || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_username: e.target.value })}
+                        placeholder="Username atau akun SMTP"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -725,16 +953,43 @@ export default function SettingsPage() {
 
                     <div>
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
+                        Password / App Password:
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSmtpPassword ? 'text' : 'password'}
+                          value={formData.smtp_password || ''}
+                          onChange={(e) => setFormData({ ...formData, smtp_password: e.target.value })}
+                          placeholder="••••••••••••"
+                          className="w-full px-3.5 py-1.5 pr-10 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                        >
+                          {showSmtpPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-800 mb-1">
                         Nama Pengirim
                       </label>
                       <input
                         type="text"
                         value={formData.smtp_sender_name || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_sender_name: e.target.value })}
+                        placeholder="Contoh: buku tamu SEAMOLEC"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
-                    <div>
+
+                    <div className="md:col-span-2">
                       <label className="block text-xs font-semibold text-gray-800 mb-1">
                         Email pengirim:
                       </label>
@@ -742,6 +997,7 @@ export default function SettingsPage() {
                         type="email"
                         value={formData.smtp_sender_email || ''}
                         onChange={(e) => setFormData({ ...formData, smtp_sender_email: e.target.value })}
+                        placeholder="Contoh: buktam@seamolec.org"
                         className="w-full px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                       />
                     </div>
@@ -760,18 +1016,38 @@ export default function SettingsPage() {
                       type="button"
                       onClick={handleTestEmail}
                       disabled={testingEmail}
-                      className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-6 py-2 rounded-xl font-medium text-sm shadow-sm transition disabled:opacity-50"
+                      className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-6 py-2 rounded-xl font-medium text-sm shadow-sm transition disabled:opacity-50 flex items-center space-x-1.5"
                     >
-                      {testingEmail ? 'Mengirim...' : 'Kirim email uji'}
+                      {testingEmail && (
+                        <div className="w-3.5 h-3.5 border-2 border-gray-800 border-t-transparent rounded-full animate-spin mr-1" />
+                      )}
+                      <span>{testingEmail ? 'Menguji & Mengirim...' : 'Kirim email uji'}</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="flex justify-end mt-8 pt-4">
-                  <div className="bg-[#2D6A4F] text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
-                    <span>✓</span>
-                    <span>Terhubung</span>
-                  </div>
+                  {testingEmail ? (
+                    <div className="bg-amber-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1.5 shadow-sm animate-pulse">
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menguji Koneksi...</span>
+                    </div>
+                  ) : formData.smtp_status === 'CONNECTED' ? (
+                    <div className="bg-[#2D6A4F] text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                      <span>✓</span>
+                      <span>Terhubung</span>
+                    </div>
+                  ) : formData.smtp_status === 'ERROR' ? (
+                    <div className="bg-red-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                      <span>✕</span>
+                      <span>Gagal Terhubung</span>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                      <span>○</span>
+                      <span>Belum Terhubung</span>
+                    </div>
+                  )}
                 </div>
               </form>
             )}
@@ -894,13 +1170,25 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end mt-8 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-8 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={handleSendMonthlyReport}
+                    disabled={sendingMonthlyReport}
+                    className="bg-white hover:bg-gray-50 border border-gray-800 text-gray-900 px-5 py-2 rounded-xl font-medium text-xs sm:text-sm shadow-xs transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    {sendingMonthlyReport && (
+                      <div className="w-3.5 h-3.5 border-2 border-gray-800 border-t-transparent rounded-full animate-spin mr-1" />
+                    )}
+                    <span>{sendingMonthlyReport ? 'Mengirim Laporan...' : 'Kirim Rekap Laporan Bulanan ke Email'}</span>
+                  </button>
+
                   <button
                     type="submit"
                     disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
+                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-7 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50 cursor-pointer"
                   >
-                    Simpan pengaturan
+                    {saving ? 'Menyimpan...' : 'Simpan pengaturan'}
                   </button>
                 </div>
               </form>
@@ -992,7 +1280,7 @@ export default function SettingsPage() {
                           type="text"
                           value={formData.sso_client_id || ''}
                           onChange={(e) => setFormData({ ...formData, sso_client_id: e.target.value })}
-                          placeholder="bukutamu-seamolec"
+                          placeholder="Contoh: 123456789-abc.apps.googleusercontent.com"
                           className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
                         />
                       </div>
@@ -1000,15 +1288,79 @@ export default function SettingsPage() {
                         <label className="block text-xs md:text-sm font-semibold text-gray-900 mb-1.5">
                           Client secret:
                         </label>
-                        <input
-                          type="password"
-                          value={formData.sso_client_secret || ''}
-                          onChange={(e) => setFormData({ ...formData, sso_client_secret: e.target.value })}
-                          placeholder="••••••••••••"
-                          className="w-full px-3.5 py-2 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showSsoSecret ? 'text' : 'password'}
+                            value={formData.sso_client_secret || ''}
+                            onChange={(e) => setFormData({ ...formData, sso_client_secret: e.target.value })}
+                            placeholder="GOCSPX-••••••••••••"
+                            className="w-full px-3.5 py-2 pr-10 rounded-lg border border-gray-500 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] focus:border-[#8A001A] bg-[#F9FBFA]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSsoSecret(!showSsoSecret)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                            title={showSsoSecret ? 'Sembunyikan secret' : 'Tampilkan secret'}
+                          >
+                            {showSsoSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
+
+                    {formData.sso_enabled && (
+                      <div className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/70 text-xs text-blue-900 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2 font-bold text-blue-950">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Integrasi Single Sign-On (SSO / OAuth 2.0) Siap Digunakan</span>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              formData.sso_client_id && formData.sso_client_id.trim() !== ''
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                            }`}
+                          >
+                            {formData.sso_client_id && formData.sso_client_id.trim() !== ''
+                              ? 'Client ID Terpasang'
+                              : 'Menunggu Pengisian Client ID'}
+                          </span>
+                        </div>
+
+                        <p className="text-blue-800 leading-relaxed">
+                          Sistem telah menyediakan endpoint otentikasi SSO dan tombol <strong>Masuk dengan Akun Google / SSO</strong> di halaman login. Daftarkan URL callback di bawah ini ke Google Cloud Console Anda:
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                          <div className="flex-1 bg-white px-3 py-1.5 rounded-lg border border-blue-200 font-mono text-[11px] text-gray-700 select-all overflow-x-auto">
+                            {typeof window !== 'undefined' ? `${window.location.origin}/login` : 'http://localhost:3000/login'}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof window !== 'undefined') {
+                                navigator.clipboard.writeText(`${window.location.origin}/login`);
+                                setCopiedRedirectUri(true);
+                                setTimeout(() => setCopiedRedirectUri(false), 2000);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition cursor-pointer text-center text-xs shrink-0"
+                          >
+                            {copiedRedirectUri ? 'Tersalin ✓' : 'Salin URI'}
+                          </button>
+                        </div>
+
+                        <div className="text-[11px] text-blue-700 space-y-1 pt-1 border-t border-blue-200/60">
+                          <p>
+                            • <strong>Authorized Redirect URI:</strong> Masukkan URI di atas pada Google Cloud Console (Credentials &gt; OAuth 2.0 Client ID &gt; Authorized redirect URIs).
+                          </p>
+                          <p>
+                            • <strong>Pencocokan Pengguna:</strong> Akun Google yang digunakan harus memiliki email yang sama dengan salah satu pengguna terdaftar di menu <em>Pengguna &amp; Role</em>.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1074,16 +1426,16 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => backupFileInputRef.current?.click()}
                         disabled={restoringBackup}
-                        className="border border-[#8A001A] text-[#8A001A] hover:bg-[#8A001A]/10 px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50 flex items-center space-x-1.5"
+                        className="border border-[#0284C7] text-[#0284C7] bg-white hover:bg-sky-50 px-4 py-2 rounded-lg text-xs font-semibold shadow-2xs transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
                       >
                         {restoringBackup ? (
                           <>
-                            <div className="w-3.5 h-3.5 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mr-1" />
+                            <div className="w-3.5 h-3.5 border-2 border-[#0284C7] border-t-transparent rounded-full animate-spin mr-1" />
                             <span>Memulihkan data...</span>
                           </>
                         ) : (
                           <>
-                            <span>🔄</span>
+                            <span className="text-[#0284C7]">📥</span>
                             <span>Pulihkan dari File (.json)</span>
                           </>
                         )}
@@ -1215,11 +1567,31 @@ export default function SettingsPage() {
                       </label>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleExecuteRetention}
+                        disabled={cleaningRetention}
+                        className="border border-[#8A001A] text-[#8A001A] hover:bg-[#8A001A]/10 px-4 py-2 rounded-xl text-xs font-semibold shadow-2xs transition disabled:opacity-50 flex items-center justify-center space-x-1.5 cursor-pointer"
+                        title="Hapus foto dan riwayat kunjungan yang melebihi batas retensi sekarang"
+                      >
+                        {cleaningRetention ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mr-1" />
+                            <span>Membersihkan data...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🧹</span>
+                            <span>Jalankan Pembersihan Retensi Sekarang</span>
+                          </>
+                        )}
+                      </button>
+
                       <button
                         type="submit"
                         disabled={saving}
-                        className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center space-x-1.5"
+                        className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2 rounded-xl font-semibold text-sm shadow transition disabled:opacity-50 flex items-center justify-center space-x-1.5 cursor-pointer"
                       >
                         <span>✓</span>
                         <span>Simpan pengaturan</span>
@@ -1238,7 +1610,7 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 animate-fadeIn">
             <h3 className="text-lg font-bold text-[#8A001A] mb-4">
-              {roleModalData.name ? `Edit Role: ${roleModalData.name}` : 'Tambah Role Baru'}
+              {roleModalData.id_role ? `Edit Role: ${roleModalData.name}` : '+ Tambah Role Baru'}
             </h3>
             <div className="space-y-4">
               <div>
@@ -1247,7 +1619,7 @@ export default function SettingsPage() {
                   type="text"
                   value={roleModalData.name}
                   onChange={(e) => setRoleModalData({ ...roleModalData, name: e.target.value })}
-                  placeholder="Nama role..."
+                  placeholder="Contoh: Security / Operator / Auditor"
                   className="w-full px-3 py-2 rounded-lg border border-gray-400 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
                 />
               </div>
@@ -1261,25 +1633,33 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2 rounded-lg border border-gray-400 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
                 />
               </div>
+
+              {roleModalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center space-x-2 animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{roleModalError}</span>
+                </div>
+              )}
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 type="button"
                 onClick={() => setShowRoleModal(false)}
-                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition"
+                disabled={savingRole}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowRoleModal(false);
-                  setSuccessMessage('Data role berhasil diperbarui.');
-                  setTimeout(() => setSuccessMessage(''), 3000);
-                }}
-                className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition"
+                onClick={handleSaveRole}
+                disabled={savingRole}
+                className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
               >
-                Simpan
+                {savingRole && (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                )}
+                <span>Simpan</span>
               </button>
             </div>
           </div>

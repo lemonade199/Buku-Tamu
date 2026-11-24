@@ -43,18 +43,84 @@ function GoogleLogo() {
 }
 
 function LoginForm() {
-  const { login } = useAuth();
+  const { login, loginWithSso } = useAuth();
   const searchParams = useSearchParams();
   const currentDateTime = useCurrentDateTime();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [institutionName, setInstitutionName] = useState('SEAMOLEC');
+  const [logoUrl, setLogoUrl] = useState('/seamolec-logo.png');
+  const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [ssoIssuer, setSsoIssuer] = useState('https://accounts.google.com');
+  const [ssoClientId, setSsoClientId] = useState('');
 
   useEffect(() => {
-    if (searchParams.get('reason') === 'inactive') {
+    const fetchPublicSettings = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        const res = await fetch(`${apiUrl}/settings/public`);
+        const json = await res.json();
+        if (json?.success && json?.data) {
+          if (json.data.institution_name) setInstitutionName(json.data.institution_name);
+          if (json.data.logo_url) setLogoUrl(json.data.logo_url);
+          setSsoEnabled(Boolean(json.data.sso_enabled));
+          if (json.data.sso_issuer) setSsoIssuer(json.data.sso_issuer);
+          if (json.data.sso_client_id) setSsoClientId(json.data.sso_client_id);
+        }
+      } catch {
+        // Fallback to default
+      }
+    };
+    fetchPublicSettings();
+  }, []);
+
+  // Handle OAuth callback from URL hash or query
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.startsWith('#') ? window.location.hash.substring(1) : '';
+      const params = new URLSearchParams(hash || window.location.search);
+      const token = params.get('access_token') || params.get('id_token') || params.get('credential');
+      const email = params.get('email');
+
+      if (token || email) {
+        setSsoLoading(true);
+        loginWithSso({ credential: token || undefined, email: email || undefined })
+          .catch((err: any) => {
+            setErrorMessage(err.response?.data?.message || 'Gagal masuk menggunakan akun SSO.');
+          })
+          .finally(() => setSsoLoading(false));
+      }
+    }
+  }, [loginWithSso]);
+
+  const handleSsoClick = () => {
+    setErrorMessage('');
+    if (!ssoClientId) {
+      setErrorMessage(
+        'Integrasi SSO telah siap, namun Client ID dan Secret belum dikonfigurasi di menu Pengaturan Keamanan. Silakan isi Client ID terlebih dahulu atau gunakan username & kata sandi.'
+      );
+      return;
+    }
+
+    const issuer = ssoIssuer || 'https://accounts.google.com';
+    const redirectUri = window.location.origin + '/login';
+    const authUrl = `${issuer}/o/oauth2/v2/auth?client_id=${encodeURIComponent(
+      ssoClientId
+    )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile`;
+
+    window.location.href = authUrl;
+  };
+
+  useEffect(() => {
+    const reason = searchParams.get('reason');
+    if (reason === 'inactive') {
       setErrorMessage('Akun Anda telah dinonaktifkan oleh administrator. Anda otomatis dikeluarkan dari sistem.');
+    } else if (reason === 'session_timeout') {
+      setErrorMessage('Sesi antarmuka Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.');
     }
   }, [searchParams]);
 
@@ -77,16 +143,18 @@ function LoginForm() {
       <header className="bg-[#8A001A] text-white px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shadow-md relative z-20">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center p-1 shadow-sm shrink-0">
+            {/* Logo dan nama instansi diambil dari Pengaturan. */}
             <img
-              src="/seamolec-logo.png"
-              alt="Logo SEAMOLEC"
+              src={logoUrl}
+              alt={`Logo ${institutionName}`}
               width={44}
               height={44}
+              onError={() => setLogoUrl('/seamolec-logo.png')}
               className="w-full h-full object-contain"
             />
           </div>
-          <span className={`${wordmarkFont.className} text-2xl sm:text-[28px] leading-none tracking-[0.06em] text-white`}>
-            SEAMOLEC
+          <span className={`${wordmarkFont.className} text-2xl sm:text-[28px] leading-none tracking-[0.06em] text-white uppercase truncate`}>
+            {institutionName}
           </span>
         </div>
 
@@ -183,23 +251,30 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="my-5 flex items-center gap-3 text-xs text-gray-500" aria-hidden="true">
-            <span className="h-px flex-1 bg-gray-200" />
-            atau
-            <span className="h-px flex-1 bg-gray-200" />
-          </div>
+          {/* Login Google sungguhan dari tim backend; hanya tampil kalau SSO diaktifkan admin di Pengaturan. */}
+          {ssoEnabled && (
+            <>
+              <div className="my-5 flex items-center gap-3 text-xs text-gray-500" aria-hidden="true">
+                <span className="h-px flex-1 bg-gray-200" />
+                atau
+                <span className="h-px flex-1 bg-gray-200" />
+              </div>
 
-          {/* TODO: aktifkan setelah backend menyediakan endpoint login Google (SSO). */}
-          <button
-            type="button"
-            disabled
-            aria-describedby="google-login-note"
-            className="w-full py-2.5 px-4 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-2.5 disabled:opacity-75 disabled:cursor-not-allowed"
-          >
-            <GoogleLogo />
-            <span>Masuk dengan Google</span>
-          </button>
-          
+              <button
+                type="button"
+                onClick={handleSsoClick}
+                disabled={ssoLoading}
+                className="w-full py-2.5 px-4 bg-white hover:bg-gray-50 active:bg-gray-100 border border-gray-300 rounded-xl text-xs font-semibold text-gray-800 flex items-center justify-center gap-2.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+              >
+                {ssoLoading ? (
+                  <div className="w-4 h-4 border-2 border-gray-800 border-t-transparent rounded-full animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <GoogleLogo />
+                )}
+                <span>{ssoLoading ? 'Memverifikasi akun Google...' : 'Masuk dengan Google'}</span>
+              </button>
+            </>
+          )}
         </div>
       </main>
     </div>

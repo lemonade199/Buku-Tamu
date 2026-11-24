@@ -32,7 +32,6 @@ def test_checkout_by_id_success(client):
 
     checkin_res = client.post('/api/v1/visitors/checkin', json={
         'fullname': 'Siti Rahmawati',
-        'telephone': '081233445566',
         'institution': 'Kemendikbud',
         'no_pass': '01',
         'photo_base64': SAMPLE_PHOTO
@@ -71,7 +70,6 @@ def test_checkout_by_pass_number(client):
 
     checkin_res = client.post('/api/v1/visitors/checkin', json={
         'fullname': 'Ahmad Fauzi',
-        'telephone': '089988776655',
         'institution': 'Universitas Indonesia',
         'no_pass': '02',
         'photo_base64': SAMPLE_PHOTO

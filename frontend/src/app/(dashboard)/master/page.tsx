@@ -42,6 +42,13 @@ interface UserItem {
   last_login_at?: string;
 }
 
+interface RoleOption {
+  id_role: number;
+  code: string;
+  name: string;
+  display_name?: string;
+}
+
 export default function MasterDataPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -56,6 +63,7 @@ export default function MasterDataPage() {
   const [activeTab, setActiveTab] = useState<'pass' | 'user'>('user');
   const [passes, setPasses] = useState<PassItem[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<RoleOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,13 +124,17 @@ export default function MasterDataPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [passRes, userRes] = await Promise.all([
+      const [passRes, userRes, roleRes] = await Promise.all([
         api.get<{ success: boolean; data: PassItem[] }>('/pass').catch(() => ({ data: { data: [] } })),
         api.get<{ success: boolean; data: UserItem[] }>('/auth/users').catch(() => ({ data: { data: [] } })),
+        api.get<{ success: boolean; data: RoleOption[] }>('/auth/roles').catch(() => ({ data: { data: [] } })),
       ]);
 
       setPasses(passRes.data.data || []);
       setUsers(userRes.data.data || []);
+      if (roleRes.data?.data && Array.isArray(roleRes.data.data)) {
+        setAvailableRoles(roleRes.data.data);
+      }
     } catch {
       setFeedback({ type: 'error', text: 'Gagal memuat data master.' });
     } finally {
@@ -442,6 +454,14 @@ export default function MasterDataPage() {
     return matchesSearch && matchesCondition;
   });
 
+  const getRoleDisplayName = (roleCode: string) => {
+    const found = availableRoles.find((r) => r.code === roleCode);
+    if (found) return found.display_name || found.name;
+    if (roleCode === 'ADMIN') return 'Admin';
+    if (roleCode === 'PETUGAS') return 'Resepsionis';
+    return roleCode;
+  };
+
   const filteredUsers = users
     .filter((u) => !['admin', 'petugas'].includes(u.username.toLowerCase()))
     .filter((u) => {
@@ -451,9 +471,11 @@ export default function MasterDataPage() {
         u.fullname.toLowerCase().includes(term) ||
         u.username.toLowerCase().includes(term);
 
-      const roleDisplay = u.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis';
+      const roleDisplay = getRoleDisplayName(u.role_code);
       const matchesRole =
-        userRoleFilter === 'Semua peran' || roleDisplay === userRoleFilter;
+        userRoleFilter === 'Semua peran' ||
+        roleDisplay.toLowerCase() === userRoleFilter.toLowerCase() ||
+        u.role_code.toLowerCase() === userRoleFilter.toLowerCase();
 
       return matchesSearch && matchesRole;
     });
@@ -710,8 +732,13 @@ export default function MasterDataPage() {
                 </button>
 
                 {userRoleFilterOpen && (
-                  <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-44 text-xs">
-                    {['Semua peran', 'Admin', 'Resepsionis'].map((r) => (
+                  <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs max-h-60 overflow-y-auto">
+                    {[
+                      'Semua peran',
+                      ...(availableRoles.length > 0
+                        ? availableRoles.map((r) => r.display_name || r.name)
+                        : ['Admin', 'Resepsionis']),
+                    ].map((r) => (
                       <button
                         key={r}
                         type="button"
@@ -810,10 +837,14 @@ export default function MasterDataPage() {
                         <td className="py-3 px-3 whitespace-nowrap">
                           <span
                             className={`inline-block px-3.5 py-0.5 text-[11px] font-bold rounded-full min-w-[75px] text-center shadow-2xs text-white ${
-                              roleIsAdmin ? 'bg-black' : 'bg-[#8A001A]'
+                              u.role_code === 'ADMIN'
+                                ? 'bg-black'
+                                : u.role_code === 'PETUGAS'
+                                ? 'bg-[#8A001A]'
+                                : 'bg-[#4A000E]'
                             }`}
                           >
-                            {roleIsAdmin ? 'Admin' : 'Resepsionis'}
+                            {getRoleDisplayName(u.role_code)}
                           </span>
                         </td>
 
@@ -1174,8 +1205,18 @@ export default function MasterDataPage() {
                       onChange={(e) => setAddUserForm({ ...addUserForm, role_code: e.target.value })}
                       className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] appearance-none cursor-pointer"
                     >
-                      <option value="PETUGAS">Resepsionis</option>
-                      <option value="ADMIN">Admin</option>
+                      {availableRoles.length > 0 ? (
+                        availableRoles.map((r) => (
+                          <option key={r.code} value={r.code}>
+                            {r.display_name || r.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="PETUGAS">Resepsionis</option>
+                          <option value="ADMIN">Admin</option>
+                        </>
+                      )}
                     </select>
                     <ChevronDown className="w-3.5 h-3.5 text-gray-700 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -1330,8 +1371,18 @@ export default function MasterDataPage() {
                       onChange={(e) => setEditUserForm({ ...editUserForm, role_code: e.target.value })}
                       className="w-full bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] appearance-none cursor-pointer"
                     >
-                      <option value="PETUGAS">Resepsionis</option>
-                      <option value="ADMIN">Admin</option>
+                      {availableRoles.length > 0 ? (
+                        availableRoles.map((r) => (
+                          <option key={r.code} value={r.code}>
+                            {r.display_name || r.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="PETUGAS">Resepsionis</option>
+                          <option value="ADMIN">Admin</option>
+                        </>
+                      )}
                     </select>
                     <ChevronDown className="w-3.5 h-3.5 text-gray-700 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>

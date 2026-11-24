@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import { Search, Calendar, ChevronDown, RefreshCw } from 'lucide-react';
+import { Search, Calendar, ChevronDown, RefreshCw, ShieldAlert, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import Link from 'next/link';
 import PassRack from '@/components/PassRack';
 
 interface PassMonitoringItem {
@@ -23,11 +24,16 @@ interface PassCounts {
   available: number;
   pending: number;
   in_use: number;
+  warning_limit?: number;
+  is_warning?: boolean;
 }
 
 function MonitoringPassPage() {
+  const { user, loading: authLoading } = useAuth();
+  const hasAccess = user?.permissions?.includes('*') || user?.permissions?.includes('pass.read');
+
   const [items, setItems] = useState<PassMonitoringItem[]>([]);
-  const [counts, setCounts] = useState<PassCounts>({ available: 14, pending: 3, in_use: 2 });
+  const [counts, setCounts] = useState<PassCounts>({ available: 0, pending: 0, in_use: 0 });
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,8 +45,25 @@ function MonitoringPassPage() {
 
   const [selectedReceptionist, setSelectedReceptionist] = useState('Semua resepsionis');
   const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
+  const [receptionistOptions, setReceptionistOptions] = useState<string[]>([]);
+
+  // Daftar resepsionis dari database: akun aktif berperan resepsionis, sama seperti filter di halaman Laporan.
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: { fullname: string; role_code: string | null; is_active: boolean }[] }>('/auth/users')
+      .then((res) => {
+        setReceptionistOptions(
+          (res.data.data || []).filter((u) => u.role_code === 'PETUGAS' && u.is_active).map((u) => u.fullname)
+        );
+      })
+      .catch((err) => console.error('Gagal mengambil daftar resepsionis:', err));
+  }, []);
 
   const fetchMonitoringData = useCallback(async () => {
+    if (!hasAccess) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get<{
         success: boolean;
@@ -57,7 +80,7 @@ function MonitoringPassPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [hasAccess]);
 
   useEffect(() => {
     fetchMonitoringData();
@@ -78,6 +101,15 @@ function MonitoringPassPage() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [fetchMonitoringData]);
+
+  // Nama yang benar-benar tercatat menyerahkan atau menerima kartu ikut dimasukkan, supaya filter selalu cocok dengan tabel.
+  const receptionistChoices = Array.from(
+    new Set(
+      [...receptionistOptions, ...items.flatMap((i) => [i.handed_over_by, i.received_by])].filter(
+        (n): n is string => Boolean(n) && n !== '-'
+      )
+    )
+  ).sort((a, b) => a.localeCompare(b, 'id'));
 
   const filteredItems = items.filter((item) => {
     const term = searchTerm.toLowerCase().trim();
@@ -124,6 +156,27 @@ function MonitoringPassPage() {
     return matchesSearch && matchesStatus && matchesReceptionist && matchesDate;
   });
 
+  if (!authLoading && !hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[450px] text-center p-8 bg-white rounded-2xl border border-gray-200 shadow-sm max-w-xl mx-auto mt-12 animate-fadeIn">
+        <div className="w-16 h-16 rounded-full bg-red-100 text-[#8A001A] flex items-center justify-center mb-4">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Akses Ditolak</h2>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+          Akun Anda tidak memiliki izin untuk mengakses halaman <strong>Monitoring Kartu Pass</strong>. Hubungi Administrator sistem jika Anda membutuhkan hak akses ini.
+        </p>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center space-x-2 bg-[#8A001A] hover:bg-[#6D0015] text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Kembali ke Dashboard</span>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -143,12 +196,30 @@ function MonitoringPassPage() {
         </button>
       </div>
 
+      {counts.available <= (counts.warning_limit ?? 5) && (
+        <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 flex items-start space-x-3 shadow-2xs animate-fadeIn">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs md:text-sm leading-relaxed">
+            <span className="font-bold">Peringatan Stok Kartu Pass:</span> Sisa kartu pass yang tersedia di rak hanya tersisa <span className="font-extrabold text-[#8A001A]">{counts.available}</span> kartu (batas minimum: {counts.warning_limit ?? 5}). Harap segera ingatkan pengunjung untuk mengembalikan kartu pass.
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl">
-        <div className="bg-white rounded-2xl py-4 px-5 border border-gray-200 shadow-sm flex items-center">
-          <div className="min-w-0">
-            <span className="text-sm font-medium text-gray-600 block">
-              Tersedia
-            </span>
+        <div
+          className={`bg-white rounded-2xl py-4 px-5 border shadow-sm flex items-center ${
+            counts.available <= (counts.warning_limit ?? 5) ? 'border-amber-400 ring-2 ring-amber-300/50' : 'border-gray-200'
+          }`}
+        >
+          <div className="min-w-0 w-full">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-gray-600 block">Tersedia</span>
+              {counts.available <= (counts.warning_limit ?? 5) && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                  Stok Menipis
+                </span>
+              )}
+            </div>
             <span className="text-3xl sm:text-4xl font-bold text-[#8A001A] mt-1 block tabular-nums">
               {counts.available}
             </span>
@@ -262,7 +333,7 @@ function MonitoringPassPage() {
 
           {receptionistFilterOpen && (
             <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
-              {['Semua resepsionis', 'Rina', 'Dina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
+              {['Semua resepsionis', ...receptionistChoices].map((r) => (
                 <button
                   key={r}
                   type="button"

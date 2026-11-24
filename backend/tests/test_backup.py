@@ -61,3 +61,18 @@ def test_backup_lifecycle(client):
     del_res = client.delete(f'/api/v1/settings/backup/{filename}', headers=headers)
     assert del_res.status_code == 200
     assert del_res.get_json()['success'] is True
+
+def test_retention_cleanup_lifecycle(client):
+    login_res = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_res.get_json()['data']['access_token']
+    headers = {'Authorization': f'Bearer {token}'}
+
+    res = client.post('/api/v1/settings/retention/cleanup', json={
+        'guest_photo_retention_months': 6,
+        'visit_data_retention_years': 5
+    }, headers=headers)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['success'] is True
+    assert 'photos_cleaned' in data['data']
+    assert 'visits_purged' in data['data']
