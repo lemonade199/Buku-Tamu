@@ -74,14 +74,12 @@ export default function PassRack() {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   const fetchRack = useCallback(async () => {
     try {
       const res = await api.get<{ success: boolean; summary: RackSummary; data: RackSlot[] }>('/pass/rack');
       setSlots(res.data.data || []);
       setSummary(res.data.summary);
-      setUpdatedAt(new Date());
       setError(false);
     } catch (err) {
       console.error('Gagal mengambil data rak kartu pass:', err);
@@ -104,17 +102,10 @@ export default function PassRack() {
 
   const visibleSlots = filter === 'ALL' ? slots : slots.filter((s) => s.status === filter);
 
-  const updatedLabel = updatedAt
-    ? `${String(updatedAt.getHours()).padStart(2, '0')}.${String(updatedAt.getMinutes()).padStart(2, '0')}`
-    : null;
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">Kontrol Pass Aktif</h1>
-          {updatedLabel && <p className="text-xs text-gray-600 mt-1">Diperbarui pukul {updatedLabel}</p>}
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#3B0A11] tracking-tight">Kartu Pass</h1>
         <button
           type="button"
           onClick={() => {

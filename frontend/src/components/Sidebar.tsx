@@ -50,8 +50,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
   const navItems = navItemsList
     .filter((item) => hasPermission(item.permission))
-    // Resepsionis melihat rak kartu di /pass, jadi namanya mengikuti mockup: "Kontrol Pass Aktif".
-    .map((item) => (item.href === '/pass' && !isAdmin ? { ...item, name: 'Kontrol Pass Aktif' } : item));
+    // Resepsionis melihat rak kartu di /pass, jadi menunya bernama "Kartu Pass".
+    .map((item) => (item.href === '/pass' && !isAdmin ? { ...item, name: 'Kartu Pass' } : item));
 
   // Menu di layar kecil menutup sendiri saat pindah halaman.
   useEffect(() => {
