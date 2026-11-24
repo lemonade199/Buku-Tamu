@@ -50,12 +50,9 @@ export default function MonthlyVisitsChart() {
   return (
     <section aria-labelledby="monthly-chart-title" className="bg-white rounded-2xl border border-[#E8DCCB] shadow-sm p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 mb-4">
-        <div>
-          <h2 id="monthly-chart-title" className="text-lg font-semibold text-[#3B0A11]">
-            Kunjungan per bulan, {year}
-          </h2>
-          <p className="text-xs text-gray-600">Jumlah kunjungan yang disetujui resepsionis.</p>
-        </div>
+        <h2 id="monthly-chart-title" className="text-lg font-semibold text-[#3B0A11]">
+          Kunjungan per bulan, {year}
+        </h2>
         {rows && (
           <dl className="flex gap-6 text-xs">
             <div>
