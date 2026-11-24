@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import User, Role, Setting
+from backend.app.models.entities import User, Role, Setting, AuditLog
 from backend.app.repositories.user_repository import UserRepository
 from backend.app.services.auth_service import AuthService
 from backend.app.schemas.auth import LoginRequest, RefreshRequest
@@ -36,6 +36,71 @@ def _record_failed_attempt(ip: str):
 
 def _clear_login_attempts(ip: str):
     _login_attempts.pop(ip, None)
+
+
+# --- Riwayat perubahan hak akses dan proteksi akun admin ---
+
+ACCESS_AUDIT_ACTIONS = [
+    'USER_CREATED',
+    'USER_ROLE_CHANGED',
+    'USER_ACTIVATED',
+    'USER_DEACTIVATED',
+    'ROLE_CREATED',
+    'ROLE_UPDATED',
+    'ROLE_DELETED',
+    'PERMISSION_MATRIX_UPDATED',
+]
+
+
+def _current_user_id():
+    try:
+        return int(get_jwt_identity())
+    except Exception:
+        return None
+
+
+def _record_access_audit(db, action: str, entity: str, entity_id, description: str):
+    """Mencatat siapa mengubah role/izin siapa, kapan, dan dari nilai apa ke apa."""
+    db.add(AuditLog(
+        id_user=_current_user_id(),
+        action=action,
+        entity=entity,
+        entity_id=str(entity_id) if entity_id is not None else None,
+        description=description,
+        ip_address=request.remote_addr,
+        user_agent=(request.headers.get('User-Agent') or '')[:500],
+    ))
+
+
+def _role_label(role) -> str:
+    if not role:
+        return '-'
+    if role.code == 'PETUGAS' and role.name.lower() in ['petugas', 'resepsionis']:
+        return 'Resepsionis'
+    return role.name
+
+
+def _other_active_admin_count(db, exclude_user_id: int) -> int:
+    return db.query(User).join(Role, User.id_role == Role.id_role).filter(
+        Role.code == 'ADMIN',
+        User.is_active.is_(True),
+        User.id_user != exclude_user_id,
+    ).count()
+
+
+def _admin_lockout_error(db, user, removing_admin_role: bool, deactivating: bool):
+    """Mencegah admin mengunci aksesnya sendiri atau menghapus admin aktif terakhir."""
+    current_id = _current_user_id()
+    is_admin = bool(user.role and user.role.code == 'ADMIN')
+
+    if current_id == user.id_user and deactivating:
+        return 'Anda tidak dapat menonaktifkan akun Anda sendiri.'
+    if current_id == user.id_user and removing_admin_role:
+        return 'Anda tidak dapat menurunkan role akun Anda sendiri.'
+    if is_admin and user.is_active and (removing_admin_role or deactivating):
+        if _other_active_admin_count(db, user.id_user) == 0:
+            return 'Minimal harus ada satu Administrator aktif. Tambahkan administrator lain terlebih dahulu.'
+    return None
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -333,6 +398,11 @@ def create_user():
             is_active=True
         )
         db.add(new_user)
+        db.flush()
+        _record_access_audit(
+            db, 'USER_CREATED', 'user', new_user.id_user,
+            f"Akun {new_user.fullname} (@{new_user.username}) dibuat dengan role {_role_label(role)}.",
+        )
         db.commit()
         db.refresh(new_user)
 
@@ -390,6 +460,21 @@ def update_user_by_admin(user_id: int):
                 'message': 'Email sudah digunakan oleh akun lain.'
             }), 409
 
+        old_role = user.role
+        new_role = None
+        if role_code:
+            new_role = db.query(Role).filter(Role.code == role_code.strip().upper()).first()
+        role_changes = bool(new_role and old_role and new_role.id_role != old_role.id_role)
+        deactivating = is_active is not None and not bool(is_active) and user.is_active
+
+        lockout_error = _admin_lockout_error(
+            db, user,
+            removing_admin_role=role_changes and old_role.code == 'ADMIN',
+            deactivating=deactivating,
+        )
+        if lockout_error:
+            return jsonify({'success': False, 'message': lockout_error}), 400
+
         user.fullname = fullname
         user.username = username
         user.email = email
@@ -402,10 +487,18 @@ def update_user_by_admin(user_id: int):
             except Exception:
                 pass
 
-        if role_code:
-            role = db.query(Role).filter(Role.code == role_code.strip().upper()).first()
-            if role:
-                user.id_role = role.id_role
+        if role_changes:
+            user.id_role = new_role.id_role
+            _record_access_audit(
+                db, 'USER_ROLE_CHANGED', 'user', user.id_user,
+                f"Role {user.fullname} diubah dari {_role_label(old_role)} menjadi {_role_label(new_role)}.",
+            )
+
+        if is_active is not None and bool(is_active) != user.is_active:
+            _record_access_audit(
+                db, 'USER_ACTIVATED' if is_active else 'USER_DEACTIVATED', 'user', user.id_user,
+                f"Akun {user.fullname} {'diaktifkan' if is_active else 'dinonaktifkan'}.",
+            )
 
         if is_active is not None:
             user.is_active = bool(is_active)
@@ -441,7 +534,15 @@ def toggle_user_active(user_id: int):
                 'message': 'Pengguna tidak ditemukan.'
             }), 404
 
+        lockout_error = _admin_lockout_error(db, user, removing_admin_role=False, deactivating=user.is_active)
+        if lockout_error:
+            return jsonify({'success': False, 'message': lockout_error}), 400
+
         user.is_active = not user.is_active
+        _record_access_audit(
+            db, 'USER_ACTIVATED' if user.is_active else 'USER_DEACTIVATED', 'user', user.id_user,
+            f"Akun {user.fullname} {'diaktifkan' if user.is_active else 'dinonaktifkan'}.",
+        )
         if not user.is_active:
             user_repo = UserRepository(db)
             user_repo.revoke_all_user_tokens(user.id_user)
@@ -598,6 +699,8 @@ def create_role():
             permissions=[]
         )
         db.add(new_role)
+        db.flush()
+        _record_access_audit(db, 'ROLE_CREATED', 'role', new_role.id_role, f"Role baru {name} dibuat.")
 
         setting = db.query(Setting).first()
         if setting and setting.permissions_matrix:
@@ -640,8 +743,15 @@ def update_role(id_role: int):
         if not role:
             return jsonify({'success': False, 'message': 'Role tidak ditemukan.'}), 404
 
+        changes = []
+        if role.name != name:
+            changes.append(f"nama dari {role.name} menjadi {name}")
+        if (role.description or '') != description:
+            changes.append("deskripsi diperbarui")
         role.name = name
         role.description = description
+        if changes:
+            _record_access_audit(db, 'ROLE_UPDATED', 'role', role.id_role, f"Role {name}: {', '.join(changes)}.")
         db.commit()
 
         res_data = role.to_dict()
@@ -679,6 +789,7 @@ def delete_role(id_role: int):
 
         role_key = role.code.lower()
         role_name = role.name
+        _record_access_audit(db, 'ROLE_DELETED', 'role', role.id_role, f"Role {role_name} dihapus.")
         db.delete(role)
 
         setting = db.query(Setting).first()
@@ -746,10 +857,34 @@ def update_roles_matrix():
             setting = Setting()
             db.add(setting)
 
+        # Administrator harus tetap bisa membuka Pengaturan dan mengelola pengguna, supaya tidak terkunci.
+        for item in new_matrix:
+            if item.get('id') in ('settings', 'users') and not item.get('admin'):
+                return jsonify({
+                    'success': False,
+                    'message': 'Administrator harus tetap memiliki akses "Pengguna & role" dan "Pengaturan sistem" agar tidak terkunci dari sistem.'
+                }), 400
+
+        old_matrix = list(setting.permissions_matrix) if setting.permissions_matrix else list(DEFAULT_PERMISSIONS_MATRIX)
+        old_by_id = {row.get('id') or row.get('feature'): row for row in old_matrix}
+        all_roles = db.query(Role).all()
+        role_names = {
+            ('admin' if r.code == 'ADMIN' else ('receptionist' if r.code == 'PETUGAS' else r.code.lower())): _role_label(r)
+            for r in all_roles
+        }
+        matrix_changes = []
+        for item in new_matrix:
+            old_item = old_by_id.get(item.get('id') or item.get('feature'), {})
+            for key, label in role_names.items():
+                before, after = bool(old_item.get(key)), bool(item.get(key))
+                if before != after:
+                    matrix_changes.append(f"{item.get('feature', item.get('id'))} untuk {label}: {'diberikan' if after else 'dicabut'}")
+
         setting.permissions_matrix = new_matrix
+        if matrix_changes:
+            _record_access_audit(db, 'PERMISSION_MATRIX_UPDATED', 'permissions_matrix', None, '; '.join(matrix_changes) + '.')
 
         # Dynamically compute permissions for ALL roles in database
-        all_roles = db.query(Role).all()
         for role in all_roles:
             role_key = 'admin' if role.code == 'ADMIN' else ('receptionist' if role.code == 'PETUGAS' else role.code.lower())
             role_perms = set()
@@ -787,6 +922,36 @@ def update_roles_matrix():
     except Exception as e:
         db.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+
+@auth_bp.route('/audit/access', methods=['GET'])
+@role_required('ADMIN')
+def list_access_audit():
+    """Riwayat perubahan pengguna, role, dan hak akses (terbaru di atas)."""
+    try:
+        limit = max(1, min(int(request.args.get('limit', 20)), 100))
+    except ValueError:
+        limit = 20
+    db = get_db_session()
+    try:
+        logs = (
+            db.query(AuditLog)
+            .filter(AuditLog.action.in_(ACCESS_AUDIT_ACTIONS))
+            .order_by(AuditLog.created_at.desc(), AuditLog.id_log.desc())
+            .limit(limit)
+            .all()
+        )
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': log.id_log,
+                'action': log.action,
+                'description': log.description,
+                'actor': log.user.fullname if log.user else 'Sistem',
+                'created_at': log.created_at.isoformat() if log.created_at else None,
+            } for log in logs],
+        }), 200
     finally:
         db.close()
 

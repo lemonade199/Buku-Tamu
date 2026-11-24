@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import api, { resolveServerUrl } from '@/lib/api';
+import RoleMembersModal, { RoleOption } from '@/components/RoleMembersModal';
+import AccessAuditLog, { ACCESS_AUDIT_REFRESH_EVENT } from '@/components/AccessAuditLog';
 import { CheckCircle2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 type TabType = 'umum' | 'smtp' | 'notifikasi' | 'role' | 'sso' | 'backup';
@@ -101,6 +103,7 @@ export default function SettingsPage() {
   const [savingRole, setSavingRole] = useState(false);
   const [rolesList, setRolesList] = useState<RoleItem[]>([]);
   const [rolesMeta, setRolesMeta] = useState<RoleMeta[]>([]);
+  const [membersRole, setMembersRole] = useState<RoleOption | null>(null);
   const [matrix, setMatrix] = useState<any[]>(permissionsMatrix);
   const [pendingPermissionChange, setPendingPermissionChange] = useState<{
     featureIndex: number;
@@ -161,6 +164,12 @@ export default function SettingsPage() {
     fetchMatrix();
     fetchRoles();
   }, []);
+
+  const refreshAccessData = () => {
+    fetchRoles();
+    fetchMatrix();
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(ACCESS_AUDIT_REFRESH_EVENT));
+  };
 
   const fetchRoles = async () => {
     try {
@@ -229,8 +238,7 @@ export default function SettingsPage() {
       setShowRoleModal(false);
       setRoleModalData({ name: '', description: '' });
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchRoles();
-      fetchMatrix();
+      refreshAccessData();
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Gagal menyimpan role.';
       setRoleModalError(msg);
@@ -249,8 +257,7 @@ export default function SettingsPage() {
       const res = await api.delete(`/auth/roles/${role.id_role}`);
       setSuccessMessage(res.data?.message || `Role "${role.name}" berhasil dihapus.`);
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchRoles();
-      fetchMatrix();
+      refreshAccessData();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menghapus role.');
       setTimeout(() => setErrorMessage(''), 4000);
@@ -640,6 +647,7 @@ export default function SettingsPage() {
         setMatrix(res.data.data);
       }
       setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
+      refreshAccessData();
       setTimeout(() => setSuccessMessage(''), 3500);
 
       if (typeof window !== 'undefined') {
@@ -748,8 +756,17 @@ export default function SettingsPage() {
                           <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
                             {role.description || '—'}
                           </td>
-                          <td className="py-3 px-4 text-center font-semibold text-gray-800">
-                            {role.user_count}
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMembersRole({ id_role: role.id_role, code: role.code, label: role.display_name || role.name })
+                              }
+                              aria-label={`Lihat ${role.user_count} pengguna dengan role ${role.display_name || role.name}`}
+                              className="min-w-[36px] px-3 py-1 rounded-full font-semibold text-[#8A001A] underline underline-offset-2 hover:bg-[#FAF2EA] active:bg-[#F3E6D8] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A] tabular-nums"
+                            >
+                              {role.user_count}
+                            </button>
                           </td>
                           <td className="py-3 pl-4 text-center space-x-1.5 whitespace-nowrap">
                             <button
@@ -843,6 +860,21 @@ export default function SettingsPage() {
                 })()}
               </div>
             </div>
+
+            <AccessAuditLog />
+
+            {membersRole && (
+              <RoleMembersModal
+                role={membersRole}
+                roles={rolesList.map((r) => ({ id_role: r.id_role, code: r.code, label: r.display_name || r.name }))}
+                onClose={() => setMembersRole(null)}
+                onChanged={(message) => {
+                  setSuccessMessage(message);
+                  setTimeout(() => setSuccessMessage(''), 3500);
+                  refreshAccessData();
+                }}
+              />
+            )}
           </div>
         ) : (
           <div className="flex-1 w-full max-w-2xl">
@@ -1793,3 +1825,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
