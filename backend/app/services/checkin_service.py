@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta, timezone
 from flask import current_app
 from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from backend.app.models.entities import Visitor, Pass, AuditLog, Setting, AppNotification
 from backend.app.utils.photo_storage import save_visitor_photo
 from backend.app.utils.datetime_utils import utc_now
@@ -48,6 +49,36 @@ class CheckinService:
         photo_base64 = data.get('photo_base64')
         if not photo_base64:
             raise ValueError("Foto pengunjung wajib diambil melalui kamera sebelum registrasi.")
+
+        fullname = (data.get('fullname') or '').strip()
+        if not fullname:
+            raise ValueError("Nama lengkap pengunjung wajib diisi.")
+
+        # Validasi anti-duplikasi nama:
+        # 1. Cek apakah ada tamu dengan nama yang sama yang masih aktif berada di dalam gedung (APPROVED & belum check-out)
+        active_duplicate = self.db.query(Visitor).filter(
+            func.lower(Visitor.fullname) == fullname.lower(),
+            Visitor.status == 'APPROVED',
+            Visitor.check_out_at.is_(None)
+        ).first()
+        if active_duplicate:
+            card_no = active_duplicate.pass_card.no_pass if active_duplicate.pass_card else str(active_duplicate.id_pass)
+            raise ValueError(
+                f"Pengunjung dengan nama '{fullname}' saat ini masih tercatat aktif di dalam gedung (Kartu pass #{card_no}). "
+                f"Harap lakukan check-out terlebih dahulu sebelum mendaftar kembali."
+            )
+
+        # 2. Cek apakah ada tamu dengan nama yang sama yang sedang dalam antrean verifikasi (PENDING)
+        pending_duplicate = self.db.query(Visitor).filter(
+            func.lower(Visitor.fullname) == fullname.lower(),
+            Visitor.status == 'PENDING'
+        ).first()
+        if pending_duplicate:
+            card_no = pending_duplicate.pass_card.no_pass if pending_duplicate.pass_card else str(pending_duplicate.id_pass)
+            raise ValueError(
+                f"Pengunjung dengan nama '{fullname}' sudah terdaftar dan sedang dalam antrean verifikasi resepsionis (Kartu pass #{card_no}). "
+                f"Mohon tunggu konfirmasi dari petugas resepsionis."
+            )
 
         pass_card = None
         id_pass = data.get('id_pass')
