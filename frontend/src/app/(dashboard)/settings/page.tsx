@@ -42,6 +42,23 @@ interface SettingsData {
   auto_backup_schedule?: string;
 }
 
+interface RoleItem {
+  id_role: number;
+  code: string;
+  name: string;
+  description: string;
+  user_count: number;
+  display_name: string;
+  role_key: string;
+}
+
+interface RoleMeta {
+  id_role: number;
+  code: string;
+  name: string;
+  key: string;
+}
+
 const permissionsMatrix = [
   { feature: 'Dashboard', admin: true, receptionist: true },
   { feature: 'Penerimaan tamu', admin: false, receptionist: true },
@@ -74,13 +91,19 @@ export default function SettingsPage() {
   const [sendingMonthlyReport, setSendingMonthlyReport] = useState(false);
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
-  const [roleModalData, setRoleModalData] = useState({ name: '', description: '' });
-  const [matrix, setMatrix] = useState(permissionsMatrix);
+  const [roleModalData, setRoleModalData] = useState<{ id_role?: number; name: string; description: string }>({
+    name: '',
+    description: '',
+  });
+  const [savingRole, setSavingRole] = useState(false);
+  const [rolesList, setRolesList] = useState<RoleItem[]>([]);
+  const [rolesMeta, setRolesMeta] = useState<RoleMeta[]>([]);
+  const [matrix, setMatrix] = useState<any[]>(permissionsMatrix);
   const [pendingPermissionChange, setPendingPermissionChange] = useState<{
     featureIndex: number;
     featureName: string;
-    role: 'Admin' | 'Resepsionis';
-    roleKey: 'admin' | 'receptionist';
+    role: string;
+    roleKey: string;
     currentVal: boolean;
   } | null>(null);
   const [showPermissionWarningModal, setShowPermissionWarningModal] = useState(false);
@@ -128,16 +151,97 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchSettings();
     fetchMatrix();
+    fetchRoles();
   }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const res = await api.get('/auth/roles');
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setRolesList(res.data.data);
+      }
+    } catch {
+      // fallback
+    }
+  };
 
   const fetchMatrix = async () => {
     try {
       const res = await api.get('/auth/roles/matrix');
-      if (res.data?.success && Array.isArray(res.data?.data)) {
-        setMatrix(res.data.data);
+      if (res.data?.success) {
+        if (Array.isArray(res.data?.data)) {
+          setMatrix(res.data.data);
+        }
+        if (Array.isArray(res.data?.roles)) {
+          setRolesMeta(res.data.roles);
+        }
       }
     } catch {
       // fallback to permissionsMatrix
+    }
+  };
+
+  const handleOpenAddRole = () => {
+    setRoleModalData({ id_role: undefined, name: '', description: '' });
+    setShowRoleModal(true);
+  };
+
+  const handleOpenEditRole = (role: RoleItem) => {
+    setRoleModalData({
+      id_role: role.id_role,
+      name: role.display_name || role.name,
+      description: role.description || '',
+    });
+    setShowRoleModal(true);
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleModalData.name.trim()) {
+      setErrorMessage('Nama role wajib diisi.');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    setSavingRole(true);
+    try {
+      if (roleModalData.id_role) {
+        const res = await api.put(`/auth/roles/${roleModalData.id_role}`, {
+          name: roleModalData.name,
+          description: roleModalData.description,
+        });
+        setSuccessMessage(res.data?.message || 'Data role berhasil diperbarui.');
+      } else {
+        const res = await api.post('/auth/roles', {
+          name: roleModalData.name,
+          description: roleModalData.description,
+        });
+        setSuccessMessage(res.data?.message || 'Role baru berhasil ditambahkan.');
+      }
+      setShowRoleModal(false);
+      setRoleModalData({ name: '', description: '' });
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchRoles();
+      fetchMatrix();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan role.');
+      setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async (role: RoleItem) => {
+    if (!window.confirm(`Yakin ingin menghapus role "${role.display_name || role.name}"?`)) {
+      return;
+    }
+    try {
+      const res = await api.delete(`/auth/roles/${role.id_role}`);
+      setSuccessMessage(res.data?.message || `Role "${role.name}" berhasil dihapus.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchRoles();
+      fetchMatrix();
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menghapus role.');
+      setTimeout(() => setErrorMessage(''), 4000);
     }
   };
 
@@ -431,8 +535,8 @@ export default function SettingsPage() {
   const handlePermissionClick = (
     index: number,
     featureName: string,
-    role: 'Admin' | 'Resepsionis',
-    roleKey: 'admin' | 'receptionist',
+    role: string,
+    roleKey: string,
     currentVal: boolean
   ) => {
     setPendingPermissionChange({
@@ -529,22 +633,19 @@ export default function SettingsPage() {
         </div>
 
         {activeTab === 'role' ? (
-          <div className="flex-1 w-full max-w-2xl space-y-6">
+          <div className="flex-1 w-full max-w-3xl space-y-6">
             <div>
               <div className="flex justify-end mb-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setRoleModalData({ name: '', description: '' });
-                    setShowRoleModal(true);
-                  }}
-                  className="bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-sm transition"
+                  onClick={handleOpenAddRole}
+                  className="bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-sm transition cursor-pointer"
                 >
                   + Tambah role
                 </button>
               </div>
 
-              <div className="w-full">
+              <div className="w-full overflow-x-auto">
                 <table className="w-full text-left text-xs md:text-sm">
                   <thead>
                     <tr className="text-[#3B0207] font-bold">
@@ -555,56 +656,50 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    <tr>
-                      <td className="py-3 pr-4">
-                        <span className="bg-black text-white px-4 py-1 rounded-full text-xs font-semibold inline-block">
-                          Admin
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
-                        Mengatur sistem, master data, pengguna, dan laporan
-                      </td>
-                      <td className="py-3 px-4 text-center font-semibold text-gray-800">
-                        1
-                      </td>
-                      <td className="py-3 pl-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRoleModalData({ name: 'Admin', description: 'Mengatur sistem, master data, pengguna, dan laporan' });
-                            setShowRoleModal(true);
-                          }}
-                          className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-3 pr-4">
-                        <span className="bg-[#8A001A] text-white px-3 py-1 rounded-full text-xs font-semibold inline-block">
-                          Resepsionis
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
-                        Melayani penerimaan dan pengembalian tamu
-                      </td>
-                      <td className="py-3 px-4 text-center font-semibold text-gray-800">
-                        3
-                      </td>
-                      <td className="py-3 pl-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRoleModalData({ name: 'Resepsionis', description: 'Melayani penerimaan dan pengembalian tamu' });
-                            setShowRoleModal(true);
-                          }}
-                          className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
+                    {rolesList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-gray-500 text-xs">
+                          Memuat data role...
+                        </td>
+                      </tr>
+                    ) : (
+                      rolesList.map((role) => (
+                        <tr key={role.id_role}>
+                          <td className="py-3 pr-4">
+                            <span className={`px-3.5 py-1 rounded-full text-xs font-semibold inline-block ${
+                              role.code === 'ADMIN' ? 'bg-black text-white' : 'bg-[#8A001A] text-white'
+                            }`}>
+                              {role.display_name || role.name}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
+                            {role.description || '—'}
+                          </td>
+                          <td className="py-3 px-4 text-center font-semibold text-gray-800">
+                            {role.user_count}
+                          </td>
+                          <td className="py-3 pl-4 text-center space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditRole(role)}
+                              className="bg-[#6B7280] hover:bg-[#4B5563] text-white text-xs px-3.5 py-1 rounded-md font-medium transition cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            {role.code !== 'ADMIN' && role.code !== 'PETUGAS' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRole(role)}
+                                className="bg-red-600 hover:bg-red-700 text-white text-xs px-2.5 py-1 rounded-md font-medium transition cursor-pointer"
+                                title="Hapus Role"
+                              >
+                                Hapus
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -618,56 +713,61 @@ export default function SettingsPage() {
                   </span>
                 </div>
 
-                <div className="w-full">
-                  <table className="w-full text-left text-xs md:text-sm">
-                    <thead>
-                      <tr className="text-[#3B0207] font-bold">
-                        <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Fitur</span></th>
-                        <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Admin</span></th>
-                        <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Resepsionis</span></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {matrix.map((item, index) => (
-                        <tr key={item.feature}>
-                          <td className="py-2.5 text-xs text-gray-800 font-medium">{item.feature}</td>
-                          <td className="py-2.5 text-center">
-                            <div className="flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => handlePermissionClick(index, item.feature, 'Admin', 'admin', item.admin)}
-                                className="group relative focus:outline-none cursor-pointer"
-                                title={`Klik untuk mengubah izin fitur ${item.feature} untuk Admin`}
-                              >
-                                {item.admin ? (
-                                  <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2.5 text-center">
-                            <div className="flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => handlePermissionClick(index, item.feature, 'Resepsionis', 'receptionist', item.receptionist)}
-                                className="group relative focus:outline-none cursor-pointer"
-                                title={`Klik untuk mengubah izin fitur ${item.feature} untuk Resepsionis`}
-                              >
-                                {item.receptionist ? (
-                                  <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {(() => {
+                  const displayRoles: RoleMeta[] = rolesMeta.length > 0 ? rolesMeta : (
+                    rolesList.length > 0
+                      ? rolesList.map(r => ({ id_role: r.id_role, code: r.code, name: r.display_name || r.name, key: r.role_key }))
+                      : [
+                          { id_role: 1, code: 'ADMIN', name: 'Admin', key: 'admin' },
+                          { id_role: 2, code: 'PETUGAS', name: 'Resepsionis', key: 'receptionist' }
+                        ]
+                  );
+
+                  return (
+                    <div className="w-full overflow-x-auto">
+                      <table className="w-full text-left text-xs md:text-sm">
+                        <thead>
+                          <tr className="text-[#3B0207] font-bold">
+                            <th className="pb-2 font-bold min-w-[170px]"><span className="border-b border-[#3B0207] pb-0.5">Fitur</span></th>
+                            {displayRoles.map((r) => (
+                              <th key={r.key} className="pb-2 font-bold text-center px-3 min-w-[95px]">
+                                <span className="border-b border-[#3B0207] pb-0.5">{r.name}</span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {matrix.map((item, index) => (
+                            <tr key={item.feature || index}>
+                              <td className="py-2.5 text-xs text-gray-800 font-medium">{item.feature}</td>
+                              {displayRoles.map((r) => {
+                                const isGranted = Boolean(item[r.key]);
+                                return (
+                                  <td key={r.key} className="py-2.5 text-center px-3">
+                                    <div className="flex justify-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePermissionClick(index, item.feature, r.name, r.key, isGranted)}
+                                        className="group relative focus:outline-none cursor-pointer"
+                                        title={`Klik untuk mengubah izin fitur ${item.feature} untuk ${r.name}`}
+                                      >
+                                        {isGranted ? (
+                                          <span className="w-5 h-5 rounded-full bg-[#2D6A4F] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-white flex items-center justify-center text-xs font-bold shadow-sm transition">✓</span>
+                                        ) : (
+                                          <span className="w-5 h-5 rounded-full bg-[#E5E7EB] group-hover:scale-110 group-hover:ring-2 group-hover:ring-[#8A001A] text-gray-500 flex items-center justify-center text-xs font-bold transition">—</span>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1504,7 +1604,7 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-6 animate-fadeIn">
             <h3 className="text-lg font-bold text-[#8A001A] mb-4">
-              {roleModalData.name ? `Edit Role: ${roleModalData.name}` : 'Tambah Role Baru'}
+              {roleModalData.id_role ? `Edit Role: ${roleModalData.name}` : '+ Tambah Role Baru'}
             </h3>
             <div className="space-y-4">
               <div>
@@ -1513,7 +1613,7 @@ export default function SettingsPage() {
                   type="text"
                   value={roleModalData.name}
                   onChange={(e) => setRoleModalData({ ...roleModalData, name: e.target.value })}
-                  placeholder="Nama role..."
+                  placeholder="Contoh: Security / Operator / Auditor"
                   className="w-full px-3 py-2 rounded-lg border border-gray-400 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
                 />
               </div>
@@ -1532,20 +1632,21 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowRoleModal(false)}
-                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition"
+                disabled={savingRole}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowRoleModal(false);
-                  setSuccessMessage('Data role berhasil diperbarui.');
-                  setTimeout(() => setSuccessMessage(''), 3000);
-                }}
-                className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition"
+                onClick={handleSaveRole}
+                disabled={savingRole}
+                className="px-5 py-2 rounded-xl bg-[#8A001A] hover:bg-[#68001a] text-white text-xs font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
               >
-                Simpan
+                {savingRole && (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                )}
+                <span>Simpan</span>
               </button>
             </div>
           </div>
