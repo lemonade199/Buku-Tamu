@@ -43,6 +43,7 @@ export default function MonitoringPassPage() {
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
 
   const [selectedReceptionist, setSelectedReceptionist] = useState('Semua resepsionis');
+  const [receptionistList, setReceptionistList] = useState<string[]>([]);
   const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
 
   const fetchMonitoringData = useCallback(async () => {
@@ -87,6 +88,24 @@ export default function MonitoringPassPage() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [fetchMonitoringData]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get<{ success: boolean; data: { fullname: string; username: string }[] }>('/auth/users');
+        if (res.data?.data && Array.isArray(res.data.data)) {
+          const names = res.data.data
+            .map((u) => u.fullname?.trim())
+            .filter((name): name is string => Boolean(name));
+          const uniqueNames = Array.from(new Set(names));
+          setReceptionistList(uniqueNames);
+        }
+      } catch (err) {
+        console.error('Gagal mengambil daftar pengguna untuk filter pass:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const filteredItems = items.filter((item) => {
     const term = searchTerm.toLowerCase().trim();
@@ -309,8 +328,8 @@ export default function MonitoringPassPage() {
           </button>
 
           {receptionistFilterOpen && (
-            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
-              {['Semua resepsionis', 'Rina', 'Dina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
+            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-52 max-h-60 overflow-y-auto text-xs">
+              {['Semua resepsionis', ...receptionistList].map((r) => (
                 <button
                   key={r}
                   type="button"

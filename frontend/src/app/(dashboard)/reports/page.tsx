@@ -25,6 +25,7 @@ export default function ReportsPage() {
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
   const [selectedReceptionist, setSelectedReceptionist] = useState<string>('Semua resepsionis');
+  const [receptionistList, setReceptionistList] = useState<string[]>([]);
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -80,6 +81,24 @@ export default function ReportsPage() {
   useEffect(() => {
     fetchVisitors();
   }, [fetchVisitors]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get<{ success: boolean; data: { fullname: string; username: string }[] }>('/auth/users');
+        if (res.data?.data && Array.isArray(res.data.data)) {
+          const names = res.data.data
+            .map((u) => u.fullname?.trim())
+            .filter((name): name is string => Boolean(name));
+          const uniqueNames = Array.from(new Set(names));
+          setReceptionistList(uniqueNames);
+        }
+      } catch (err) {
+        console.error('Gagal mengambil daftar pengguna untuk filter resepsionis:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const handleInitiateCheckout = (visitor: VisitorItem) => {
     setCheckoutVisitor({
@@ -232,7 +251,9 @@ export default function ReportsPage() {
             <span>
               {startDate && endDate
                 ? `${startDate.slice(8, 10)}/${startDate.slice(5, 7)} – ${endDate.slice(8, 10)}/${endDate.slice(5, 7)}/${endDate.slice(0, 4)}`
-                : '01/11 – 10/11/2026'}
+                : startDate
+                ? `Mulai ${startDate.slice(8, 10)}/${startDate.slice(5, 7)}/${startDate.slice(0, 4)}`
+                : 'Semua Tanggal'}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
           </button>
@@ -306,8 +327,8 @@ export default function ReportsPage() {
           </button>
 
           {receptionistFilterOpen && (
-            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
-              {['Semua resepsionis', 'Rina', 'Dina', 'Tasha', 'Petugas Resepsionis'].map((r) => (
+            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-52 max-h-60 overflow-y-auto text-xs">
+              {['Semua resepsionis', ...receptionistList].map((r) => (
                 <button
                   key={r}
                   type="button"
