@@ -104,3 +104,43 @@ def test_login_rate_limiting(client):
         assert blocked_res.get_json()['code'] == 'TOO_MANY_REQUESTS'
     finally:
         client.application.config['TEST_RATE_LIMIT'] = False
+
+def test_role_management_lifecycle(client):
+    login_res = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_res.get_json()['data']['access_token']
+    headers = {'Authorization': f'Bearer {token}'}
+
+    # 1. List roles
+    list_res = client.get('/api/v1/auth/roles', headers=headers)
+    assert list_res.status_code == 200
+    roles = list_res.get_json()['data']
+    assert len(roles) >= 2
+
+    # 2. Add new role
+    create_res = client.post('/api/v1/auth/roles', json={
+        'name': 'Petugas Keamanan',
+        'description': 'Menjaga keamanan pos depan dan inspeksi kendaraan.'
+    }, headers=headers)
+    assert create_res.status_code == 201
+    new_role = create_res.get_json()['data']
+    role_id = new_role['id_role']
+    assert new_role['name'] == 'Petugas Keamanan'
+
+    # 3. Check matrix has new role column
+    matrix_res = client.get('/api/v1/auth/roles/matrix', headers=headers)
+    assert matrix_res.status_code == 200
+    m_data = matrix_res.get_json()
+    assert len(m_data['roles']) >= 3
+    assert any(r['id_role'] == role_id for r in m_data['roles'])
+
+    # 4. Update role
+    update_res = client.put(f'/api/v1/auth/roles/{role_id}', json={
+        'name': 'Chief Security',
+        'description': 'Kepala pos keamanan.'
+    }, headers=headers)
+    assert update_res.status_code == 200
+    assert update_res.get_json()['data']['name'] == 'Chief Security'
+
+    # 5. Delete custom role
+    del_res = client.delete(f'/api/v1/auth/roles/{role_id}', headers=headers)
+    assert del_res.status_code == 200

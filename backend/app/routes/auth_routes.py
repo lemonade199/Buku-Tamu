@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import json
 from collections import defaultdict
@@ -552,15 +553,179 @@ FEATURE_PERMS_MAP = {
     "settings": ["settings.manage"],
 }
 
+@auth_bp.route('/roles', methods=['GET'])
+@jwt_required()
+def list_roles():
+    db = get_db_session()
+    try:
+        roles = db.query(Role).order_by(Role.id_role.asc()).all()
+        result = []
+        for r in roles:
+            data = r.to_dict()
+            data['user_count'] = len(r.users)
+            data['display_name'] = 'Resepsionis' if r.code == 'PETUGAS' and r.name.lower() in ['petugas', 'resepsionis'] else r.name
+            data['role_key'] = 'admin' if r.code == 'ADMIN' else ('receptionist' if r.code == 'PETUGAS' else r.code.lower())
+            result.append(data)
+        return jsonify({'success': True, 'data': result}), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/roles', methods=['POST'])
+@role_required('ADMIN')
+def create_role():
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    description = (data.get('description') or '').strip()
+    code = (data.get('code') or '').strip()
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Nama role wajib diisi.'}), 400
+
+    if not code:
+        code = re.sub(r'[^A-Za-z0-9]', '_', name).upper()
+
+    db = get_db_session()
+    try:
+        existing = db.query(Role).filter((Role.code == code) | (Role.name == name)).first()
+        if existing:
+            return jsonify({'success': False, 'message': f"Role dengan nama atau kode '{name}' sudah ada."}), 400
+
+        new_role = Role(
+            code=code,
+            name=name,
+            description=description,
+            is_active=True,
+            permissions=[]
+        )
+        db.add(new_role)
+
+        setting = db.query(Setting).first()
+        if setting and setting.permissions_matrix:
+            matrix = list(setting.permissions_matrix)
+            role_key = code.lower()
+            for item in matrix:
+                if role_key not in item:
+                    item[role_key] = False
+            setting.permissions_matrix = matrix
+
+        db.commit()
+        res_data = new_role.to_dict()
+        res_data['user_count'] = 0
+        res_data['display_name'] = new_role.name
+        res_data['role_key'] = new_role.code.lower()
+        return jsonify({
+            'success': True,
+            'message': f"Role '{name}' berhasil ditambahkan.",
+            'data': res_data
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+
+@auth_bp.route('/roles/<int:id_role>', methods=['PUT'])
+@role_required('ADMIN')
+def update_role(id_role: int):
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    description = (data.get('description') or '').strip()
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Nama role wajib diisi.'}), 400
+
+    db = get_db_session()
+    try:
+        role = db.query(Role).filter(Role.id_role == id_role).first()
+        if not role:
+            return jsonify({'success': False, 'message': 'Role tidak ditemukan.'}), 404
+
+        role.name = name
+        role.description = description
+        db.commit()
+
+        res_data = role.to_dict()
+        res_data['user_count'] = len(role.users)
+        res_data['display_name'] = 'Resepsionis' if role.code == 'PETUGAS' and role.name.lower() in ['petugas', 'resepsionis'] else role.name
+        res_data['role_key'] = 'admin' if role.code == 'ADMIN' else ('receptionist' if role.code == 'PETUGAS' else role.code.lower())
+        return jsonify({
+            'success': True,
+            'message': f"Data role '{name}' berhasil diperbarui.",
+            'data': res_data
+        }), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+
+@auth_bp.route('/roles/<int:id_role>', methods=['DELETE'])
+@role_required('ADMIN')
+def delete_role(id_role: int):
+    db = get_db_session()
+    try:
+        role = db.query(Role).filter(Role.id_role == id_role).first()
+        if not role:
+            return jsonify({'success': False, 'message': 'Role tidak ditemukan.'}), 404
+
+        if role.code in ['ADMIN', 'PETUGAS']:
+            return jsonify({'success': False, 'message': 'Role sistem utama tidak dapat dihapus.'}), 400
+
+        if len(role.users) > 0:
+            return jsonify({
+                'success': False,
+                'message': f"Role '{role.name}' tidak dapat dihapus karena masih digunakan oleh {len(role.users)} pengguna."
+            }), 400
+
+        role_key = role.code.lower()
+        role_name = role.name
+        db.delete(role)
+
+        setting = db.query(Setting).first()
+        if setting and setting.permissions_matrix:
+            matrix = list(setting.permissions_matrix)
+            for item in matrix:
+                item.pop(role_key, None)
+            setting.permissions_matrix = matrix
+
+        db.commit()
+        return jsonify({
+            'success': True,
+            'message': f"Role '{role_name}' berhasil dihapus."
+        }), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        db.close()
+
 @auth_bp.route('/roles/matrix', methods=['GET'])
 @jwt_required()
 def get_roles_matrix():
     db = get_db_session()
     try:
+        roles = db.query(Role).order_by(Role.id_role.asc()).all()
+        roles_meta = []
+        for r in roles:
+            roles_meta.append({
+                'id_role': r.id_role,
+                'code': r.code,
+                'name': 'Resepsionis' if r.code == 'PETUGAS' and r.name.lower() in ['petugas', 'resepsionis'] else r.name,
+                'key': 'admin' if r.code == 'ADMIN' else ('receptionist' if r.code == 'PETUGAS' else r.code.lower())
+            })
+
         setting = db.query(Setting).first()
-        matrix = setting.permissions_matrix if setting and setting.permissions_matrix else DEFAULT_PERMISSIONS_MATRIX
+        matrix = list(setting.permissions_matrix) if setting and setting.permissions_matrix else list(DEFAULT_PERMISSIONS_MATRIX)
+
+        # Make sure every role key is present in each matrix row
+        for item in matrix:
+            for rm in roles_meta:
+                if rm['key'] not in item:
+                    item[rm['key']] = False
+
         return jsonify({
             'success': True,
+            'roles': roles_meta,
             'data': matrix
         }), 200
     finally:
@@ -583,42 +748,34 @@ def update_roles_matrix():
 
         setting.permissions_matrix = new_matrix
 
-        # Compute dynamic permissions for PETUGAS and ADMIN
-        petugas_perms = set()
-        admin_perms = set()
-        all_admin_enabled = True
+        # Dynamically compute permissions for ALL roles in database
+        all_roles = db.query(Role).all()
+        for role in all_roles:
+            role_key = 'admin' if role.code == 'ADMIN' else ('receptionist' if role.code == 'PETUGAS' else role.code.lower())
+            role_perms = set()
+            all_enabled = True
 
-        for item in new_matrix:
-            fid = item.get('id')
-            if not fid:
-                fname = item.get('feature', '').lower()
-                for def_item in DEFAULT_PERMISSIONS_MATRIX:
-                    if def_item['feature'].lower() in fname or fname in def_item['feature'].lower():
-                        fid = def_item['id']
-                        break
+            for item in new_matrix:
+                fid = item.get('id')
+                if not fid:
+                    fname = item.get('feature', '').lower()
+                    for def_item in DEFAULT_PERMISSIONS_MATRIX:
+                        if def_item['feature'].lower() in fname or fname in def_item['feature'].lower():
+                            fid = def_item['id']
+                            break
 
-            perms = FEATURE_PERMS_MAP.get(fid, [item.get('perm')] if item.get('perm') else [])
+                perms = FEATURE_PERMS_MAP.get(fid, [item.get('perm')] if item.get('perm') else [])
+                is_granted = bool(item.get(role_key))
 
-            if item.get('receptionist'):
-                petugas_perms.update(perms)
+                if is_granted:
+                    role_perms.update(perms)
+                else:
+                    all_enabled = False
 
-            if item.get('admin'):
-                admin_perms.update(perms)
+            if role.code == 'ADMIN' and all_enabled:
+                role.permissions = ["*"]
             else:
-                all_admin_enabled = False
-
-        # Update PETUGAS role
-        petugas_role = db.query(Role).filter(Role.code == 'PETUGAS').first()
-        if petugas_role:
-            petugas_role.permissions = sorted(list(petugas_perms))
-
-        # Update ADMIN role
-        admin_role = db.query(Role).filter(Role.code == 'ADMIN').first()
-        if admin_role:
-            if all_admin_enabled:
-                admin_role.permissions = ["*"]
-            else:
-                admin_role.permissions = sorted(list(admin_perms))
+                role.permissions = sorted(list(role_perms))
 
         db.commit()
 
