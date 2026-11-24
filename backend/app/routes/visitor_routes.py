@@ -275,7 +275,7 @@ def list_visitors():
         db.close()
 
 @visitor_bp.route('/export/excel', methods=['GET'])
-@permission_required('reports.read', 'reports.export')
+@permission_required('reports.export')
 def export_visitors_excel():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
@@ -334,7 +334,7 @@ def export_visitors_excel():
         db.close()
 
 @visitor_bp.route('/export/pdf', methods=['GET'])
-@permission_required('reports.read', 'reports.export')
+@permission_required('reports.export')
 def export_visitors_pdf():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
