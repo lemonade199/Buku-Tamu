@@ -134,3 +134,39 @@ def test_visitor_photo_protection(client):
     auth_query_res = client.get(f'/api/v1/visitors/{visitor_id}/photo?token={token}')
     assert auth_query_res.status_code == 200
     assert auth_query_res.mimetype == 'image/jpeg'
+
+def test_checkin_duplicate_name_blocked(client):
+    login_res = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    token = login_res.get_json()['data']['access_token']
+    auth_headers = {'Authorization': f'Bearer {token}'}
+
+    # 1. First checkin with pass 05
+    res1 = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Rudi Hermawan',
+        'no_pass': '05',
+        'photo_base64': SAMPLE_PHOTO_BASE64
+    })
+    assert res1.status_code == 201
+    vis1_id = res1.get_json()['data']['id_visitor']
+
+    # 2. Second checkin with same name while first is PENDING -> must be rejected (400)
+    res2 = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'rudi hermawan',
+        'no_pass': '06',
+        'photo_base64': SAMPLE_PHOTO_BASE64
+    })
+    assert res2.status_code == 400
+    assert 'antrean verifikasi' in res2.get_json()['message'].lower()
+
+    # 3. Approve first checkin -> visitor becomes active inside building
+    approve_res = client.post(f'/api/v1/visitors/{vis1_id}/approve', headers=auth_headers)
+    assert approve_res.status_code == 200
+
+    # 4. Attempt checkin while still active inside building -> must be rejected (400)
+    res3 = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Rudi HERMAWAN',
+        'no_pass': '06',
+        'photo_base64': SAMPLE_PHOTO_BASE64
+    })
+    assert res3.status_code == 400
+    assert 'masih tercatat aktif' in res3.get_json()['message'].lower()

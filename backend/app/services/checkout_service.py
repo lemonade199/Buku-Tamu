@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
-from backend.app.models.entities import Visitor, Pass, AuditLog
+from backend.app.models.entities import Visitor, Pass, AuditLog, AppNotification
 from backend.app.utils.datetime_utils import utc_now
 
 class CheckoutService:
@@ -77,7 +77,15 @@ class CheckoutService:
         )
         self.db.add(audit)
 
-        # 4. Commit atomic transaction
+        # 4. Trigger AppNotification event for checkout
+        notif = AppNotification(
+            type='CHECKOUT',
+            title='Tamu Selesai Kunjungan (Check-Out)',
+            message=f"{visitor.fullname} ({visitor.institution or 'Umum'}) telah menyelesaikan kunjungan dan check-out. Kartu pass #{pass_no_str} telah dikembalikan."
+        )
+        self.db.add(notif)
+
+        # 5. Commit atomic transaction
         self.db.commit()
 
         return {

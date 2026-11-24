@@ -89,3 +89,33 @@ def test_checkout_by_pass_number(client):
     assert res_data['data']['pass']['no_pass'] == '02'
     assert res_data['data']['pass']['status'] == 'AVAILABLE'
     assert res_data['data']['visitor']['fullname'] == 'Ahmad Fauzi'
+
+def test_checkout_triggers_app_notification(client):
+    login_res = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    token = login_res.get_json()['data']['access_token']
+    auth_headers = {'Authorization': f'Bearer {token}'}
+
+    # 1. Checkin visitor
+    checkin_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Hendra Notifikasi',
+        'institution': 'PT Notif Jaya',
+        'no_pass': '03',
+        'photo_base64': SAMPLE_PHOTO
+    })
+    assert checkin_res.status_code == 201
+    visitor_id = checkin_res.get_json()['data']['id_visitor']
+
+    # 2. Approve
+    client.post(f'/api/v1/visitors/{visitor_id}/approve', headers=auth_headers)
+
+    # 3. Checkout
+    checkout_res = client.post(f'/api/v1/visitors/{visitor_id}/checkout', headers=auth_headers)
+    assert checkout_res.status_code == 200
+
+    # 4. Fetch notifications to verify CHECKOUT AppNotification exists
+    notif_res = client.get('/api/v1/settings/notifications', headers=auth_headers)
+    assert notif_res.status_code == 200
+    notifs = notif_res.get_json()['data']
+    checkout_notif = next((n for n in notifs if n['type'] == 'CHECKOUT'), None)
+    assert checkout_notif is not None
+    assert 'Hendra Notifikasi' in checkout_notif['message']

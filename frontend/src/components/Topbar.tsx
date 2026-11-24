@@ -207,6 +207,10 @@ export default function Topbar() {
                           <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
                             <UserCheck className="w-4 h-4" />
                           </div>
+                        ) : notif.type === 'CHECKOUT' ? (
+                          <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                            <LogOut className="w-4 h-4" />
+                          </div>
                         ) : notif.type === 'BACKUP_FAIL' ? (
                           <div className="w-7 h-7 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center">
                             <AlertTriangle className="w-4 h-4" />
