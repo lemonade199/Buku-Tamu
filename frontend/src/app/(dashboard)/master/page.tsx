@@ -599,7 +599,7 @@ export default function MasterDataPage() {
                 className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Tambah pass</span>
+                <span> Tambah pass</span>
               </button>
             </div>
           </div>
@@ -774,7 +774,7 @@ export default function MasterDataPage() {
                 className="inline-flex items-center space-x-1.5 px-4 py-1.5 bg-[#6B0014] hover:bg-[#52000F] text-white text-xs font-bold rounded-full shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Tambah pengguna</span>
+                <span> Tambah pengguna</span>
               </button>
             </div>
           </div>

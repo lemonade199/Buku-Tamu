@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from pydantic import ValidationError
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import Pass, Visitor, AuditLog
+from backend.app.models.entities import Pass, Visitor, AuditLog, Setting
 from backend.app.schemas.pass_schema import PassCreateRequest, PassStatusUpdateRequest
 from backend.app.middleware.auth import role_required, permission_required
 from backend.app.utils.datetime_utils import utc_now

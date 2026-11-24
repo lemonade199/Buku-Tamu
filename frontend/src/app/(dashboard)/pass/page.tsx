@@ -32,7 +32,7 @@ export default function MonitoringPassPage() {
   const hasAccess = user?.permissions?.includes('*') || user?.permissions?.includes('pass.read');
 
   const [items, setItems] = useState<PassMonitoringItem[]>([]);
-  const [counts, setCounts] = useState<PassCounts>({ available: 14, pending: 3, in_use: 2 });
+  const [counts, setCounts] = useState<PassCounts>({ available: 0, pending: 0, in_use: 0 });
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
