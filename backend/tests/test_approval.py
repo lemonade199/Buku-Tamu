@@ -124,3 +124,63 @@ def test_receptionist_rejection_workflow(client):
     assert status_res.get_json()['data']['status'] == 'REJECTED'
     assert status_res.get_json()['data']['rejection_reason'] == rejection_reason_text
     assert status_res.get_json()['data']['is_active'] is False
+
+def test_custom_role_with_permissions_can_approve_and_export(client):
+    from backend.app.models.base import get_db_session
+    from backend.app.models.entities import Role, User
+    from backend.app.utils.security import hash_password
+
+    # 1. Create a custom role with permissions for approval and export
+    db = get_db_session()
+    sup_role = Role(
+        code='SUPERVISOR',
+        name='Supervisor Operasional',
+        description='Pengawas operasional buku tamu',
+        permissions=['dashboard.read', 'visitors.read', 'visitors.approve', 'reports.read', 'reports.export']
+    )
+    db.add(sup_role)
+    db.commit()
+
+    sup_user = User(
+        fullname='Supervisor User',
+        username='supervisor',
+        email='supervisor@example.com',
+        hash_password=hash_password('Super123!'),
+        id_role=sup_role.id_role,
+        is_active=True
+    )
+    db.add(sup_user)
+    db.commit()
+    db.close()
+
+    # 2. Login as supervisor
+    login_res = client.post('/api/v1/auth/login', json={'username': 'supervisor', 'password': 'Super123!'})
+    assert login_res.status_code == 200
+    token = login_res.get_json()['data']['access_token']
+
+    # 3. Create a pending registration
+    reg_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Custom Role',
+        'institution': 'Instansi Penguji',
+        'no_pass': '06',
+        'photo_base64': SAMPLE_PHOTO
+    })
+    assert reg_res.status_code == 201
+    visitor_id = reg_res.get_json()['data']['id_visitor']
+
+    # 4. Supervisor can view pending registrations without 403
+    pending_res = client.get('/api/v1/visitors/pending', headers={'Authorization': f'Bearer {token}'})
+    assert pending_res.status_code == 200
+
+    # 5. Supervisor can approve visitor registration without 403
+    approve_res = client.post(f'/api/v1/visitors/{visitor_id}/approve', headers={'Authorization': f'Bearer {token}'})
+    assert approve_res.status_code == 200
+    assert approve_res.get_json()['data']['status'] == 'APPROVED'
+
+    # 6. Supervisor can export excel and pdf without 403
+    excel_res = client.get('/api/v1/visitors/export/excel', headers={'Authorization': f'Bearer {token}'})
+    assert excel_res.status_code == 200
+
+    pdf_res = client.get('/api/v1/visitors/export/pdf', headers={'Authorization': f'Bearer {token}'})
+    assert pdf_res.status_code == 200
+

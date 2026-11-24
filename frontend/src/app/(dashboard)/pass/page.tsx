@@ -332,7 +332,7 @@ function MonitoringPassPage() {
           </button>
 
           {receptionistFilterOpen && (
-            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
+            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-52 max-h-60 overflow-y-auto text-xs">
               {['Semua resepsionis', ...receptionistChoices].map((r) => (
                 <button
                   key={r}

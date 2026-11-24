@@ -20,8 +20,10 @@ def role_required(*allowed_roles):
         return wrapper
     return decorator
 
-def permission_required(required_permission):
-    """Decorator to enforce specific granular permission dynamically."""
+def permission_required(*required_permissions):
+    """Decorator to enforce granular permissions dynamically.
+    Grants access if user is ADMIN, has wildcard '*', or has ANY of the required_permissions.
+    """
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
@@ -39,11 +41,17 @@ def permission_required(required_permission):
                 if not user or not user.is_active or not user.role:
                     return jsonify({'success': False, 'message': 'Akses ditolak: Pengguna tidak valid atau nonaktif.'}), 403
 
+                # Admin always has full access
+                if user.role.code == 'ADMIN':
+                    return fn(*args, **kwargs)
+
                 perms = user.role.permissions if isinstance(user.role.permissions, list) else json.loads(user.role.permissions or '[]')
-                if "*" not in perms and required_permission not in perms:
+                has_perm = "*" in perms or any(p in perms for p in required_permissions)
+                if not has_perm:
+                    perm_str = ", ".join(required_permissions)
                     return jsonify({
                         'success': False,
-                        'message': f'Akses ditolak: Anda tidak memiliki izin untuk fitur ini ({required_permission}).'
+                        'message': f'Akses ditolak: Anda tidak memiliki izin untuk fitur ini ({perm_str}).'
                     }), 403
             finally:
                 db.close()

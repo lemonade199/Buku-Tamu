@@ -8,11 +8,12 @@ from pydantic import ValidationError
 from sqlalchemy import or_
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import Visitor
-from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest, RejectRegistrationRequest
+from backend.app.models.entities import Visitor, Pass, AuditLog
+from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest, RejectRegistrationRequest, VisitorUpdateRequest
 from backend.app.services.checkin_service import CheckinService
 from backend.app.services.checkout_service import CheckoutService
-from backend.app.middleware.auth import role_required
+from backend.app.middleware.auth import role_required, permission_required
+from backend.app.utils.datetime_utils import utc_now
 from backend.app.utils.photo_storage import get_photo_path
 from backend.app.utils.export_service import generate_excel, generate_pdf
 
@@ -90,7 +91,7 @@ def checkin_visitor():
         db.close()
 
 @visitor_bp.route('/pending', methods=['GET'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('visitors.read', 'visitors.create')
 def list_pending_registrations():
     db = get_db_session()
     try:
@@ -107,7 +108,7 @@ def list_pending_registrations():
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/approve', methods=['POST'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('visitors.approve', 'visitors.checkin', 'pass.manage')
 def approve_visitor_registration(id_visitor: int):
     user_id = int(get_jwt_identity())
     ip_addr = request.remote_addr
@@ -135,7 +136,7 @@ def approve_visitor_registration(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/reject', methods=['POST'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('visitors.approve', 'visitors.checkin', 'pass.manage')
 def reject_visitor_registration(id_visitor: int):
     data = request.get_json(silent=True) or {}
     try:
@@ -274,7 +275,7 @@ def list_visitors():
         db.close()
 
 @visitor_bp.route('/export/excel', methods=['GET'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('reports.read', 'reports.export')
 def export_visitors_excel():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
@@ -333,7 +334,7 @@ def export_visitors_excel():
         db.close()
 
 @visitor_bp.route('/export/pdf', methods=['GET'])
-@role_required('ADMIN', 'PETUGAS')
+@permission_required('reports.read', 'reports.export')
 def export_visitors_pdf():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
@@ -418,6 +419,108 @@ def get_visitor_detail(id_visitor: int):
         if not visitor:
             return jsonify({'success': False, 'message': 'Data pengunjung tidak ditemukan.'}), 404
         return jsonify({'success': True, 'data': visitor.to_dict()}), 200
+    finally:
+        db.close()
+
+@visitor_bp.route('/<int:id_visitor>', methods=['PUT'])
+@permission_required('visitors.update', 'visitors.manage', 'visitors.create')
+def update_visitor(id_visitor: int):
+    data = request.get_json(silent=True) or {}
+    try:
+        req = VisitorUpdateRequest(**data)
+    except ValidationError as e:
+        return jsonify({
+            'success': False,
+            'message': 'Validasi formulir perbaruan pengunjung gagal.',
+            'errors': e.errors()
+        }), 422
+
+    user_id = int(get_jwt_identity())
+    db = get_db_session()
+    try:
+        visitor = db.query(Visitor).filter(Visitor.id_visitor == id_visitor).with_for_update().first()
+        if not visitor:
+            return jsonify({'success': False, 'message': 'Data pengunjung tidak ditemukan.'}), 404
+
+        now = utc_now()
+        changes = []
+
+        if req.id_pass is not None and req.id_pass != visitor.id_pass:
+            if visitor.status != 'PENDING':
+                return jsonify({
+                    'success': False,
+                    'message': f"Nomor kartu pass hanya dapat dipindahkan saat status permohonan masih PENDING (status saat ini: {visitor.status})."
+                }), 400
+
+            new_pass = db.query(Pass).filter(Pass.id_pass == req.id_pass).with_for_update().first()
+            if not new_pass:
+                return jsonify({'success': False, 'message': 'Kartu pass baru tidak ditemukan.'}), 404
+
+            if new_pass.status != 'AVAILABLE':
+                return jsonify({
+                    'success': False,
+                    'message': f"Kartu pass #{new_pass.no_pass} tidak tersedia (status saat ini: {new_pass.status})."
+                }), 400
+
+            old_pass = db.query(Pass).filter(Pass.id_pass == visitor.id_pass).with_for_update().first()
+            if old_pass:
+                old_pass.status = 'AVAILABLE'
+                old_pass.updated_at = now
+
+            new_pass.status = 'PENDING'
+            new_pass.updated_at = now
+
+            changes.append(f"pass {old_pass.no_pass if old_pass else visitor.id_pass} -> {new_pass.no_pass}")
+            visitor.id_pass = new_pass.id_pass
+
+        if req.fullname is not None:
+            clean_name = req.fullname.strip()
+            if clean_name != visitor.fullname:
+                changes.append(f"nama '{visitor.fullname}' -> '{clean_name}'")
+                visitor.fullname = clean_name
+
+        if req.institution is not None:
+            clean_inst = req.institution.strip() or None
+            if clean_inst != visitor.institution:
+                changes.append(f"instansi '{visitor.institution}' -> '{clean_inst}'")
+                visitor.institution = clean_inst
+
+        if req.representing is not None:
+            clean_rep = req.representing.strip() or None
+            if clean_rep != visitor.representing:
+                changes.append(f"tujuan pejabat '{visitor.representing}' -> '{clean_rep}'")
+                visitor.representing = clean_rep
+
+        if req.purpose is not None:
+            clean_purp = req.purpose.strip() or None
+            if clean_purp != visitor.purpose:
+                changes.append("keperluan kunjungan diperbarui")
+                visitor.purpose = clean_purp
+
+        if not changes:
+            return jsonify({
+                'success': True,
+                'message': 'Tidak ada perubahan data yang disimpan.',
+                'data': visitor.to_dict()
+            }), 200
+
+        visitor.updated_at = now
+
+        audit = AuditLog(
+            id_user=user_id,
+            action='VISITOR_UPDATE',
+            entity='visitors',
+            entity_id=str(visitor.id_visitor),
+            description=f"Perbarui data pengunjung {visitor.fullname} (ID: {visitor.id_visitor}) oleh user ID {user_id}. Perubahan: {', '.join(changes)}."
+        )
+        db.add(audit)
+        db.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f"Data pengunjung '{visitor.fullname}' berhasil diperbarui.",
+            'data': visitor.to_dict()
+        }), 200
     finally:
         db.close()
 

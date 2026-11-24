@@ -217,6 +217,8 @@ export default function ReportsPage() {
             <span>
               {startDate && endDate
                 ? `${startDate.slice(8, 10)}/${startDate.slice(5, 7)} – ${endDate.slice(8, 10)}/${endDate.slice(5, 7)}/${endDate.slice(0, 4)}`
+                : startDate
+                ? `Mulai ${startDate.slice(8, 10)}/${startDate.slice(5, 7)}/${startDate.slice(0, 4)}`
                 : 'Semua tanggal'}
             </span>
             <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
@@ -291,7 +293,7 @@ export default function ReportsPage() {
           </button>
 
           {receptionistFilterOpen && (
-            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-48 text-xs">
+            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-52 max-h-60 overflow-y-auto text-xs">
               {['Semua resepsionis', ...receptionistChoices].map((r) => (
                 <button
                   key={r}

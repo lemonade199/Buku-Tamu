@@ -75,11 +75,13 @@ export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
+  const hasAccess = user?.role_code === 'ADMIN' || user?.permissions?.includes('*') || user?.permissions?.includes('settings.manage');
+
   useEffect(() => {
-    if (!authLoading && user && user.role_code !== 'ADMIN') {
+    if (!authLoading && user && !hasAccess) {
       router.replace('/dashboard');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, hasAccess]);
 
   const [activeTab, setActiveTab] = useState<TabType>('umum');
   const [loading, setLoading] = useState(true);

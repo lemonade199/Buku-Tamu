@@ -54,11 +54,13 @@ export default function MasterDataPage() {
   const router = useRouter();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
+  const hasAccess = user?.role_code === 'ADMIN' || user?.permissions?.includes('*') || user?.permissions?.includes('master.manage');
+
   useEffect(() => {
-    if (!authLoading && user && user.role_code !== 'ADMIN') {
+    if (!authLoading && user && !hasAccess) {
       router.replace('/dashboard');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, hasAccess]);
 
   const [activeTab, setActiveTab] = useState<'pass' | 'user'>('user');
   const [passes, setPasses] = useState<PassItem[]>([]);
@@ -146,7 +148,7 @@ export default function MasterDataPage() {
     fetchData();
   }, [fetchData]);
 
-  if (!authLoading && user && user.role_code !== 'ADMIN') {
+  if (!authLoading && user && !hasAccess) {
     return (
       <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-2xl border border-rose-200 shadow-sm text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">

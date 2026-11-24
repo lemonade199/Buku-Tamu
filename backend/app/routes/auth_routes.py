@@ -267,7 +267,7 @@ def update_password():
         db.close()
 
 @auth_bp.route('/users', methods=['GET'])
-@role_required('ADMIN')
+@jwt_required()
 def get_all_users():
     db = get_db_session()
     try:
@@ -547,7 +547,7 @@ FEATURE_PERMS_MAP = {
     "pass_handover": ["visitors.checkin", "visitors.approve"],
     "checkout": ["visitors.checkout"],
     "pass_monitoring": ["pass.read", "pass.manage"],
-    "reports": ["reports.read"],
+    "reports": ["reports.read", "reports.export"],
     "master": ["master.manage"],
     "users": ["users.manage"],
     "settings": ["settings.manage"],
