@@ -95,6 +95,7 @@ export default function SettingsPage() {
     name: '',
     description: '',
   });
+  const [roleModalError, setRoleModalError] = useState('');
   const [savingRole, setSavingRole] = useState(false);
   const [rolesList, setRolesList] = useState<RoleItem[]>([]);
   const [rolesMeta, setRolesMeta] = useState<RoleMeta[]>([]);
@@ -183,6 +184,7 @@ export default function SettingsPage() {
 
   const handleOpenAddRole = () => {
     setRoleModalData({ id_role: undefined, name: '', description: '' });
+    setRoleModalError('');
     setShowRoleModal(true);
   };
 
@@ -192,16 +194,17 @@ export default function SettingsPage() {
       name: role.display_name || role.name,
       description: role.description || '',
     });
+    setRoleModalError('');
     setShowRoleModal(true);
   };
 
   const handleSaveRole = async () => {
     if (!roleModalData.name.trim()) {
-      setErrorMessage('Nama role wajib diisi.');
-      setTimeout(() => setErrorMessage(''), 3000);
+      setRoleModalError('Nama role wajib diisi.');
       return;
     }
     setSavingRole(true);
+    setRoleModalError('');
     try {
       if (roleModalData.id_role) {
         const res = await api.put(`/auth/roles/${roleModalData.id_role}`, {
@@ -222,7 +225,9 @@ export default function SettingsPage() {
       fetchRoles();
       fetchMatrix();
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan role.');
+      const msg = err.response?.data?.message || 'Gagal menyimpan role.';
+      setRoleModalError(msg);
+      setErrorMessage(msg);
       setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setSavingRole(false);
@@ -1627,6 +1632,13 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2 rounded-lg border border-gray-400 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A]"
                 />
               </div>
+
+              {roleModalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center space-x-2 animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{roleModalError}</span>
+                </div>
+              )}
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
