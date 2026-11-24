@@ -41,7 +41,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const isAdmin = user?.role_code === 'ADMIN';
 
   const userPerms = user?.permissions || [];
-  const hasWildcard = userPerms.includes('*') || user?.role_code === 'ADMIN';
+  const hasWildcard = userPerms.includes('*');
   const hasPermission = (perm?: string) => {
     if (!perm) return true;
     if (hasWildcard) return true;

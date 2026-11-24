@@ -5,10 +5,8 @@ import axios from 'axios';
 import { resolveServerUrl } from '@/lib/api';
 import { Lobster, Questrial } from 'next/font/google';
 import { Camera, Clock, RefreshCw, CheckCircle2, AlertCircle, X, Hourglass, CreditCard } from 'lucide-react';
-
-// Bentuk huruf geometris dan bulat, paling dekat dengan wordmark resmi SEAMOLEC.
 const wordmarkFont = Questrial({ weight: '400', subsets: ['latin'], display: 'swap' });
-// Huruf sambung tebal untuk tulisan "Selamat datang".
+
 const welcomeFont = Lobster({ weight: '400', subsets: ['latin'], display: 'swap' });
 
 const WELCOME_SECONDS = 10;

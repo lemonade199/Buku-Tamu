@@ -1,12 +1,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { formatJam } from '@/lib/datetime';
 import { VisitorItem } from '@/types';
 import { Search, User, CheckCircle2, AlertCircle, X, RefreshCw } from 'lucide-react';
 
 export default function ReceptionGuestIntakePage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  const userPerms = user?.permissions || [];
+  const hasAccess = userPerms.includes('*') || userPerms.includes('visitors.create') || userPerms.includes('visitors.read');
+
+  useEffect(() => {
+    if (!authLoading && user && !hasAccess) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router, hasAccess]);
+
   const [visitors, setVisitors] = useState<VisitorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

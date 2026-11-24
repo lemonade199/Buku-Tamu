@@ -1,12 +1,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { formatJam } from '@/lib/datetime';
 import { LogOut, Search, RefreshCw, CheckCircle2, AlertCircle, User, X } from 'lucide-react';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 
 export default function CheckoutPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  const userPerms = user?.permissions || [];
+  const hasAccess = userPerms.includes('*') || userPerms.includes('visitors.checkout');
+
+  useEffect(() => {
+    if (!authLoading && user && !hasAccess) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router, hasAccess]);
+
   const [activeVisitors, setActiveVisitors] = useState<ActiveVisitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
