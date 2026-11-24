@@ -187,3 +187,105 @@ def test_pending_pass_status_inactive_cancels_visitor(client):
     vis_data = vis_res.get_json()['data']
     assert vis_data['status'] == 'REJECTED'
     assert 'dinonaktifkan' in vis_data['rejection_reason'].lower()
+
+def test_delete_pass_with_relation_validation(client):
+    login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_admin.get_json()['data']['access_token']
+
+    # 1. Create a brand new pass with no relations
+    create_res = client.post('/api/v1/pass', json={'no_pass': '88', 'slot': 'Slot 88'}, headers={'Authorization': f'Bearer {token}'})
+    assert create_res.status_code == 201
+    pass_id = create_res.get_json()['data']['id_pass']
+
+    # 2. Deleting an unused pass succeeds
+    del_res = client.delete(f'/api/v1/pass/{pass_id}', headers={'Authorization': f'Bearer {token}'})
+    assert del_res.status_code == 200
+    assert del_res.get_json()['success'] is True
+
+    # 3. Create another pass and attach a visitor
+    create_res2 = client.post('/api/v1/pass', json={'no_pass': '89', 'slot': 'Slot 89'}, headers={'Authorization': f'Bearer {token}'})
+    assert create_res2.status_code == 201
+    pass_id_with_visitor = create_res2.get_json()['data']['id_pass']
+
+    import io
+    from PIL import Image
+    import base64
+    img = Image.new('RGB', (100, 100), color=(10, 20, 30))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    photo_b64 = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+
+    checkin_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Terkait Pass 89',
+        'institution': 'PT Relasi',
+        'purpose': 'Testing pass relation validation on delete',
+        'id_pass': pass_id_with_visitor,
+        'photo_base64': photo_b64
+    })
+    assert checkin_res.status_code == 201
+
+    # 4. Deleting pass with active/pending visitor fails (status 400)
+    del_fail_res = client.delete(f'/api/v1/pass/{pass_id_with_visitor}', headers={'Authorization': f'Bearer {token}'})
+    assert del_fail_res.status_code == 400
+    assert 'tidak dapat dihapus' in del_fail_res.get_json()['message'].lower()
+
+def test_update_visitor_endpoint(client):
+    login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_admin.get_json()['data']['access_token']
+
+    import io
+    from PIL import Image
+    import base64
+    img = Image.new('RGB', (100, 100), color=(50, 60, 70))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    photo_b64 = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+
+    # Checkin with pass 5
+    checkin_res = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Awal',
+        'institution': 'Instansi Lama',
+        'purpose': 'Keperluan Lama',
+        'id_pass': 5,
+        'photo_base64': photo_b64
+    })
+    assert checkin_res.status_code == 201
+    visitor_id = checkin_res.get_json()['data']['id_visitor']
+
+    # Update visitor profile details
+    update_res = client.put(f'/api/v1/visitors/{visitor_id}', json={
+        'fullname': 'Tamu Revisi',
+        'institution': 'Instansi Baru',
+        'purpose': 'Keperluan Baru'
+    }, headers={'Authorization': f'Bearer {token}'})
+    assert update_res.status_code == 200
+    updated_data = update_res.get_json()['data']
+    assert updated_data['fullname'] == 'Tamu Revisi'
+    assert updated_data['institution'] == 'Instansi Baru'
+    assert updated_data['purpose'] == 'Keperluan Baru'
+
+    # Reassign pass from 5 to 6 (pass 6 is AVAILABLE)
+    reassign_res = client.put(f'/api/v1/visitors/{visitor_id}', json={
+        'id_pass': 6
+    }, headers={'Authorization': f'Bearer {token}'})
+    assert reassign_res.status_code == 200
+    assert reassign_res.get_json()['data']['id_pass'] == 6
+
+    # Verify pass 5 returned to AVAILABLE and pass 6 is now PENDING
+    pass_res = client.get('/api/v1/pass', headers={'Authorization': f'Bearer {token}'})
+    passes_list = pass_res.get_json()['data']
+    pass_5 = next(p for p in passes_list if p['id_pass'] == 5)
+    pass_6 = next(p for p in passes_list if p['id_pass'] == 6)
+    assert pass_5['status'] == 'AVAILABLE'
+    assert pass_6['status'] == 'PENDING'
+
+    # Approve visitor
+    approve_res = client.post(f'/api/v1/visitors/{visitor_id}/approve', headers={'Authorization': f'Bearer {token}'})
+    assert approve_res.status_code == 200
+
+    # Attempting to reassign pass on APPROVED visitor must fail with 400
+    fail_reassign = client.put(f'/api/v1/visitors/{visitor_id}', json={
+        'id_pass': 7
+    }, headers={'Authorization': f'Bearer {token}'})
+    assert fail_reassign.status_code == 400
+    assert 'PENDING' in fail_reassign.get_json()['message']

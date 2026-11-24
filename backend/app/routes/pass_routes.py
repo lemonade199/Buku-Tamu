@@ -290,6 +290,49 @@ def update_pass_details(id_pass: int):
     finally:
         db.close()
 
+@pass_bp.route('/<int:id_pass>', methods=['DELETE'])
+@permission_required('pass.delete', 'pass.manage', 'master.manage')
+def delete_pass(id_pass: int):
+    user_id = int(get_jwt_identity())
+    db = get_db_session()
+    try:
+        pass_card = db.query(Pass).filter(Pass.id_pass == id_pass).with_for_update().first()
+        if not pass_card:
+            return jsonify({'success': False, 'message': 'Kartu pass tidak ditemukan.'}), 404
+
+        if pass_card.status in ['IN_USE', 'PENDING']:
+            return jsonify({
+                'success': False,
+                'message': f"Kartu pass #{pass_card.no_pass} sedang berstatus {pass_card.status} (sedang digunakan atau dalam antrean registrasi) sehingga tidak dapat dihapus."
+            }), 400
+
+        visitor_count = db.query(Visitor).filter(Visitor.id_pass == id_pass).count()
+        if visitor_count > 0:
+            return jsonify({
+                'success': False,
+                'message': f"Kartu pass #{pass_card.no_pass} tidak dapat dihapus karena memiliki riwayat dengan {visitor_count} data kunjungan. Silakan nonaktifkan kartu jika tidak ingin digunakan lagi."
+            }), 400
+
+        no_pass = pass_card.no_pass
+        db.delete(pass_card)
+
+        audit = AuditLog(
+            id_user=user_id,
+            action='PASS_DELETE',
+            entity='pass',
+            entity_id=str(id_pass),
+            description=f"Kartu pass #{no_pass} berhasil dihapus permanen oleh user ID {user_id}."
+        )
+        db.add(audit)
+        db.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f"Kartu pass #{no_pass} berhasil dihapus."
+        }), 200
+    finally:
+        db.close()
+
 @pass_bp.route('/<int:id_pass>/status', methods=['PUT'])
 @jwt_required()
 def update_pass_status(id_pass: int):

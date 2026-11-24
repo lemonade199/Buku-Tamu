@@ -31,3 +31,11 @@ class CheckoutRequest(BaseModel):
 class RejectRegistrationRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=500, description="Alasan penolakan registrasi")
 
+class VisitorUpdateRequest(BaseModel):
+    fullname: Optional[str] = Field(None, min_length=2, max_length=150, description="Nama lengkap pengunjung")
+    institution: Optional[str] = Field(None, max_length=150, description="Asal instansi atau perusahaan")
+    representing: Optional[str] = Field(None, max_length=150, description="Pihak atau pejabat yang dikunjungi")
+    purpose: Optional[str] = Field(None, max_length=1000, description="Tujuan atau keperluan kunjungan")
+    id_pass: Optional[int] = Field(None, description="ID pass baru jika ingin dipindahkan (hanya berlaku jika status PENDING)")
+
+
