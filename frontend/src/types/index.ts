@@ -82,6 +82,12 @@ export interface RecentActivity {
   date: string;
   time: string;
   description: string;
+  action?: string;
+  actor?: string | null;
+  visitor_name?: string | null;
+  no_pass?: string | null;
+  from_status?: string | null;
+  to_status?: string | null;
 }
 
 export interface DashboardMetrics {

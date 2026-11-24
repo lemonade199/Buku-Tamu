@@ -83,6 +83,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/dashboard');
   };
 
+  // Data dari /auth/me (dicek berkala di layout dashboard) menyegarkan role dan izin tanpa perlu login ulang,
+  // jadi menu sidebar langsung mengikuti perubahan hak akses dari Pengaturan.
+  useEffect(() => {
+    const onMe = (e: Event) => {
+      const fresh = (e as CustomEvent<Partial<User>>).detail;
+      if (!fresh) return;
+      setUser((prev) => {
+        if (!prev) return prev;
+        const merged = { ...prev, ...fresh, avatar: prev.avatar };
+        localStorage.setItem('user_info', JSON.stringify(merged));
+        return merged;
+      });
+    };
+    window.addEventListener('auth-me-updated', onMe);
+    return () => window.removeEventListener('auth-me-updated', onMe);
+  }, []);
+
   const updateUser = (updated: Partial<User>) => {
     if (!user) return;
     const merged = { ...user, ...updated };

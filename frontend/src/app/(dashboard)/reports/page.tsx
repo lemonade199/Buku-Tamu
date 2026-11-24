@@ -5,6 +5,7 @@ import { parseServerDate } from '@/lib/datetime';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { VisitorItem } from '@/types';
+import MonthlyVisitsChart from '@/components/MonthlyVisitsChart';
 import {
   Search,
   Calendar,
@@ -204,6 +205,8 @@ export default function ReportsPage() {
           </button>
         </div>
       )}
+
+      <MonthlyVisitsChart />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

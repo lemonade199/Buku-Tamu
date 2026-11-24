@@ -1291,7 +1291,7 @@ export default function SettingsPage() {
                       className="w-full max-w-md px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                     />
                     <p id="notif-email-help" className="mt-1 text-[11px] text-gray-600">
-                      Tersimpan otomatis setelah selesai mengetik.
+                      Tersimpan otomatis.
                     </p>
                   </div>
                 </div>
@@ -1509,9 +1509,7 @@ export default function SettingsPage() {
                     <h4 className="text-xs font-bold text-[#8A001A] mb-2">
                       Operasi Cadangan & Pemulihan
                     </h4>
-                    <p className="text-xs text-gray-600 mb-3">
-                      Buat salinan data lengkap sistem untuk pencegahan kehilangan data, atau pulihkan database dari salinan sebelumnya.
-                    </p>
+                  
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
@@ -1526,7 +1524,7 @@ export default function SettingsPage() {
                           </>
                         ) : (
                           <>
-                            <span>💾</span>
+
                             <span>Cadangkan Sekarang (Backup)</span>
                           </>
                         )}
@@ -1553,7 +1551,7 @@ export default function SettingsPage() {
                           </>
                         ) : (
                           <>
-                            <span className="text-[#0284C7]">📥</span>
+                            
                             <span>Pulihkan dari File (.json)</span>
                           </>
                         )}

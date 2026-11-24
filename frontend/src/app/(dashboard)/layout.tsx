@@ -35,7 +35,10 @@ export default function DashboardLayout({
     const checkMe = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       try {
-        await api.get('/auth/me');
+        const res = await api.get('/auth/me');
+        if (res.data?.success && res.data?.data) {
+          window.dispatchEvent(new CustomEvent('auth-me-updated', { detail: res.data.data }));
+        }
       } catch (err: any) {
         if (err.response?.status === 401) {
           localStorage.removeItem('access_token');
@@ -53,6 +56,8 @@ export default function DashboardLayout({
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    // Hak akses diubah di Pengaturan: segarkan izin sekarang juga agar menu sidebar ikut berubah.
+    window.addEventListener('permissions-updated', checkMe);
 
     // Idle session timeout based on settings
     let sessionTimeoutHours = 8;
@@ -87,6 +92,7 @@ export default function DashboardLayout({
       clearInterval(checkActiveInterval);
       clearInterval(idleTimer);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('permissions-updated', checkMe);
       activityEvents.forEach((ev) => window.removeEventListener(ev, handleUserActivity));
     };
   }, [isAuthenticated, router]);

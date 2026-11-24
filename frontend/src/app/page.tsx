@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { resolveServerUrl } from '@/lib/api';
+import { guestCheckinSchema } from '@/lib/validation/guestForm';
 import { Lobster, Questrial } from 'next/font/google';
 import { Camera, Clock, RefreshCw, CheckCircle2, AlertCircle, X, Hourglass, CreditCard } from 'lucide-react';
 const wordmarkFont = Questrial({ weight: '400', subsets: ['latin'], display: 'swap' });
@@ -249,25 +250,21 @@ export default function KioskCheckinPage() {
       return;
     }
 
-    if (!fullname.trim()) {
-      setFormError('Nama Tamu wajib diisi.');
-      return;
-    }
-
-    if (!capturedPhoto) {
-      setFormError('Foto pengunjung wajib diambil sebelum mendaftar.');
+    const parsed = guestCheckinSchema.safeParse({
+      fullname,
+      institution,
+      purpose,
+      photo_base64: capturedPhoto ?? undefined,
+    });
+    if (!parsed.success) {
+      setFormError(parsed.error.issues[0].message);
       return;
     }
 
     setSubmitting(true);
     try {
       // no_pass sengaja tidak dikirim: backend mengambil kartu AVAILABLE pertama dengan row lock.
-      const res = await axios.post(`${API_BASE_URL}/visitors/checkin`, {
-        fullname: fullname.trim(),
-        institution: institution.trim() || undefined,
-        purpose: purpose.trim() || undefined,
-        photo_base64: capturedPhoto,
-      });
+      const res = await axios.post(`${API_BASE_URL}/visitors/checkin`, parsed.data);
 
       setRegistrationResult({
         fullname: res.data.data.fullname,

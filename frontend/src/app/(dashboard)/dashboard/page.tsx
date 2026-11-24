@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { formatJam } from '@/lib/datetime';
+import { describeActivity } from '@/lib/activity';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardMetrics, VisitorItem, RecentActivity } from '@/types';
 import {
@@ -436,15 +437,18 @@ export default function DashboardPage() {
                       </td>
                     </tr>
                   ) : (
-                    recentActivities.map((act) => (
-                      <tr key={act.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{act.date}</td>
-                        <td className="px-4 py-3 text-gray-700 text-center tabular-nums">{act.time}</td>
-                        <td className="px-4 py-3 text-gray-900 truncate" title={act.description}>
-                          {act.description}
-                        </td>
-                      </tr>
-                    ))
+                    recentActivities.map((act) => {
+                      const sentence = describeActivity(act);
+                      return (
+                        <tr key={act.id} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="px-4 py-3 text-gray-800 font-medium whitespace-nowrap">{act.date}</td>
+                          <td className="px-4 py-3 text-gray-700 text-center tabular-nums">{act.time}</td>
+                          <td className="px-4 py-3 text-gray-900 truncate" title={sentence}>
+                            {sentence}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
