@@ -429,6 +429,36 @@ def restore_database():
     finally:
         db.close()
 
+@setting_bp.route('/retention/cleanup', methods=['POST'])
+@role_required('ADMIN')
+def execute_retention_cleanup():
+    identity = get_jwt_identity()
+    user_id = int(identity) if identity is not None else None
+    ip_addr = request.remote_addr
+
+    data = request.get_json(silent=True) or {}
+    guest_photo_months = data.get('guest_photo_retention_months')
+    visit_data_years = data.get('visit_data_retention_years')
+
+    db = get_db_session()
+    try:
+        service = BackupService(db)
+        result = service.execute_retention_cleanup(
+            user_id=user_id,
+            ip_address=ip_addr,
+            guest_photo_months=guest_photo_months,
+            visit_data_years=visit_data_years
+        )
+        return jsonify({
+            'success': True,
+            'message': f"Pembersihan retensi selesai: {result['photos_cleaned']} foto dibersihkan, {result['visits_purged']} riwayat kunjungan dihapus.",
+            'data': result
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Gagal menjalankan pembersihan retensi: {str(e)}"}), 500
+    finally:
+        db.close()
+
 @setting_bp.route('/notifications', methods=['GET'])
 @jwt_required()
 def get_in_app_notifications():
