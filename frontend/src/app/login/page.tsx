@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Questrial } from 'next/font/google';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveServerUrl } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { User, Lock, Eye, EyeOff, AlertCircle, Clock } from 'lucide-react';
 
@@ -66,7 +67,7 @@ function LoginForm() {
         const json = await res.json();
         if (json?.success && json?.data) {
           if (json.data.institution_name) setInstitutionName(json.data.institution_name);
-          if (json.data.logo_url) setLogoUrl(json.data.logo_url);
+          if (json.data.logo_url) setLogoUrl(resolveServerUrl(json.data.logo_url) || '/seamolec-logo.png');
           setSsoEnabled(Boolean(json.data.sso_enabled));
           if (json.data.sso_issuer) setSsoIssuer(json.data.sso_issuer);
           if (json.data.sso_client_id) setSsoClientId(json.data.sso_client_id);

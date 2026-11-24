@@ -73,6 +73,16 @@ api.interceptors.response.use(
   }
 );
 
+// Backend mengirim alamat file tanpa nama server (contoh: "/api/v1/settings/logo/x.png").
+// Tanpa nama server, browser mencarinya di frontend (port 3000) dan gambar gagal dimuat.
+export function resolveServerUrl(path?: string | null): string | null {
+  if (!path) return null;
+  if (/^(https?:|data:|blob:)/.test(path)) return path;
+  if (!path.startsWith('/api/')) return path;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+  return `${apiUrl.replace(/\/api\/v\d+\/?$/, '')}${path}`;
+}
+
 export function getVisitorPhotoUrl(idVisitor: number): string {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : '';

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Questrial } from 'next/font/google';
 import { Clock, Menu, Bell, Check, UserCheck, AlertTriangle, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import api, { getUserAvatarUrl } from '@/lib/api';
+import api, { getUserAvatarUrl, resolveServerUrl } from '@/lib/api';
 
 // Sama dengan halaman tamu dan login supaya identitas SEAMOLEC konsisten.
 const wordmarkFont = Questrial({ weight: '400', subsets: ['latin'], display: 'swap' });
@@ -32,7 +32,7 @@ export default function Topbar({ onOpenMenu }: TopbarProps) {
           setInstitutionName(res.data.data.institution_name);
         }
         if (res.data.data.logo_url) {
-          setLogoUrl(res.data.data.logo_url);
+          setLogoUrl(resolveServerUrl(res.data.data.logo_url) || '/seamolec-logo.png');
         }
       }
     } catch {
@@ -48,7 +48,7 @@ export default function Topbar({ onOpenMenu }: TopbarProps) {
         setInstitutionName(e.detail.institution_name);
       }
       if (e?.detail?.logo_url) {
-        setLogoUrl(e.detail.logo_url);
+        setLogoUrl(resolveServerUrl(e.detail.logo_url) || '/seamolec-logo.png');
       } else {
         fetchPublicSettings();
       }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import api from '@/lib/api';
+import api, { resolveServerUrl } from '@/lib/api';
 import { CheckCircle2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 type TabType = 'umum' | 'smtp' | 'notifikasi' | 'role' | 'sso' | 'backup';
@@ -113,6 +113,11 @@ export default function SettingsPage() {
   const [showSsoSecret, setShowSsoSecret] = useState(false);
   const [copiedRedirectUri, setCopiedRedirectUri] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Tab Umum bekerja seperti halaman Profil: kolom terkunci sampai tombol Edit ditekan.
+  const [isEditingUmum, setIsEditingUmum] = useState(false);
+  const [pendingLogo, setPendingLogo] = useState<string | null>(null);
+  const [savedLogoPreview, setSavedLogoPreview] = useState<string>('/seamolec-logo.png');
+  const [umumSnapshot, setUmumSnapshot] = useState<{ institution_name: string; opening_time: string; closing_time: string } | null>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   const [backups, setBackups] = useState<any[]>([]);
@@ -288,7 +293,9 @@ export default function SettingsPage() {
           auto_backup_schedule: d.auto_backup_schedule || 'Setiap hari pukul 23:00',
         });
         if (d.logo_path) {
-          setLogoPreview(`/api/v1/settings/logo/${d.logo_path}`);
+          const url = resolveServerUrl(`/api/v1/settings/logo/${d.logo_path}`) || '/seamolec-logo.png';
+          setLogoPreview(url);
+          setSavedLogoPreview(url);
         }
       }
     } catch {
@@ -441,32 +448,50 @@ export default function SettingsPage() {
     }
   };
 
-  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = async () => {
+    reader.onload = () => {
       const base64 = reader.result as string;
       setLogoPreview(base64);
-      try {
-        const res = await api.post('/settings/logo', { logo: base64 });
-        setSuccessMessage('Logo instansi berhasil diperbarui.');
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('institution-settings-updated', {
-            detail: {
-              logo_path: res.data?.logo_path,
-              logo_url: res.data?.logo_url || `/api/v1/settings/logo/${res.data?.logo_path}`
-            }
-          }));
-        }
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } catch (err: any) {
-        setErrorMessage(err.response?.data?.message || 'Gagal mengunggah logo.');
-        setTimeout(() => setErrorMessage(''), 3000);
-      }
+      setPendingLogo(base64);
     };
     reader.readAsDataURL(file);
+  };
+
+  const startEditUmum = () => {
+    setUmumSnapshot({
+      institution_name: formData.institution_name,
+      opening_time: formData.opening_time,
+      closing_time: formData.closing_time,
+    });
+    setIsEditingUmum(true);
+  };
+
+  const cancelEditUmum = () => {
+    if (umumSnapshot) setFormData({ ...formData, ...umumSnapshot });
+    setPendingLogo(null);
+    setLogoPreview(savedLogoPreview);
+    setIsEditingUmum(false);
+  };
+
+  // Logo baru diunggah dulu, baru pengaturan lain disimpan, supaya keduanya tersimpan bersamaan.
+  const uploadPendingLogo = async () => {
+    if (!pendingLogo) return;
+    const res = await api.post('/settings/logo', { logo: pendingLogo });
+    const url =
+      resolveServerUrl(res.data?.logo_url || (res.data?.logo_path ? `/api/v1/settings/logo/${res.data.logo_path}` : null)) ||
+      pendingLogo;
+    setLogoPreview(url);
+    setSavedLogoPreview(url);
+    setPendingLogo(null);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('institution-settings-updated', { detail: { logo_path: res.data?.logo_path, logo_url: url } })
+      );
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -476,12 +501,14 @@ export default function SettingsPage() {
     setErrorMessage('');
 
     try {
+      if (activeTab === 'umum') await uploadPendingLogo();
       await api.put('/settings', {
         ...formData,
         jwt_access_token_expiry: (formData.jwt_access_token_expiry || 15) * 60,
         jwt_refresh_token_expiry: (formData.jwt_refresh_token_expiry || 7) * 86400,
       });
       setSuccessMessage('Pengaturan berhasil disimpan.');
+      if (activeTab === 'umum') setIsEditingUmum(false);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('institution-settings-updated', {
           detail: { institution_name: formData.institution_name }
@@ -785,107 +812,107 @@ export default function SettingsPage() {
               {activeTab === 'umum' && (
               <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
                 <div>
-                  <div className="mb-6">
-                    <span className="text-[#3B0A11] text-lg font-semibold inline-block">
-                      Identitas instansi
-                    </span>
-                  </div>
+                  <h2 className="text-[#3B0A11] text-lg font-semibold mb-6">Identitas instansi</h2>
 
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-start">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          Nama instansi / institusi:
-                        </label>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                    {/* Kolom kiri: logo, sama seperti foto di halaman Profil. */}
+                    <div className="md:col-span-4 flex flex-col items-center text-center">
+                      <div className="relative">
+                        <div className="w-32 h-32 rounded-full bg-white border-2 border-gray-200 p-3 flex items-center justify-center overflow-hidden shadow-sm">
+                          <img
+                            src={logoPreview}
+                            alt={`Logo ${formData.institution_name}`}
+                            width={128}
+                            height={128}
+                            onError={() => {
+                              if (!pendingLogo) setLogoPreview('/seamolec-logo.png');
+                            }}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={!isEditingUmum}
+                          title={isEditingUmum ? 'Ganti logo instansi' : 'Tekan Edit terlebih dahulu untuk mengganti logo'}
+                          className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#4A000E] hover:bg-[#38000A] disabled:bg-gray-500 disabled:hover:bg-gray-500 disabled:cursor-not-allowed text-white text-[11px] font-bold px-4 py-1.5 rounded-full shadow-md transition-colors cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4A000E]"
+                        >
+                          Ganti logo
+                        </button>
                         <input
-                          type="text"
-                          value={formData.institution_name}
-                          onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
-                          className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleLogoFileChange}
+                          accept="image/*"
+                          className="hidden"
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          Jam buka:
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.opening_time}
-                          onChange={(e) => setFormData({ ...formData, opening_time: e.target.value })}
-                          placeholder="07.30"
-                          className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          Jam tutup:
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.closing_time}
-                          onChange={(e) => setFormData({ ...formData, closing_time: e.target.value })}
-                          placeholder="16.00"
-                          className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-800 mb-1">
-                          Batas peringatan kartu pass (stok minimum):
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={formData.pass_warning_limit ?? 5}
-                          onChange={(e) => setFormData({ ...formData, pass_warning_limit: Number(e.target.value) })}
-                          placeholder="5"
-                          className="w-full max-w-[280px] px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
-                        />
-                        <p className="text-[11px] text-gray-500 mt-1 max-w-[280px] leading-tight">
-                          Peringatan visual akan muncul di dashboard & monitoring jika sisa kartu pass di rak kurang dari atau sama dengan angka ini.
-                        </p>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center md:items-start pt-1">
-                      <span className="text-xs font-semibold text-gray-800 mb-2">
-                        Logo:
-                      </span>
-                      <div className="w-16 h-16 rounded-full border border-gray-300 p-1 flex items-center justify-center bg-white shadow-sm mb-3 overflow-hidden">
-                        <img
-                          src={logoPreview}
-                          alt="Logo Instansi"
-                          className="w-full h-full object-contain rounded-full"
+                    {/* Kolom kanan: data instansi. */}
+                    <div className="md:col-span-8 space-y-4">
+                      <div>
+                        <label htmlFor="setting-institution" className="block text-xs font-semibold text-gray-800 mb-1">
+                          Nama instansi / institusi
+                        </label>
+                        <input
+                          id="setting-institution"
+                          type="text"
+                          value={formData.institution_name}
+                          onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
+                          disabled={!isEditingUmum}
+                          className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-sm text-gray-900 font-medium disabled:opacity-80 disabled:cursor-not-allowed focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="bg-[#1A1A1A] hover:bg-black text-white text-xs px-4 py-1.5 rounded-lg font-medium transition shadow-sm"
-                      >
-                        Ganti logo
-                      </button>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleLogoFileChange}
-                        accept="image/*"
-                        className="hidden"
-                      />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="setting-open" className="block text-xs font-semibold text-gray-800 mb-1">
+                            Jam buka
+                          </label>
+                          <input
+                            id="setting-open"
+                            type="text"
+                            value={formData.opening_time}
+                            onChange={(e) => setFormData({ ...formData, opening_time: e.target.value })}
+                            disabled={!isEditingUmum}
+                            placeholder="07.30"
+                            className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-sm text-gray-900 font-medium tabular-nums disabled:opacity-80 disabled:cursor-not-allowed focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="setting-close" className="block text-xs font-semibold text-gray-800 mb-1">
+                            Jam tutup
+                          </label>
+                          <input
+                            id="setting-close"
+                            type="text"
+                            value={formData.closing_time}
+                            onChange={(e) => setFormData({ ...formData, closing_time: e.target.value })}
+                            disabled={!isEditingUmum}
+                            placeholder="16.00"
+                            className="w-full bg-[#F3F4F6] border border-gray-400 rounded-xl px-3.5 py-2 text-sm text-gray-900 font-medium tabular-nums disabled:opacity-80 disabled:cursor-not-allowed focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] transition-all"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end mt-8 pt-4">
+                <div className="flex items-center justify-end gap-2 mt-8 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={isEditingUmum ? cancelEditUmum : startEditUmum}
+                    className="px-5 py-1.5 bg-[#6B7280] hover:bg-[#555D6B] active:bg-[#4B5260] text-white text-xs font-bold rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500"
+                  >
+                    {isEditingUmum ? 'Batal' : 'Edit'}
+                  </button>
                   <button
                     type="submit"
-                    disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50"
+                    disabled={!isEditingUmum || saving}
+                    className="px-5 py-1.5 bg-[#8A001A] hover:bg-[#700015] active:bg-[#5A0011] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
                   >
-                    {saving ? 'Menyimpan...' : 'Simpan pengaturan'}
+                    {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
                 </div>
               </form>

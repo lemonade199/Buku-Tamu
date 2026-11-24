@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { resolveServerUrl } from '@/lib/api';
 import { Lobster, Questrial } from 'next/font/google';
 import { Camera, Clock, RefreshCw, CheckCircle2, AlertCircle, X, Hourglass, CreditCard } from 'lucide-react';
 
@@ -101,7 +102,7 @@ export default function KioskCheckinPage() {
         const res = await axios.get(`${API_BASE_URL}/settings/public`);
         if (res.data?.success && res.data?.data) {
           if (res.data.data.institution_name) setInstitutionName(res.data.data.institution_name);
-          if (res.data.data.logo_url) setInstitutionLogo(res.data.data.logo_url);
+          if (res.data.data.logo_url) setInstitutionLogo(resolveServerUrl(res.data.data.logo_url) || '/seamolec-logo.png');
           const oTime = res.data.data.opening_time || '07:30';
           const cTime = res.data.data.closing_time || '16:00';
           setOpeningTime(oTime);
