@@ -11,36 +11,29 @@ interface NavItem {
   permission?: string;
 }
 
-const adminNavItems: NavItem[] = [
+const navItemsList: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', permission: 'dashboard.read' },
+  { name: 'Penerimaan Tamu', href: '/checkin', permission: 'visitors.create' },
+  { name: 'Pengembalian Akses', href: '/checkout', permission: 'visitors.checkout' },
   { name: 'Monitoring Kartu Pass', href: '/pass', permission: 'pass.read' },
   { name: 'Laporan', href: '/reports', permission: 'reports.read' },
   { name: 'Master data', href: '/master', permission: 'master.manage' },
   { name: 'Pengaturan', href: '/settings', permission: 'settings.manage' },
 ];
-
-const receptionistNavItems: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', permission: 'dashboard.read' },
-  { name: 'Penerimaan Tamu', href: '/checkin', permission: 'visitors.create' },
-  { name: 'Pengembalian Akses', href: '/checkout', permission: 'visitors.checkout' },
-  { name: 'Kontrol Pass Aktif', href: '/pass', permission: 'pass.read' },
-  { name: 'Laporan', href: '/reports', permission: 'reports.read' },
-];
   
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const isAdmin = user?.role_code === 'ADMIN';
 
   const userPerms = user?.permissions || [];
-  const hasWildcard = userPerms.includes('*');
+  const hasWildcard = userPerms.includes('*') || user?.role_code === 'ADMIN';
   const hasPermission = (perm?: string) => {
     if (!perm) return true;
     if (hasWildcard) return true;
     return userPerms.includes(perm);
   };
 
-  const navItems = (isAdmin ? adminNavItems : receptionistNavItems).filter((item) =>
+  const navItems = navItemsList.filter((item) =>
     hasPermission(item.permission)
   );
 
