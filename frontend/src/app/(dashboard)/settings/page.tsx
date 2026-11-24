@@ -279,7 +279,7 @@ export default function SettingsPage() {
           notify_email_monthly_report: d.notify_email_monthly_report ?? true,
           notify_email_new_account: d.notify_email_new_account ?? true,
           notify_email_reset_password: d.notify_email_reset_password ?? true,
-          admin_notification_email: d.admin_notification_email || 'tasha@seamolec.org',
+          admin_notification_email: d.admin_notification_email || '',
           jwt_access_token_expiry: d.jwt_access_token_expiry ? Math.round(d.jwt_access_token_expiry / 60) : 5,
           jwt_refresh_token_expiry: d.jwt_refresh_token_expiry ? Math.round(d.jwt_refresh_token_expiry / 86400) : 7,
           session_timeout_hours: d.session_timeout_hours ?? 8,
@@ -292,6 +292,7 @@ export default function SettingsPage() {
           auto_backup_enabled: d.auto_backup_enabled ?? true,
           auto_backup_schedule: d.auto_backup_schedule || 'Setiap hari pukul 23:00',
         });
+        setSavedNotifEmail(d.admin_notification_email || '');
         if (d.logo_path) {
           const url = resolveServerUrl(`/api/v1/settings/logo/${d.logo_path}`) || '/seamolec-logo.png';
           setLogoPreview(url);
@@ -491,6 +492,43 @@ export default function SettingsPage() {
       window.dispatchEvent(
         new CustomEvent('institution-settings-updated', { detail: { logo_path: res.data?.logo_path, logo_url: url } })
       );
+    }
+  };
+
+  // Tab Aturan notifikasi tidak punya tombol simpan: setiap perubahan langsung dikirim ke server.
+  type NotifKey =
+    | 'notify_app_checkin'
+    | 'notify_app_backup_fail'
+    | 'notify_email_monthly_report'
+    | 'notify_email_new_account'
+    | 'notify_email_reset_password';
+
+  const toggleNotification = async (key: NotifKey) => {
+    const nextValue = !formData[key];
+    setFormData((prev) => ({ ...prev, [key]: nextValue }));
+    setErrorMessage('');
+    try {
+      await api.put('/settings', { [key]: nextValue });
+      setSuccessMessage(nextValue ? 'Notifikasi diaktifkan.' : 'Notifikasi dinonaktifkan.');
+      setTimeout(() => setSuccessMessage(''), 2500);
+    } catch (err: any) {
+      setFormData((prev) => ({ ...prev, [key]: !nextValue }));
+      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan perubahan notifikasi.');
+    }
+  };
+
+  const [savedNotifEmail, setSavedNotifEmail] = useState<string | null>(null);
+  const saveNotificationEmail = async (input: HTMLInputElement) => {
+    const value = input.value.trim();
+    if (value === (savedNotifEmail ?? '') || !input.checkValidity()) return;
+    setErrorMessage('');
+    try {
+      await api.put('/settings', { admin_notification_email: value });
+      setSavedNotifEmail(value);
+      setSuccessMessage('Email penerima notifikasi disimpan.');
+      setTimeout(() => setSuccessMessage(''), 2500);
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || 'Gagal menyimpan email penerima notifikasi.');
     }
   };
 
@@ -1095,14 +1133,17 @@ export default function SettingsPage() {
                       <span className="text-sm font-medium text-gray-800">Tamu check in</span>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, notify_app_checkin: !formData.notify_app_checkin })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                        onClick={() => toggleNotification('notify_app_checkin')}
+                        role="switch"
+                        aria-checked={!!formData.notify_app_checkin}
+                        aria-label="Notifikasi tamu check in"
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2D6A4F] ${
                           formData.notify_app_checkin ? 'bg-[#2D6A4F]' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
-                            formData.notify_app_checkin ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                            formData.notify_app_checkin ? 'translate-x-[18px]' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -1112,14 +1153,17 @@ export default function SettingsPage() {
                       <span className="text-sm font-medium text-gray-800">Gagal Backup data</span>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, notify_app_backup_fail: !formData.notify_app_backup_fail })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                        onClick={() => toggleNotification('notify_app_backup_fail')}
+                        role="switch"
+                        aria-checked={!!formData.notify_app_backup_fail}
+                        aria-label="Notifikasi gagal backup data"
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2D6A4F] ${
                           formData.notify_app_backup_fail ? 'bg-[#2D6A4F]' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
-                            formData.notify_app_backup_fail ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                            formData.notify_app_backup_fail ? 'translate-x-[18px]' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -1137,14 +1181,17 @@ export default function SettingsPage() {
                       <span className="text-sm font-medium text-gray-800">Laporan bulanan admin</span>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, notify_email_monthly_report: !formData.notify_email_monthly_report })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                        onClick={() => toggleNotification('notify_email_monthly_report')}
+                        role="switch"
+                        aria-checked={!!formData.notify_email_monthly_report}
+                        aria-label="Email laporan bulanan admin"
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2D6A4F] ${
                           formData.notify_email_monthly_report ? 'bg-[#2D6A4F]' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
-                            formData.notify_email_monthly_report ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                            formData.notify_email_monthly_report ? 'translate-x-[18px]' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -1154,14 +1201,17 @@ export default function SettingsPage() {
                       <span className="text-sm font-medium text-gray-800">Info akun baru</span>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, notify_email_new_account: !formData.notify_email_new_account })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                        onClick={() => toggleNotification('notify_email_new_account')}
+                        role="switch"
+                        aria-checked={!!formData.notify_email_new_account}
+                        aria-label="Email info akun baru"
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2D6A4F] ${
                           formData.notify_email_new_account ? 'bg-[#2D6A4F]' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
-                            formData.notify_email_new_account ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                            formData.notify_email_new_account ? 'translate-x-[18px]' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -1171,14 +1221,17 @@ export default function SettingsPage() {
                       <span className="text-sm font-medium text-gray-800">Reset Password</span>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, notify_email_reset_password: !formData.notify_email_reset_password })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                        onClick={() => toggleNotification('notify_email_reset_password')}
+                        role="switch"
+                        aria-checked={!!formData.notify_email_reset_password}
+                        aria-label="Email reset password"
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2D6A4F] ${
                           formData.notify_email_reset_password ? 'bg-[#2D6A4F]' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-0.5 ${
-                            formData.notify_email_reset_password ? 'translate-x-4.5 ml-0.5' : 'translate-x-0.5'
+                            formData.notify_email_reset_password ? 'translate-x-[18px]' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -1186,16 +1239,28 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="mt-6">
-                    <label className="block text-xs font-bold text-[#3B0207] mb-1.5">
+                    <label htmlFor="notif-email" className="block text-xs font-bold text-[#3B0207] mb-1.5">
                       Email penerima notifikasi admin
                     </label>
                     <input
+                      id="notif-email"
                       type="email"
                       value={formData.admin_notification_email || ''}
                       onChange={(e) => setFormData({ ...formData, admin_notification_email: e.target.value })}
-                      placeholder="tasha@seamolec.org"
+                      onBlur={(e) => saveNotificationEmail(e.currentTarget)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      placeholder="nama@instansi.go.id"
+                      aria-describedby="notif-email-help"
                       className="w-full max-w-md px-3.5 py-1.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#8A001A] bg-white shadow-inner"
                     />
+                    <p id="notif-email-help" className="mt-1 text-[11px] text-gray-600">
+                      Tersimpan otomatis setelah selesai mengetik.
+                    </p>
                   </div>
                 </div>
 
@@ -1210,14 +1275,6 @@ export default function SettingsPage() {
                       <div className="w-3.5 h-3.5 border-2 border-gray-800 border-t-transparent rounded-full animate-spin mr-1" />
                     )}
                     <span>{sendingMonthlyReport ? 'Mengirim Laporan...' : 'Kirim Rekap Laporan Bulanan ke Email'}</span>
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-[#8A001A] hover:bg-[#68001a] text-white px-7 py-2.5 rounded-xl font-semibold text-sm shadow-md transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {saving ? 'Menyimpan...' : 'Simpan pengaturan'}
                   </button>
                 </div>
               </form>
