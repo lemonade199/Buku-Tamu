@@ -332,8 +332,9 @@ def update_password():
         db.close()
 
 @auth_bp.route('/users', methods=['GET'])
-@jwt_required()
+@permission_required('master.manage', 'settings.manage')
 def get_all_users():
+    """Daftar lengkap akun (email, HP, role). Hanya untuk pengelola Master Data / Pengaturan; halaman lain cukup /auth/receptionists."""
     db = get_db_session()
     try:
         users = db.query(User).order_by(User.id_user.asc()).all()
@@ -345,9 +346,9 @@ def get_all_users():
         db.close()
 
 @auth_bp.route('/receptionists', methods=['GET'])
-@permission_required('reports.read')
+@permission_required('reports.read', 'pass.read')
 def get_receptionist_names():
-    """Nama resepsionis aktif untuk filter Laporan. Hanya nama, supaya resepsionis tidak melihat data akun lain."""
+    """Nama resepsionis aktif untuk filter Laporan dan Monitoring Kartu Pass. Hanya nama, tanpa email atau HP."""
     db = get_db_session()
     try:
         names = [

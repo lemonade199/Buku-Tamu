@@ -332,7 +332,7 @@
                 "receptionists"
               ]
             },
-            "description": "Nama resepsionis aktif untuk filter Laporan. Hanya nama, supaya resepsionis tidak melihat data akun lain.\n\n**Akses:** Butuh salah satu izin: reports.read (admin selalu boleh)"
+            "description": "Nama resepsionis aktif untuk filter Laporan. Hanya nama, supaya resepsionis tidak melihat data akun lain.\n\n**Akses:** Butuh salah satu izin: reports.read, pass.read (admin selalu boleh)"
           }
         },
         {
@@ -350,7 +350,7 @@
                 "users"
               ]
             },
-            "description": "**Akses:** Butuh login (Bearer token)"
+            "description": "**Akses:** Butuh salah satu izin: master.manage, settings.manage (admin selalu boleh)"
           }
         },
         {

@@ -100,3 +100,13 @@ def test_receptionist_names_visible_to_receptionist(client):
     assert isinstance(names, list) and len(names) > 0
     # Hanya nama yang dikirim, bukan data akun lengkap.
     assert all(isinstance(n, str) for n in names)
+
+
+def test_user_list_hidden_from_receptionist(client):
+    login = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    petugas = {'Authorization': f"Bearer {login.get_json()['data']['access_token']}"}
+
+    # Resepsionis tidak boleh melihat email dan nomor HP semua akun.
+    assert client.get('/api/v1/auth/users', headers=petugas).status_code == 403
+    # Admin tetap bisa membuka Master Data.
+    assert client.get('/api/v1/auth/users', headers=_admin_headers(client)).status_code == 200

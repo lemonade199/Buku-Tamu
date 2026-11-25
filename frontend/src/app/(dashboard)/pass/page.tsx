@@ -50,12 +50,8 @@ function MonitoringPassPage() {
   // Daftar resepsionis dari database: akun aktif berperan resepsionis, sama seperti filter di halaman Laporan.
   useEffect(() => {
     api
-      .get<{ success: boolean; data: { fullname: string; role_code: string | null; is_active: boolean }[] }>('/auth/users')
-      .then((res) => {
-        setReceptionistOptions(
-          (res.data.data || []).filter((u) => u.role_code === 'PETUGAS' && u.is_active).map((u) => u.fullname)
-        );
-      })
+      .get<{ success: boolean; data: string[] }>('/auth/receptionists')
+      .then((res) => setReceptionistOptions(res.data.data || []))
       .catch((err) => console.error('Gagal mengambil daftar resepsionis:', err));
   }, []);
 
