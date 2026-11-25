@@ -15,6 +15,7 @@ from backend.app.schemas.auth import LoginRequest, RefreshRequest
 from backend.app.utils.security import verify_password, hash_password
 from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
 from backend.app.middleware.auth import role_required, permission_required
+from backend.app.services.permission_service import DEFAULT_PERMISSIONS_MATRIX, apply_matrix_to_roles
 from backend.app.services.email_service import send_new_account_email, send_password_reset_email
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
@@ -645,30 +646,6 @@ def get_user_avatar(user_id: int):
     finally:
         db.close()
 
-DEFAULT_PERMISSIONS_MATRIX = [
-    {"id": "dashboard", "feature": "Dashboard", "perm": "dashboard.read", "admin": True, "receptionist": True},
-    {"id": "checkin", "feature": "Penerimaan tamu", "perm": "visitors.create", "admin": False, "receptionist": True},
-    {"id": "pass_handover", "feature": "Serahkan kartu", "perm": "visitors.checkin", "admin": False, "receptionist": True},
-    {"id": "checkout", "feature": "Pengembalian akses", "perm": "visitors.checkout", "admin": False, "receptionist": True},
-    {"id": "pass_monitoring", "feature": "Monitoring kartu pass", "perm": "pass.read", "admin": True, "receptionist": True},
-    {"id": "reports", "feature": "Laporan & ekspor", "perm": "reports.read", "admin": True, "receptionist": True},
-    {"id": "master", "feature": "Master data (kartu pass & pengguna", "perm": "master.manage", "admin": True, "receptionist": False},
-    {"id": "users", "feature": "Pengguna & role", "perm": "users.manage", "admin": True, "receptionist": False},
-    {"id": "settings", "feature": "Pengaturan sistem", "perm": "settings.manage", "admin": True, "receptionist": False},
-]
-
-FEATURE_PERMS_MAP = {
-    "dashboard": ["dashboard.read"],
-    "checkin": ["visitors.read", "visitors.create"],
-    "pass_handover": ["visitors.checkin", "visitors.approve"],
-    "checkout": ["visitors.checkout"],
-    "pass_monitoring": ["pass.read", "pass.manage"],
-    "reports": ["reports.read", "reports.export"],
-    "master": ["master.manage"],
-    "users": ["users.manage"],
-    "settings": ["settings.manage"],
-}
-
 @auth_bp.route('/roles', methods=['GET'])
 @jwt_required()
 def list_roles():
@@ -899,33 +876,8 @@ def update_roles_matrix():
         if matrix_changes:
             _record_access_audit(db, 'PERMISSION_MATRIX_UPDATED', 'permissions_matrix', None, '; '.join(matrix_changes) + '.')
 
-        # Dynamically compute permissions for ALL roles in database
-        for role in all_roles:
-            role_key = 'admin' if role.code == 'ADMIN' else ('receptionist' if role.code == 'PETUGAS' else role.code.lower())
-            role_perms = set()
-            all_enabled = True
-
-            for item in new_matrix:
-                fid = item.get('id')
-                if not fid:
-                    fname = item.get('feature', '').lower()
-                    for def_item in DEFAULT_PERMISSIONS_MATRIX:
-                        if def_item['feature'].lower() in fname or fname in def_item['feature'].lower():
-                            fid = def_item['id']
-                            break
-
-                perms = FEATURE_PERMS_MAP.get(fid, [item.get('perm')] if item.get('perm') else [])
-                is_granted = bool(item.get(role_key))
-
-                if is_granted:
-                    role_perms.update(perms)
-                else:
-                    all_enabled = False
-
-            if role.code == 'ADMIN' and all_enabled:
-                role.permissions = ["*"]
-            else:
-                role.permissions = sorted(list(role_perms))
+        # Izin setiap role mengikuti tabel hak akses yang baru disimpan.
+        apply_matrix_to_roles(all_roles, new_matrix)
 
         db.commit()
 

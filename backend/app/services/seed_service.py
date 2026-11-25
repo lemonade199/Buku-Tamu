@@ -32,6 +32,19 @@ def repair_held_pass_status(db: Session) -> int:
     return repaired
 
 
+def sync_role_permissions_with_matrix(db: Session) -> None:
+    from backend.app.services.permission_service import DEFAULT_PERMISSIONS_MATRIX, permissions_for_role, role_matrix_key
+
+    setting = db.query(Setting).first()
+    matrix = list(setting.permissions_matrix) if setting and setting.permissions_matrix else DEFAULT_PERMISSIONS_MATRIX
+    for role in db.query(Role).all():
+        key = role_matrix_key(role)
+        # Role buatan sendiri yang belum punya kolom di tabel dibiarkan apa adanya.
+        if not any(key in row for row in matrix):
+            continue
+        role.permissions = permissions_for_role(role, matrix)
+
+
 def seed_initial_data(db: Session, is_testing: bool = False):
     admin_role = db.query(Role).filter(Role.code == 'ADMIN').first()
     if not admin_role:
@@ -331,6 +344,9 @@ def seed_initial_data(db: Session, is_testing: bool = False):
     # Kartu bisa tercatat Tersedia padahal masih dipegang tamu (data dari backend versi lama atau restore backup).
     # Tanpa ini kartu itu bisa dibagikan ke tamu lain, sementara tamu lama tidak bisa diproses.
     repair_held_pass_status(db)
+
+    # Izin role selalu mengikuti tabel hak akses di Pengaturan (yang tersimpan, atau bawaan kalau belum pernah disimpan).
+    sync_role_permissions_with_matrix(db)
 
     db.commit()
     print("Initial seed data successfully checked/loaded.")

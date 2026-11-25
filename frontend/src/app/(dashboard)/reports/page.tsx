@@ -343,17 +343,18 @@ export default function ReportsPage() {
 
       <div className="overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
         {/* Lebar kolom tetap supaya header dan isi selalu sejajar, sama dengan tabel di halaman lain. */}
-        <table className="w-full min-w-[960px] table-fixed text-left border-collapse">
+        <table className="w-full min-w-[1080px] table-fixed text-left border-collapse">
+          {/* Keperluan mengisi sisa lebar; kolom lain diberi lebar tetap supaya kolom Resepsionis tidak terdorong keluar layar. */}
           <colgroup>
             <col className="w-[72px]" />
             <col className="w-[112px]" />
+            <col className="w-[15%]" />
             <col className="w-[16%]" />
-            <col className="w-[18%]" />
-            <col className="w-[24%]" />
-            <col className="w-[96px]" />
-            <col className="w-[88px]" />
-            <col className="w-[88px]" />
             <col />
+            <col className="w-[96px]" />
+            <col className="w-[80px]" />
+            <col className="w-[80px]" />
+            <col className="w-[150px]" />
           </colgroup>
           <thead>
             <tr className="border-b border-gray-200 bg-[#FAF7F0]">
@@ -365,7 +366,7 @@ export default function ReportsPage() {
               <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center whitespace-nowrap">No. pass</th>
               <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Masuk</th>
               <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Keluar</th>
-              <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-right">Resepsionis</th>
+              <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Resepsionis</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-xs text-gray-800">
@@ -436,7 +437,7 @@ export default function ReportsPage() {
                     </td>
                     <td className="px-4 py-3 text-center text-gray-700 tabular-nums">{inTimeDisplay}</td>
                     <td className="px-4 py-3 text-center text-gray-700 tabular-nums">{outTimeDisplay}</td>
-                    <td className="px-4 py-3 text-gray-700 truncate text-right" title={v.approved_by || '-'}>
+                    <td className="px-4 py-3 text-gray-700 truncate" title={v.approved_by || '-'}>
                       {v.approved_by || '-'}
                     </td>
                   </tr>

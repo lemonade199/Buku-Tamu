@@ -110,3 +110,22 @@ def test_user_list_hidden_from_receptionist(client):
     assert client.get('/api/v1/auth/users', headers=petugas).status_code == 403
     # Admin tetap bisa membuka Master Data.
     assert client.get('/api/v1/auth/users', headers=_admin_headers(client)).status_code == 200
+
+
+def test_role_permissions_follow_matrix_on_fresh_install(client):
+    from backend.app.models.entities import Role
+
+    db = get_db_session()
+    try:
+        petugas = db.query(Role).filter(Role.code == 'PETUGAS').first()
+        admin = db.query(Role).filter(Role.code == 'ADMIN').first()
+        # Tabel bawaan: resepsionis boleh "Laporan & ekspor", admin tidak memegang penerimaan tamu.
+        assert 'reports.export' in petugas.permissions
+        assert 'visitors.create' not in admin.permissions
+        assert 'settings.manage' in admin.permissions
+    finally:
+        db.close()
+
+    login = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    headers = {'Authorization': f"Bearer {login.get_json()['data']['access_token']}"}
+    assert client.get('/api/v1/visitors/export/excel', headers=headers).status_code == 200

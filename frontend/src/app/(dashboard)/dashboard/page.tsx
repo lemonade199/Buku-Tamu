@@ -18,7 +18,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
 import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
@@ -349,16 +349,6 @@ export default function DashboardPage() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1F2937',
-                          color: '#FFFFFF',
-                          borderRadius: '8px',
-                          fontSize: '11px',
-                          border: 'none',
-                        }}
-                        formatter={(val: any, name: any) => [`${val} Kartu`, name]}
-                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">

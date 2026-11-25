@@ -33,7 +33,7 @@ services:
       JWT_SECRET_KEY: super-secret-key-buku-tamu-jwt-prod
       DATABASE_URL: postgresql+psycopg2://postgres:postgrespassword@db:5432/buku_tamu
       UPLOAD_FOLDER: storage/photos
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
     ports:
       - "5000:5000"
     volumes:
