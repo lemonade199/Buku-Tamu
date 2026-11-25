@@ -1,5 +1,6 @@
 import io
 from datetime import datetime
+from backend.app.utils.datetime_utils import to_wib, utc_now
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4, landscape
@@ -13,13 +14,13 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
     ws.title = "Laporan Kunjungan"
 
     title_font = Font(name="Arial", size=14, bold=True, color="650015")
-    ws.merge_cells("A1:J1")
+    ws.merge_cells("A1:I1")
     ws["A1"] = f"LAPORAN KUNJUNGAN TAMU — {institution_name.upper()}"
     ws["A1"].font = title_font
     ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
 
-    now_str = datetime.now().strftime("%d/%m/%Y %H:%M WIB")
-    ws.merge_cells("A2:J2")
+    now_str = to_wib(utc_now()).strftime("%d/%m/%Y %H:%M WIB")
+    ws.merge_cells("A2:I2")
     ws["A2"] = f"Dicetak pada: {now_str} | Total: {len(visitors)} Pengunjung"
     ws["A2"].font = Font(name="Arial", size=9, italic=True, color="555555")
     ws["A2"].alignment = Alignment(horizontal="center", vertical="center")
@@ -34,7 +35,6 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
         "No. Pass",
         "Keperluan",
         "Resepsionis",
-        "Status"
     ]
 
     header_font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
@@ -72,7 +72,7 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
 
         if cin:
             try:
-                dt_cin = datetime.fromisoformat(cin.replace("Z", "+00:00"))
+                dt_cin = to_wib(datetime.fromisoformat(cin.replace("Z", "+00:00")))
                 tgl_str = dt_cin.strftime("%d/%m/%Y")
                 cin_str = dt_cin.strftime("%H:%M")
             except Exception:
@@ -81,7 +81,7 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
 
         if cout:
             try:
-                dt_cout = datetime.fromisoformat(cout.replace("Z", "+00:00"))
+                dt_cout = to_wib(datetime.fromisoformat(cout.replace("Z", "+00:00")))
                 cout_str = dt_cout.strftime("%H:%M")
             except Exception:
                 cout_str = cout[11:16]
@@ -98,7 +98,6 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
             f"Pass #{v.get('no_pass') or v.get('id_pass', '-')}",
             v.get("purpose", "-") or "-",
             v.get("approved_by") or v.get("rejected_by") or ("Petugas" if v.get("status") == "APPROVED" else "-"),
-            v.get("status", "-")
         ]
         ws.append(row_data)
         current_row = 4 + idx
@@ -106,7 +105,7 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
             cell = ws.cell(row=current_row, column=col_idx)
             cell.font = data_font
             cell.border = thin_border
-            if col_idx in [1, 2, 3, 4, 7, 10]:
+            if col_idx in [1, 2, 3, 4, 7]:
                 cell.alignment = center_align
             else:
                 cell.alignment = left_align
@@ -120,8 +119,7 @@ def generate_excel(visitors, institution_name="SEAMOLEC"):
         "F": 22,
         "G": 14,
         "H": 28,
-        "I": 18,
-        "J": 14,
+        "I": 20,
     }
     for col_letter, width in col_widths.items():
         ws.column_dimensions[col_letter].width = width
@@ -185,7 +183,7 @@ def generate_pdf(visitors, institution_name="SEAMOLEC"):
 
     elements = []
     elements.append(Paragraph(f"LAPORAN KUNJUNGAN BUKU TAMU DIGITAL — {institution_name.upper()}", title_style))
-    now_str = datetime.now().strftime("%d/%m/%Y %H:%M WIB")
+    now_str = to_wib(utc_now()).strftime("%d/%m/%Y %H:%M WIB")
     elements.append(Paragraph(f"Waktu Cetak: {now_str} | Total: {len(visitors)} Pengunjung", sub_style))
     elements.append(Spacer(1, 14))
 
@@ -199,7 +197,6 @@ def generate_pdf(visitors, institution_name="SEAMOLEC"):
         Paragraph("Pass", head_style),
         Paragraph("Keperluan", head_style),
         Paragraph("Resepsionis", head_style),
-        Paragraph("Status", head_style)
     ]]
 
     for idx, v in enumerate(visitors, start=1):
@@ -212,7 +209,7 @@ def generate_pdf(visitors, institution_name="SEAMOLEC"):
 
         if cin:
             try:
-                dt_cin = datetime.fromisoformat(cin.replace("Z", "+00:00"))
+                dt_cin = to_wib(datetime.fromisoformat(cin.replace("Z", "+00:00")))
                 tgl_str = dt_cin.strftime("%d/%m/%Y")
                 cin_str = dt_cin.strftime("%H:%M")
             except Exception:
@@ -221,7 +218,7 @@ def generate_pdf(visitors, institution_name="SEAMOLEC"):
 
         if cout:
             try:
-                dt_cout = datetime.fromisoformat(cout.replace("Z", "+00:00"))
+                dt_cout = to_wib(datetime.fromisoformat(cout.replace("Z", "+00:00")))
                 cout_str = dt_cout.strftime("%H:%M")
             except Exception:
                 cout_str = cout[11:16]
@@ -238,10 +235,9 @@ def generate_pdf(visitors, institution_name="SEAMOLEC"):
             Paragraph(f"#{v.get('no_pass') or v.get('id_pass', '-')}", cell_center),
             Paragraph(v.get("purpose", "-") or "-", cell_style),
             Paragraph(v.get("approved_by") or v.get("rejected_by") or ("Petugas" if v.get("status") == "APPROVED" else "-"), cell_style),
-            Paragraph(v.get("status", "-"), cell_center)
         ])
 
-    col_widths = [25, 55, 40, 45, 110, 110, 45, 170, 85, 55]
+    col_widths = [25, 55, 40, 45, 115, 120, 45, 210, 95]
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#8A001A")),
