@@ -22,7 +22,7 @@ export function describeActivity(act: RecentActivity): string {
 
   switch (act.action) {
     case 'VISITOR_REGISTER_PENDING':
-      return `${guest} mendaftar di kiosk dan menunggu persetujuan${card}`;
+      return `${guest} mengisi buku tamu dan menunggu persetujuan${card}`;
     case 'VISITOR_REGISTRATION_APPROVED':
       return who ? `${who} menyetujui kunjungan ${guest}${card}` : `Kunjungan ${guest} disetujui${card}`;
     case 'VISITOR_REGISTRATION_REJECTED':

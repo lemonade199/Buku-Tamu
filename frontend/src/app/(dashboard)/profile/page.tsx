@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import api, { getUserAvatarUrl } from '@/lib/api';
 import { Camera, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -20,6 +21,7 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  useAutoDismiss(feedback, () => setFeedback(null));
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   // Foto yang baru dipilih, belum dikirim ke server sampai "Simpan Perubahan" ditekan.
@@ -33,8 +35,9 @@ export default function ProfilePage() {
     return `${base}${base.includes('?') ? '&' : '?'}v=${encodeURIComponent(user.avatar || 'awal')}`;
   };
 
+  // Data akun disegarkan berkala dari server; selama sedang mengedit, isian jangan ditimpa.
   useEffect(() => {
-    if (user) {
+    if (user && !isEditing) {
       setFullname(user.fullname || '');
       setTelephone(user.telephone || '');
       setUsername(user.username || '');
@@ -42,7 +45,7 @@ export default function ProfilePage() {
       setPhotoPreview(serverAvatarUrl());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isEditing]);
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

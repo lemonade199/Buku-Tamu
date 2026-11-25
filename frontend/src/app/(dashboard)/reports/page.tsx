@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { parseServerDate } from '@/lib/datetime';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
 import { VisitorItem } from '@/types';
 import MonthlyVisitsChart from '@/components/MonthlyVisitsChart';
 import {
@@ -15,10 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 export default function ReportsPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role_code === 'ADMIN';
   const [visitors, setVisitors] = useState<VisitorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,6 +33,7 @@ export default function ReportsPage() {
 
   const [receptionistOptions, setReceptionistOptions] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  useAutoDismiss(feedback, () => setFeedback(null));
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -81,20 +80,14 @@ export default function ReportsPage() {
     fetchVisitors();
   }, [fetchVisitors]);
 
-  // Daftar resepsionis diambil dari database: akun aktif berperan resepsionis (bisa dilihat admin),
+  // Daftar resepsionis diambil dari database (akun aktif berperan resepsionis) untuk admin maupun resepsionis,
   // ditambah nama penyetuju yang benar-benar tercatat di data kunjungan.
   useEffect(() => {
-    if (!isAdmin) return;
     api
-      .get<{ success: boolean; data: { fullname: string; role_code: string | null; is_active: boolean }[] }>('/auth/users')
-      .then((res) => {
-        const names = (res.data.data || [])
-          .filter((u) => u.role_code === 'PETUGAS' && u.is_active)
-          .map((u) => u.fullname);
-        setReceptionistOptions(names);
-      })
+      .get<{ success: boolean; data: string[] }>('/auth/receptionists')
+      .then((res) => setReceptionistOptions(res.data.data || []))
       .catch((err) => console.error('Gagal mengambil daftar resepsionis:', err));
-  }, [isAdmin]);
+  }, []);
 
   const receptionistChoices = Array.from(
     new Set([...receptionistOptions, ...visitors.map((v) => v.approved_by).filter((n): n is string => Boolean(n))])

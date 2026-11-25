@@ -139,11 +139,13 @@ class CheckinService:
 
         pass_card.status = 'PENDING'
         pass_card.updated_at = now
+        self.db.flush()  # id_visitor dibutuhkan audit log agar dashboard bisa menampilkan nama tamunya
 
         audit = AuditLog(
             id_user=handled_by_user_id,
             action='VISITOR_REGISTER_PENDING',
             entity='visitors',
+            entity_id=str(visitor.id_visitor),
             description=f"Registrasi tamu baru {visitor.fullname} dengan kartu pass #{pass_card.no_pass} menunggu konfirmasi resepsionis",
             ip_address=ip_address,
             user_agent=user_agent

@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import { ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -42,6 +43,8 @@ export default function DashboardPage() {
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useAutoDismiss(feedback, () => setFeedback(null));
 
   // Modal detail dan modal tolak bisa ditutup dengan tombol Escape.
   useEffect(() => {

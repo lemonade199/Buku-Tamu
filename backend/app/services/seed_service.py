@@ -13,6 +13,25 @@ def create_sample_photo(filename: str, color: tuple):
         img = Image.new('RGB', (200, 200), color=color)
         img.save(full_path, format='JPEG', quality=85)
 
+def repair_held_pass_status(db: Session) -> int:
+    """Kembalikan status kartu yang tercatat AVAILABLE padahal masih dipegang tamu. Mengembalikan jumlah kartu yang diperbaiki."""
+    repaired = 0
+    held = (
+        db.query(Visitor, Pass)
+        .join(Pass, Pass.id_pass == Visitor.id_pass)
+        .filter(Pass.status == 'AVAILABLE')
+        .filter(
+            (Visitor.status == 'PENDING')
+            | ((Visitor.status == 'APPROVED') & Visitor.check_out_at.is_(None))
+        )
+        .all()
+    )
+    for visitor, pass_obj in held:
+        pass_obj.status = 'PENDING' if visitor.status == 'PENDING' else 'IN_USE'
+        repaired += 1
+    return repaired
+
+
 def seed_initial_data(db: Session, is_testing: bool = False):
     admin_role = db.query(Role).filter(Role.code == 'ADMIN').first()
     if not admin_role:
@@ -38,7 +57,8 @@ def seed_initial_data(db: Session, is_testing: bool = False):
                 "visitors.checkin",
                 "visitors.checkout",
                 "pass.read",
-                "pass.manage"
+                "pass.manage",
+                "reports.read"
             ]
         )
         db.add(petugas_role)
@@ -307,6 +327,10 @@ def seed_initial_data(db: Session, is_testing: bool = False):
         for seeded in stale_seed_visitors:
             seeded.status = 'APPROVED'
             seeded.approved_at = seeded.approved_at or seeded.check_in_at
+
+    # Kartu bisa tercatat Tersedia padahal masih dipegang tamu (data dari backend versi lama atau restore backup).
+    # Tanpa ini kartu itu bisa dibagikan ke tamu lain, sementara tamu lama tidak bisa diproses.
+    repair_held_pass_status(db)
 
     db.commit()
     print("Initial seed data successfully checked/loaded.")

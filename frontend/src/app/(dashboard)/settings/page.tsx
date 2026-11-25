@@ -7,6 +7,7 @@ import api, { resolveServerUrl } from '@/lib/api';
 import RoleMembersModal, { RoleOption } from '@/components/RoleMembersModal';
 import AccessAuditLog, { ACCESS_AUDIT_REFRESH_EVENT } from '@/components/AccessAuditLog';
 import { CheckCircle2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 type TabType = 'umum' | 'smtp' | 'notifikasi' | 'role' | 'sso' | 'backup';
 
@@ -90,6 +91,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  useAutoDismiss(successMessage, () => setSuccessMessage(''));
+  useAutoDismiss(errorMessage, () => setErrorMessage(''));
   const [logoPreview, setLogoPreview] = useState<string>('/seamolec-logo.png');
   const [testingEmail, setTestingEmail] = useState(false);
   const [sendingMonthlyReport, setSendingMonthlyReport] = useState(false);
@@ -237,13 +240,11 @@ export default function SettingsPage() {
       }
       setShowRoleModal(false);
       setRoleModalData({ name: '', description: '' });
-      setTimeout(() => setSuccessMessage(''), 3000);
       refreshAccessData();
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Gagal menyimpan role.';
       setRoleModalError(msg);
       setErrorMessage(msg);
-      setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setSavingRole(false);
     }
@@ -256,11 +257,9 @@ export default function SettingsPage() {
     try {
       const res = await api.delete(`/auth/roles/${role.id_role}`);
       setSuccessMessage(res.data?.message || `Role "${role.name}" berhasil dihapus.`);
-      setTimeout(() => setSuccessMessage(''), 3000);
       refreshAccessData();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menghapus role.');
-      setTimeout(() => setErrorMessage(''), 4000);
     }
   };
 
@@ -336,11 +335,9 @@ export default function SettingsPage() {
       setTriggeringBackup(true);
       const res = await api.post('/settings/backup');
       setSuccessMessage(res.data.message || 'Cadangan database berhasil dibuat.');
-      setTimeout(() => setSuccessMessage(''), 4000);
       fetchBackups();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal membuat cadangan database.');
-      setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setTriggeringBackup(false);
     }
@@ -361,7 +358,6 @@ export default function SettingsPage() {
       link.remove();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal mengunduh file cadangan.');
-      setTimeout(() => setErrorMessage(''), 3000);
     }
   };
 
@@ -373,11 +369,9 @@ export default function SettingsPage() {
       setRestoringBackup(true);
       const res = await api.post('/settings/restore', { filename });
       setSuccessMessage(res.data.message || 'Database berhasil dipulihkan.');
-      setTimeout(() => setSuccessMessage(''), 5000);
       fetchSettings();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal memulihkan database.');
-      setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setRestoringBackup(false);
     }
@@ -390,11 +384,9 @@ export default function SettingsPage() {
     try {
       await api.delete(`/settings/backup/${filename}`);
       setSuccessMessage(`File cadangan '${filename}' berhasil dihapus.`);
-      setTimeout(() => setSuccessMessage(''), 3000);
       fetchBackups();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menghapus file cadangan.');
-      setTimeout(() => setErrorMessage(''), 3000);
     }
   };
 
@@ -416,12 +408,10 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setSuccessMessage(res.data.message || 'Database berhasil dipulihkan dari file unggahan.');
-      setTimeout(() => setSuccessMessage(''), 5000);
       fetchSettings();
       fetchBackups();
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal memulihkan database dari file.');
-      setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setRestoringBackup(false);
       if (backupFileInputRef.current) backupFileInputRef.current.value = '';
@@ -447,10 +437,8 @@ export default function SettingsPage() {
         res.data?.message ||
           `Pembersihan retensi selesai: ${data?.photos_cleaned || 0} file foto dibersihkan, ${data?.visits_purged || 0} riwayat kunjungan kedaluwarsa dihapus.`
       );
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menjalankan pembersihan retensi data.');
-      setTimeout(() => setErrorMessage(''), 4000);
     } finally {
       setCleaningRetention(false);
     }
@@ -517,7 +505,6 @@ export default function SettingsPage() {
     try {
       await api.put('/settings', { [key]: nextValue });
       setSuccessMessage(nextValue ? 'Notifikasi diaktifkan.' : 'Notifikasi dinonaktifkan.');
-      setTimeout(() => setSuccessMessage(''), 2500);
     } catch (err: any) {
       setFormData((prev) => ({ ...prev, [key]: !nextValue }));
       setErrorMessage(err.response?.data?.message || 'Gagal menyimpan perubahan notifikasi.');
@@ -533,7 +520,6 @@ export default function SettingsPage() {
       await api.put('/settings', { admin_notification_email: value });
       setSavedNotifEmail(value);
       setSuccessMessage('Email penerima notifikasi disimpan.');
-      setTimeout(() => setSuccessMessage(''), 2500);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menyimpan email penerima notifikasi.');
     }
@@ -559,7 +545,6 @@ export default function SettingsPage() {
           detail: { institution_name: formData.institution_name }
         }));
       }
-      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menyimpan pengaturan.');
     } finally {
@@ -583,11 +568,9 @@ export default function SettingsPage() {
       });
       setFormData((prev) => ({ ...prev, smtp_status: 'CONNECTED' }));
       setSuccessMessage(res.data?.message || 'Koneksi ke server SMTP berhasil. Email uji telah berhasil dikirim.');
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: any) {
       setFormData((prev) => ({ ...prev, smtp_status: 'ERROR' }));
       setErrorMessage(err.response?.data?.message || 'Gagal mengirim email uji.');
-      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setTestingEmail(false);
     }
@@ -602,10 +585,8 @@ export default function SettingsPage() {
         recipient_email: formData.admin_notification_email,
       });
       setSuccessMessage(res.data?.message || 'Rekap laporan bulanan berhasil dikirim ke email admin.');
-      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal mengirim rekap laporan bulanan.');
-      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setSendingMonthlyReport(false);
     }
@@ -648,14 +629,12 @@ export default function SettingsPage() {
       }
       setSuccessMessage(`Hak akses "${featureName}" untuk role ${role} berhasil diperbarui.`);
       refreshAccessData();
-      setTimeout(() => setSuccessMessage(''), 3500);
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('permissions-updated'));
       }
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Gagal menyimpan perubahan hak akses.');
-      setTimeout(() => setErrorMessage(''), 3500);
       fetchMatrix();
     } finally {
       setPendingPermissionChange(null);
@@ -726,17 +705,17 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
                 <table className="w-full text-left text-xs md:text-sm">
                   <thead>
-                    <tr className="text-[#3B0207] font-bold">
-                      <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Role</span></th>
-                      <th className="pb-2 font-bold"><span className="border-b border-[#3B0207] pb-0.5">Deskripsi</span></th>
-                      <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Jumlah pengguna</span></th>
-                      <th className="pb-2 font-bold text-center"><span className="border-b border-[#3B0207] pb-0.5">Aksi</span></th>
+                    <tr className="border-b border-[#E8DCCB] bg-[#FAF7F0]">
+                      <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Role</th>
+                      <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600">Deskripsi</th>
+                      <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center whitespace-nowrap">Jumlah pengguna</th>
+                      <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-[#F0E8DC]">
                     {rolesList.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-4 text-center text-gray-500 text-xs">
@@ -745,15 +724,15 @@ export default function SettingsPage() {
                       </tr>
                     ) : (
                       rolesList.map((role) => (
-                        <tr key={role.id_role}>
-                          <td className="py-3 pr-4">
+                        <tr key={role.id_role} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="px-4 py-3">
                             <span className={`px-3.5 py-1 rounded-full text-xs font-semibold inline-block ${
                               role.code === 'ADMIN' ? 'bg-black text-white' : 'bg-[#8A001A] text-white'
                             }`}>
                               {role.display_name || role.name}
                             </span>
                           </td>
-                          <td className="py-3 pr-4 text-xs text-gray-800 font-medium">
+                          <td className="px-4 py-3 text-xs text-gray-800 font-medium">
                             {role.description || '—'}
                           </td>
                           <td className="py-3 px-4 text-center">
@@ -768,7 +747,7 @@ export default function SettingsPage() {
                               {role.user_count}
                             </button>
                           </td>
-                          <td className="py-3 pl-4 text-center space-x-1.5 whitespace-nowrap">
+                          <td className="px-4 py-3 text-center space-x-1.5 whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => handleOpenEditRole(role)}
@@ -870,7 +849,6 @@ export default function SettingsPage() {
                 onClose={() => setMembersRole(null)}
                 onChanged={(message) => {
                   setSuccessMessage(message);
-                  setTimeout(() => setSuccessMessage(''), 3500);
                   refreshAccessData();
                 }}
               />
@@ -1447,7 +1425,7 @@ export default function SettingsPage() {
                         </div>
 
                         <p className="text-blue-800 leading-relaxed">
-                          Sistem telah menyediakan endpoint otentikasi SSO dan tombol <strong>Masuk dengan Akun Google / SSO</strong> di halaman login. Daftarkan URL callback di bawah ini ke Google Cloud Console Anda:
+                          Daftarkan URL callback di bawah ini ke Google Cloud Console Anda:
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">

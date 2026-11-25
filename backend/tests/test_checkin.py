@@ -194,3 +194,27 @@ def test_checkin_duplicate_name_blocked(client):
     })
     assert res3.status_code == 400
     assert 'masih tercatat aktif' in res3.get_json()['message'].lower()
+
+
+def test_startup_repairs_pass_marked_available_while_held(client):
+    from backend.app.models.entities import Visitor
+    from backend.app.services.seed_service import repair_held_pass_status
+
+    db = get_db_session()
+    try:
+        pass_01 = db.query(Pass).filter(Pass.no_pass == '01').first()
+        pass_02 = db.query(Pass).filter(Pass.no_pass == '02').first()
+        pass_01.status = 'AVAILABLE'
+        pass_02.status = 'AVAILABLE'
+        db.add(Visitor(id_pass=pass_01.id_pass, fullname='Tamu Menunggu', status='PENDING', capture_id='a.jpg'))
+        db.add(Visitor(id_pass=pass_02.id_pass, fullname='Tamu Di Dalam', status='APPROVED', capture_id='b.jpg'))
+        db.commit()
+
+        assert repair_held_pass_status(db) == 2
+        db.commit()
+        assert db.query(Pass).filter(Pass.no_pass == '01').first().status == 'PENDING'
+        assert db.query(Pass).filter(Pass.no_pass == '02').first().status == 'IN_USE'
+        # Dijalankan ulang tidak mengubah apa pun.
+        assert repair_held_pass_status(db) == 0
+    finally:
+        db.close()

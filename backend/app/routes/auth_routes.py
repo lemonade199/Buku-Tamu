@@ -14,7 +14,7 @@ from backend.app.services.auth_service import AuthService
 from backend.app.schemas.auth import LoginRequest, RefreshRequest
 from backend.app.utils.security import verify_password, hash_password
 from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
-from backend.app.middleware.auth import role_required
+from backend.app.middleware.auth import role_required, permission_required
 from backend.app.services.email_service import send_new_account_email, send_password_reset_email
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
@@ -341,6 +341,20 @@ def get_all_users():
             'success': True,
             'data': [u.to_dict() for u in users]
         }), 200
+    finally:
+        db.close()
+
+@auth_bp.route('/receptionists', methods=['GET'])
+@permission_required('reports.read')
+def get_receptionist_names():
+    """Nama resepsionis aktif untuk filter Laporan. Hanya nama, supaya resepsionis tidak melihat data akun lain."""
+    db = get_db_session()
+    try:
+        names = [
+            u.fullname
+            for u in db.query(User).join(Role).filter(Role.code == 'PETUGAS', User.is_active.is_(True)).order_by(User.fullname.asc()).all()
+        ]
+        return jsonify({'success': True, 'data': names}), 200
     finally:
         db.close()
 

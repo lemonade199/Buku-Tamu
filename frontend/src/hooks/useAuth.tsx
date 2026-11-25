@@ -92,6 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser((prev) => {
         if (!prev) return prev;
         const merged = { ...prev, ...fresh, avatar: prev.avatar };
+        // Tidak ada yang berubah: pakai objek lama supaya halaman tidak ikut dirender ulang setiap 8 detik.
+        if (JSON.stringify(merged) === JSON.stringify(prev)) return prev;
         localStorage.setItem('user_info', JSON.stringify(merged));
         return merged;
       });

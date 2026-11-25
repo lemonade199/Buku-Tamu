@@ -7,6 +7,7 @@ import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { formatJam } from '@/lib/datetime';
 import { LogOut, Search, RefreshCw, CheckCircle2, AlertCircle, User, X } from 'lucide-react';
 import CheckoutConfirmModal, { ActiveVisitor } from '@/components/CheckoutConfirmModal';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
@@ -31,6 +32,7 @@ export default function CheckoutPage() {
 
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  useAutoDismiss(feedback, () => setFeedback(null));
 
   const fetchActiveVisitors = useCallback(async () => {
     setLoading(true);

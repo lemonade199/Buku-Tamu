@@ -7,6 +7,7 @@ import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { formatJam } from '@/lib/datetime';
 import { VisitorItem } from '@/types';
 import { Search, User, CheckCircle2, AlertCircle, X, RefreshCw } from 'lucide-react';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 export default function ReceptionGuestIntakePage() {
   const { user, loading: authLoading } = useAuth();
@@ -25,6 +26,7 @@ export default function ReceptionGuestIntakePage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  useAutoDismiss(feedback, () => setFeedback(null));
   const [approvingId, setApprovingId] = useState<number | null>(null);
 
   const fetchPendingVisitors = useCallback(async () => {

@@ -11,10 +11,10 @@ describe('describeActivity', () => {
     ).toBe('Roseanne menyetujui kunjungan nuri (kartu 01)');
   });
 
-  it('pendaftaran dari kiosk tidak punya pelaku', () => {
+  it('pendaftaran dari form tamu tidak punya pelaku', () => {
     expect(
       describeActivity({ ...base, action: 'VISITOR_REGISTER_PENDING', actor: null, visitor_name: 'nuri', no_pass: '01' })
-    ).toBe('nuri mendaftar di kiosk dan menunggu persetujuan (kartu 01)');
+    ).toBe('nuri mengisi buku tamu dan menunggu persetujuan (kartu 01)');
   });
 
   it('check-out menyebut kartu yang kembali', () => {

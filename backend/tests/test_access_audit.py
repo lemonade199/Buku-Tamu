@@ -88,3 +88,15 @@ def test_access_history_requires_admin(client):
     res = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
     headers = {'Authorization': f"Bearer {res.get_json()['data']['access_token']}"}
     assert client.get('/api/v1/auth/audit/access', headers=headers).status_code == 403
+
+
+def test_receptionist_names_visible_to_receptionist(client):
+    login = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    token = login.get_json()['data']['access_token']
+
+    res = client.get('/api/v1/auth/receptionists', headers={'Authorization': f'Bearer {token}'})
+    assert res.status_code == 200, res.get_json()
+    names = res.get_json()['data']
+    assert isinstance(names, list) and len(names) > 0
+    # Hanya nama yang dikirim, bukan data akun lengkap.
+    assert all(isinstance(n, str) for n in names)

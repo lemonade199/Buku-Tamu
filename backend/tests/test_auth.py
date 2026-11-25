@@ -144,3 +144,4 @@ def test_role_management_lifecycle(client):
     # 5. Delete custom role
     del_res = client.delete(f'/api/v1/auth/roles/{role_id}', headers=headers)
     assert del_res.status_code == 200
+

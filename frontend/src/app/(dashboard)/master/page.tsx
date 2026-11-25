@@ -21,6 +21,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 interface PassItem {
   id_pass: number;
@@ -120,6 +121,8 @@ export default function MasterDataPage() {
   const [copiedPassword, setCopiedPassword] = useState(false);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useAutoDismiss(feedback, () => setFeedback(null));
 
   const fetchData = useCallback(async () => {
     setLoading(true);

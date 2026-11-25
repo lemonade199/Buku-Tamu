@@ -1,0 +1,1877 @@
+{
+  "info": {
+    "_postman_id": "e2653b1c-a87b-4ddf-979a-31fd68ccd7ae",
+    "name": "Buku Tamu Digital API",
+    "description": "Dokumentasi REST API Sistem Buku Tamu Digital (Flask).\n\n**Cara pakai:**\n1. Jalankan backend (`docker compose up -d`), lalu pilih environment **Buku Tamu - Lokal**.\n2. Buka *Autentikasi → Login* dan klik **Send**. Token tersimpan otomatis.\n3. Request lain langsung memakai token itu (Authorization: Bearer).\n\nSemua waktu dari server dikirim dalam UTC tanpa zona; tampilkan sebagai WIB (UTC+7).\n\nFormat respons umum: `{ \"success\": true|false, \"message\": \"...\", \"data\": ... }`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Sistem",
+      "item": [
+        {
+          "name": "Health check service API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{host}}/api/health",
+              "host": [
+                "{{host}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Memeriksa apakah server backend berjalan normal.\n\n**Akses:** Publik (tanpa login)",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Autentikasi",
+      "item": [
+        {
+          "name": "Login staf / administrator",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Mengautentikasi pengguna menggunakan username dan kata sandi untuk memperoleh JWT access token dan refresh token. Dilengkapi rate limiting.\n\n**Akses:** Publik (tanpa login)\n\n**Isi body (LoginRequest):**\n- `username` (wajib) — Username atau email\n- `password` (wajib) — Password pengguna",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Simpan token otomatis supaya request lain langsung bisa dipakai.",
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.access_token) {",
+                  "  pm.collectionVariables.set('access_token', res.data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', res.data.refresh_token);",
+                  "}",
+                  "pm.test('Login berhasil', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout & pencabutan refresh token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Mencabut status aktif refresh token pengguna di basis data.\n\n**Akses:** Publik (tanpa login)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Memperbarui JWT Access Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Menerbitkan access token baru menggunakan refresh token yang masih aktif.\n\n**Akses:** Publik (tanpa login)\n\n**Isi body (RefreshRequest):**\n- `refresh_token` (wajib) — Token refresh yang valid",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"urlsafe_random_token_string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.access_token) pm.collectionVariables.set('access_token', res.data.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login dengan Google SSO",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sso/callback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sso",
+                "callback"
+              ]
+            },
+            "description": "**Akses:** Publik (tanpa login)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"budi@contoh.id\",\n  \"credential\": \"<google-id-token>\",\n  \"id_token\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Konfigurasi login Google SSO (publik)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sso/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sso",
+                "config"
+              ]
+            },
+            "description": "**Akses:** Publik (tanpa login)",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profil saya",
+      "item": [
+        {
+          "name": "Informasi pengguna yang sedang login",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Ganti kata sandi akun sendiri",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "password"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"PasswordLama123!\",\n  \"new_password\": \"PasswordBaru123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Perbarui profil akun pengguna sendiri",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Budi Rahardjo\",\n  \"username\": \"budi_r\",\n  \"email\": \"budi@instansi.go.id\",\n  \"telephone\": \"081234567890\",\n  \"avatar\": \"data:image/png;base64,iVBORw0KGgo...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pengguna",
+      "item": [
+        {
+          "name": "Daftar nama resepsionis aktif (filter Laporan)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/receptionists",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "receptionists"
+              ]
+            },
+            "description": "Nama resepsionis aktif untuk filter Laporan. Hanya nama, supaya resepsionis tidak melihat data akun lain.\n\n**Akses:** Butuh salah satu izin: reports.read (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Daftar seluruh akun pengguna (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Buat akun pengguna baru (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Siti Aminah\",\n  \"username\": \"siti\",\n  \"email\": \"siti@instansi.go.id\",\n  \"telephone\": \"081299998888\",\n  \"role_code\": \"PETUGAS\",\n  \"password\": \"Petugas123!\",\n  \"avatar\": \"data:image/png;base64,iVBORw0KGgo...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Perbarui data akun pengguna oleh Admin",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/:user_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                ":user_id"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": "ID user (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Budi Santoso\",\n  \"username\": \"admin\",\n  \"email\": \"budi@contoh.id\",\n  \"telephone\": \"081234567890\",\n  \"role_code\": \"PETUGAS\",\n  \"is_active\": true,\n  \"avatar\": \"data:image/png;base64,iVBORw0KGgo...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ambil file gambar avatar staf",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/:user_id/avatar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                ":user_id",
+                "avatar"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": "ID user (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Reset kata sandi pengguna oleh Admin",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/:user_id/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                ":user_id",
+                "reset-password"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": "ID user (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"PasswordBaru123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Aktifkan atau nonaktifkan akun pengguna (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/:user_id/toggle-active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                ":user_id",
+                "toggle-active"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": "ID user (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Aktifkan atau nonaktifkan akun pengguna (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users/:user_id/toggle-active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                ":user_id",
+                "toggle-active"
+              ],
+              "variable": [
+                {
+                  "key": "user_id",
+                  "value": "1",
+                  "description": "ID user (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Role & hak akses",
+      "item": [
+        {
+          "name": "Riwayat perubahan pengguna, role, dan hak akses (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/audit/access?limit=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "audit",
+                "access"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                }
+              ]
+            },
+            "description": "Riwayat perubahan pengguna, role, dan hak akses (terbaru di atas).\n\n**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Daftar role beserta jumlah pengguna",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "roles"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Buat role baru (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "roles"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Security\",\n  \"description\": \"Petugas keamanan gedung\",\n  \"code\": \"SECURITY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Perbarui role (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/roles/:id_role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "roles",
+                ":id_role"
+              ],
+              "variable": [
+                {
+                  "key": "id_role",
+                  "value": "1",
+                  "description": "ID role (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Security\",\n  \"description\": \"Petugas keamanan gedung\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Hapus role (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/roles/:id_role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "roles",
+                ":id_role"
+              ],
+              "variable": [
+                {
+                  "key": "id_role",
+                  "value": "1",
+                  "description": "ID role (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Tabel hak akses per role",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/roles/matrix",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "roles",
+                "matrix"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Simpan tabel hak akses per role (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/roles/matrix",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "roles",
+                "matrix"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matrix\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Statistik real-time dashboard & grafik tren kunjungan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "metrics"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tamu",
+      "item": [
+        {
+          "name": "Daftar riwayat kunjungan tamu dengan filter & paginasi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors?search=&status=&start_date=&end_date=&page=&limit=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "start_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "end_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Detail informasi satu kunjungan tamu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Perbarui data kunjungan tamu",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: visitors.update, visitors.manage, visitors.create (admin selalu boleh)\n\n**Isi body (VisitorUpdateRequest):**\n- `fullname` (opsional) — Nama lengkap pengunjung\n- `institution` (opsional) — Asal instansi atau perusahaan\n- `representing` (opsional) — Pihak atau pejabat yang dikunjungi\n- `purpose` (opsional) — Tujuan atau keperluan kunjungan\n- `id_pass` (opsional) — ID pass baru jika ingin dipindahkan (hanya berlaku jika status PENDING)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Budi Santoso\",\n  \"institution\": \"SMKN 13 Bandung\",\n  \"representing\": \"\",\n  \"purpose\": \"Kunjungan industri\",\n  \"id_pass\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Setujui registrasi tamu & serahkan kartu pass",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor",
+                "approve"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: visitors.approve, visitors.checkin, pass.manage (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Check-out tamu manual berdasarkan ID pengunjung",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor",
+                "checkout"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Kartu retak\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ambil file foto wajah pengunjung (Terproteksi)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor/photo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor",
+                "photo"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Tolak registrasi tamu dengan alasan",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor",
+                "reject"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: visitors.approve, visitors.checkin, pass.manage (admin selalu boleh)\n\n**Isi body (RejectRegistrationRequest):**\n- `reason` (wajib) — Alasan penolakan registrasi",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Pejabat yang dituju sedang dinas luar kota\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cek status pendaftaran tamu (publik, untuk layar kiosk)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/:id_visitor/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                ":id_visitor",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id_visitor",
+                  "value": "1",
+                  "description": "ID visitor (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Publik (tanpa login)",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Daftar tamu aktif di dalam gedung",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                "active"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Registrasi mandiri tamu di Kiosk",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/checkin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                "checkin"
+              ]
+            },
+            "description": "Pengunjung mendaftarkan diri dengan foto wajah webcam. Kartu pass fisik otomatis dialokasikan dan status menjadi PENDING menunggu persetujuan resepsionis. Terproteksi rate limiting.\n\n**Akses:** Publik (token opsional)\n\n**Isi body (CheckinRequest):**\n- `fullname` (wajib) — Nama lengkap pengunjung\n- `institution` (opsional) — Asal instansi atau perusahaan\n- `representing` (opsional) — Pihak atau pejabat yang dikunjungi\n- `purpose` (opsional) — Tujuan atau keperluan kunjungan\n- `id_pass` (opsional) — ID pass yang dipilih\n- `no_pass` (opsional) — Nomor pass yang dipilih (misal: 01)\n- `photo_base64` (wajib) — Data foto wajib format base64 dari kamera",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Ahmad Dahlan\",\n  \"institution\": \"PT Sinergi Nusantara\",\n  \"representing\": \"Direktur IT\",\n  \"purpose\": \"Konsultasi teknis integrasi sistem\",\n  \"photo_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Check-out tamu via nomor pass / RFID",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                "checkout"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)\n\n**Isi body (CheckoutRequest):**\n- `id_visitor` (opsional) — ID pengunjung yang akan check-out\n- `no_pass` (opsional) — Nomor kartu pass yang dikembalikan\n- `notes` (opsional) — Catatan kepulangan opsional",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_visitor\": 1,\n  \"no_pass\": \"PASS-01\",\n  \"notes\": \"Tamu pulang dalam keadaan tertib\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unduh rekapitulasi laporan kunjungan (Excel .xlsx)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/export/excel?search=&status=&start_date=&end_date=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                "export",
+                "excel"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "start_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "end_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: reports.export (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Unduh rekapitulasi laporan kunjungan (Dokumen PDF)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/export/pdf?search=&status=&start_date=&end_date=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                "export",
+                "pdf"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "start_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                },
+                {
+                  "key": "end_date",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Opsional"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: reports.export (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Daftar antrean tamu di ruang tunggu (Pending Approval)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/visitors/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "visitors",
+                "pending"
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: visitors.read, visitors.create (admin selalu boleh)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kartu pass",
+      "item": [
+        {
+          "name": "Daftar inventaris kartu pass fisik",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass"
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: pass.read (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Daftarkan kartu pass baru (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN\n\n**Isi body (PassCreateRequest):**\n- `no_pass` (wajib) — Nomor kartu pass fisik (misal: 21)\n- `slot` (opsional) — Posisi slot rak fisik",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"no_pass\": \"PASS-11\",\n  \"slot\": \"Rak B - Slot 6\",\n  \"status\": \"MAINTENANCE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Perbarui nomor kartu atau lokasi slot (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/:id_pass",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                ":id_pass"
+              ],
+              "variable": [
+                {
+                  "key": "id_pass",
+                  "value": "1",
+                  "description": "ID pass (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"no_pass\": \"01\",\n  \"slot\": \"Rak A - 01\",\n  \"kondisi\": \"\",\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Hapus kartu pass",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/:id_pass",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                ":id_pass"
+              ],
+              "variable": [
+                {
+                  "key": "id_pass",
+                  "value": "1",
+                  "description": "ID pass (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: pass.delete, pass.manage, master.manage (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Setujui tamu yang menunggu lewat kartu pass",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/:id_pass/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                ":id_pass",
+                "approve"
+              ],
+              "variable": [
+                {
+                  "key": "id_pass",
+                  "value": "1",
+                  "description": "ID pass (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: pass.manage, visitors.approve, visitors.checkin (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Tolak tamu yang menunggu lewat kartu pass",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/:id_pass/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                ":id_pass",
+                "reject"
+              ],
+              "variable": [
+                {
+                  "key": "id_pass",
+                  "value": "1",
+                  "description": "ID pass (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: pass.manage, visitors.approve, visitors.checkin (admin selalu boleh)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejection_reason\": \"Data tidak lengkap\",\n  \"reason\": \"Data tidak lengkap\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ubah status kartu pass",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/:id_pass/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                ":id_pass",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id_pass",
+                  "value": "1",
+                  "description": "ID pass (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)\n\n**Isi body (PassStatusUpdateRequest):**\n- `status` (wajib) — Status kondisi kartu pass\n- `notes` (opsional) — Catatan perubahan status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"MAINTENANCE\",\n  \"notes\": \"Kartu retak\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Daftar kartu pass yang berstatus AVAILABLE (Siap Pakai)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/available",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                "available"
+              ]
+            },
+            "description": "**Akses:** Publik (token opsional)",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Data monitoring komprehensif kartu pass",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/monitoring",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                "monitoring"
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: pass.read (admin selalu boleh)"
+          }
+        },
+        {
+          "name": "Visualisasi kartu pass pada rak fisik",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pass/rack",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pass",
+                "rack"
+              ]
+            },
+            "description": "**Akses:** Butuh salah satu izin: pass.read (admin selalu boleh)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pengaturan",
+      "item": [
+        {
+          "name": "Ambil konfigurasi sistem & institusi (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Perbarui sebagian konfigurasi (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution_name\": \"SEAMOLEC\",\n  \"opening_time\": \"07:30\",\n  \"closing_time\": \"16:00\",\n  \"pass_warning_limit\": 1,\n  \"smtp_host\": \"\",\n  \"smtp_port\": 1,\n  \"smtp_username\": \"\",\n  \"smtp_password\": \"\",\n  \"smtp_encryption\": \"\",\n  \"smtp_sender_name\": \"\",\n  \"smtp_sender_email\": \"\",\n  \"smtp_status\": \"\",\n  \"notify_app_checkin\": true,\n  \"notify_app_backup_fail\": true,\n  \"notify_email_monthly_report\": true,\n  \"notify_email_new_account\": true,\n  \"notify_email_reset_password\": true,\n  \"admin_notification_email\": \"pimpinan@contoh.id\",\n  \"jwt_access_token_expiry\": \"\",\n  \"jwt_refresh_token_expiry\": \"\",\n  \"sso_enabled\": true,\n  \"sso_issuer\": true,\n  \"sso_client_id\": true,\n  \"sso_client_secret\": true,\n  \"session_timeout_hours\": 1,\n  \"guest_photo_retention_months\": \"\",\n  \"visit_data_retention_years\": \"\",\n  \"auto_backup_enabled\": \"\",\n  \"auto_backup_schedule\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Perbarui konfigurasi institusi, SMTP, SSO (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution_name\": \"Kementerian Keuangan RI\",\n  \"opening_time\": \"07:30\",\n  \"closing_time\": \"16:00\",\n  \"pass_warning_limit\": 5,\n  \"smtp_host\": \"smtp.mailtrap.io\",\n  \"smtp_port\": 587,\n  \"smtp_username\": \"\",\n  \"smtp_password\": \"\",\n  \"smtp_encryption\": \"\",\n  \"smtp_sender_name\": \"\",\n  \"smtp_sender_email\": \"\",\n  \"smtp_status\": \"\",\n  \"notify_app_checkin\": true,\n  \"notify_app_backup_fail\": true,\n  \"notify_email_monthly_report\": true,\n  \"notify_email_new_account\": true,\n  \"notify_email_reset_password\": true,\n  \"admin_notification_email\": \"pimpinan@contoh.id\",\n  \"jwt_access_token_expiry\": \"\",\n  \"jwt_refresh_token_expiry\": \"\",\n  \"sso_enabled\": true,\n  \"sso_issuer\": true,\n  \"sso_client_id\": true,\n  \"sso_client_secret\": true,\n  \"session_timeout_hours\": 1,\n  \"guest_photo_retention_months\": \"\",\n  \"visit_data_retention_years\": \"\",\n  \"auto_backup_enabled\": \"\",\n  \"auto_backup_schedule\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unggah logo resmi institusi (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/logo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "logo"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logo\": \"\",\n  \"photo\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Ambil file logo instansi publik",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/logo/:filename",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "logo",
+                ":filename"
+              ],
+              "variable": [
+                {
+                  "key": "filename",
+                  "value": "logo_20261125_014329_c82e4bc9.png",
+                  "description": "Nama file logo; ambil dari field logo_path di GET /settings/public"
+                }
+              ]
+            },
+            "description": "Menyajikan file logo instansi. Hanya mengizinkan file logo resmi berawalan prefix logo_.\n\n**Akses:** Publik (tanpa login)",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Ambil profil publik institusi (Nama & Logo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "public"
+              ]
+            },
+            "description": "Menyajikan data publik instansi seperti nama institusi dan URL logo aktif tanpa memerlukan otentikasi.\n\n**Akses:** Publik (tanpa login)",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Uji coba koneksi & pengiriman email SMTP",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/smtp/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "smtp",
+                "test"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"smtp_host\": \"\",\n  \"smtp_port\": 1,\n  \"smtp_username\": \"\",\n  \"smtp_password\": \"\",\n  \"smtp_encryption\": \"\",\n  \"smtp_sender_name\": \"\",\n  \"smtp_sender_email\": \"\",\n  \"recipient_email\": \"tester@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifikasi",
+      "item": [
+        {
+          "name": "Daftar notifikasi di aplikasi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Tandai satu notifikasi sudah dibaca",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications/:id_notif/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications",
+                ":id_notif",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "id_notif",
+                  "value": "1",
+                  "description": "ID notif (angka)"
+                }
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        },
+        {
+          "name": "Kirim rekap laporan bulanan ke email (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications/monthly-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications",
+                "monthly-report"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient_email\": \"admin@contoh.id\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Tandai semua notifikasi sudah dibaca",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": "**Akses:** Butuh login (Bearer token)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Backup & data",
+      "item": [
+        {
+          "name": "Buat cadangan basis data baru (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/backup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "backup"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Hapus file cadangan basis data (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/backup/:filename",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "backup",
+                ":filename"
+              ],
+              "variable": [
+                {
+                  "key": "filename",
+                  "value": "bukutamu_backup_20261124_063939.json",
+                  "description": "Nama file cadangan; ambil dari GET /settings/backups"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Unduh file cadangan basis data (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/backup/download/:filename",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "backup",
+                "download",
+                ":filename"
+              ],
+              "variable": [
+                {
+                  "key": "filename",
+                  "value": "bukutamu_backup_20261124_063939.json",
+                  "description": "Nama file cadangan; ambil dari GET /settings/backups"
+                }
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Daftar seluruh file cadangan basis data (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/backups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "backups"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN"
+          }
+        },
+        {
+          "name": "Pulihkan basis data dari cadangan JSON (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/restore",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "restore"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bersihkan data kunjungan lama sesuai masa simpan (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings/retention/cleanup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings",
+                "retention",
+                "cleanup"
+              ]
+            },
+            "description": "**Akses:** Hanya role: ADMIN",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_photo_retention_months\": \"\",\n  \"visit_data_retention_years\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

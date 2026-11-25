@@ -138,17 +138,72 @@ class VisitorRepository:
         return [{"name": r[0], "count": r[1]} for r in rows]
 
     def get_recent_activities(self, limit: int = 8) -> list:
-        from backend.app.models.entities import AuditLog
-        logs = self.db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
+        """Aktivitas terbaru dengan data terstruktur (pelaku, tamu, kartu) agar dashboard bisa menyusun kalimat sendiri."""
+        import re
+        from backend.app.models.entities import AuditLog, Pass
+
+        # Ambil lebih banyak dari limit karena sebagian log kartu adalah pasangan dari log tamu dan akan dilewati.
+        logs = self.db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit * 3).all()
+
+        visitor_ids = {int(l.entity_id) for l in logs if l.entity == 'visitors' and (l.entity_id or '').isdigit()}
+        pass_ids = {int(l.entity_id) for l in logs if l.entity == 'pass' and (l.entity_id or '').isdigit()}
+        visitors = {v.id_visitor: v for v in self.db.query(Visitor).filter(Visitor.id_visitor.in_(visitor_ids)).all()} if visitor_ids else {}
+        passes = {p.id_pass: p for p in self.db.query(Pass).filter(Pass.id_pass.in_(pass_ids)).all()} if pass_ids else {}
+
+        # Menyetujui/menolak dari Monitoring Pass menulis dua log sekaligus (tamu + kartu); cukup tampilkan log tamunya.
+        visitor_log_moments = [(l.id_user, l.created_at) for l in logs if l.entity == 'visitors']
+
+        def is_pair_of_visitor_log(log) -> bool:
+            return any(
+                uid == log.id_user and abs((ts - log.created_at).total_seconds()) <= 3
+                for uid, ts in visitor_log_moments
+            )
+
         days_id = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
         result = []
         for l in logs:
-            dt = l.created_at
-            day_name = days_id[dt.weekday()]
+            if l.action == 'PASS_STATUS_CHANGE' and is_pair_of_visitor_log(l):
+                continue
+
+            desc = l.description or ''
+            visitor_name = None
+            no_pass = None
+            from_status = None
+            to_status = None
+
+            if l.entity == 'visitors':
+                v = visitors.get(int(l.entity_id)) if (l.entity_id or '').isdigit() else None
+                if v:
+                    visitor_name = v.fullname
+                    no_pass = v.pass_card.no_pass if v.pass_card else None
+                else:
+                    # Log pendaftaran lama tidak menyimpan id tamu; ambil dari kalimatnya.
+                    m = re.search(r"tamu (?:baru )?(.+?)(?: dengan kartu| disetujui| ditolak| \(Pass|\.|$)", desc)
+                    visitor_name = m.group(1).strip() if m else None
+            elif l.entity == 'pass':
+                p = passes.get(int(l.entity_id)) if (l.entity_id or '').isdigit() else None
+                no_pass = p.no_pass if p else None
+                m = re.search(r"dari (\w+) menjadi (\w+)", desc)
+                if m:
+                    from_status, to_status = m.group(1), m.group(2)
+
+            if no_pass is None:
+                m = re.search(r"#(\w+)", desc)
+                no_pass = m.group(1) if m else None
+
+            dt = to_wib(l.created_at)
             result.append({
                 "id": l.id_log,
-                "date": f"{day_name}, {dt.strftime('%d/%m/%Y')}",
+                "date": f"{days_id[dt.weekday()]}, {dt.strftime('%d/%m/%Y')}",
                 "time": dt.strftime('%H.%M'),
-                "description": l.description or l.action
+                "action": l.action,
+                "actor": l.user.fullname if l.user else None,
+                "visitor_name": visitor_name,
+                "no_pass": no_pass,
+                "from_status": from_status,
+                "to_status": to_status,
+                "description": desc or l.action,
             })
+            if len(result) >= limit:
+                break
         return result
