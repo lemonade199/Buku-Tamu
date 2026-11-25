@@ -17,6 +17,14 @@
   },
   "variable": [
     {
+      "key": "host",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "baseUrl",
+      "value": "{{host}}/api/v1"
+    },
+    {
       "key": "access_token",
       "value": ""
     },
