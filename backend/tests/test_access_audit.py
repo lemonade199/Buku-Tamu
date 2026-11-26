@@ -129,3 +129,57 @@ def test_role_permissions_follow_matrix_on_fresh_install(client):
     login = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
     headers = {'Authorization': f"Bearer {login.get_json()['data']['access_token']}"}
     assert client.get('/api/v1/visitors/export/excel', headers=headers).status_code == 200
+
+
+def test_endpoints_enforce_permissions_and_admin_role(client):
+    admin = _admin_headers(client)
+
+    # Buat role kosong tanpa izin & akun dengan role tersebut
+    r = client.post('/api/v1/auth/roles', json={'name': 'Operator Kosong', 'description': 'Tanpa izin'}, headers=admin)
+    assert r.status_code == 201
+    role_code = r.get_json()['data']['code']
+
+    u = client.post('/api/v1/auth/users', json={
+        'fullname': 'User Tanpa Izin',
+        'username': 'operator_nol',
+        'email': 'operator_nol@seamolec.org',
+        'role_code': role_code,
+        'password': 'User123!',
+    }, headers=admin)
+    assert u.status_code == 201
+
+    login_op = client.post('/api/v1/auth/login', json={'username': 'operator_nol', 'password': 'User123!'})
+    op_headers = {'Authorization': f"Bearer {login_op.get_json()['data']['access_token']}"}
+
+    # Semua endpoint terproteksi harus menolak 403
+    assert client.get('/api/v1/dashboard/metrics', headers=op_headers).status_code == 403
+    assert client.get('/api/v1/visitors', headers=op_headers).status_code == 403
+    assert client.get('/api/v1/visitors/active', headers=op_headers).status_code == 403
+    assert client.get('/api/v1/visitors/1', headers=op_headers).status_code == 403
+    assert client.get('/api/v1/visitors/1/photo', headers=op_headers).status_code == 403
+    assert client.post('/api/v1/visitors/checkout', json={'no_pass': '01'}, headers=op_headers).status_code == 403
+    assert client.post('/api/v1/visitors/1/checkout', headers=op_headers).status_code == 403
+    assert client.put('/api/v1/pass/1/status', json={'status': 'AVAILABLE'}, headers=op_headers).status_code == 403
+    assert client.post('/api/v1/settings/smtp/test', json={'smtp_host': 'smtp.example.com'}, headers=op_headers).status_code == 403
+
+    # Petugas (Resepsionis) juga ditolak untuk test SMTP (khusus ADMIN)
+    login_petugas = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    petugas_headers = {'Authorization': f"Bearer {login_petugas.get_json()['data']['access_token']}"}
+    assert client.post('/api/v1/settings/smtp/test', json={'smtp_host': 'smtp.example.com'}, headers=petugas_headers).status_code == 403
+
+
+def test_admin_respects_permission_matrix(client):
+    admin = _admin_headers(client)
+
+    # Secara bawaan di matriks, Admin tidak punya izin Penerimaan tamu & Pengembalian akses
+    assert client.get('/api/v1/visitors/pending', headers=admin).status_code == 403
+    assert client.post('/api/v1/visitors/checkout', json={'no_pass': '01'}, headers=admin).status_code == 403
+
+    # Aktifkan Penerimaan tamu untuk Admin di matriks -> langsung diizinkan
+    matrix = client.get('/api/v1/auth/roles/matrix', headers=admin).get_json()['data']
+    for row in matrix:
+        if row['id'] == 'checkin':
+            row['admin'] = True
+    assert client.put('/api/v1/auth/roles/matrix', json={'matrix': matrix}, headers=admin).status_code == 200
+    assert client.get('/api/v1/visitors/pending', headers=admin).status_code == 200
+

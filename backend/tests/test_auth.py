@@ -145,3 +145,142 @@ def test_role_management_lifecycle(client):
     del_res = client.delete(f'/api/v1/auth/roles/{role_id}', headers=headers)
     assert del_res.status_code == 200
 
+
+def _enable_sso(client, enabled=True, client_id='test-google-client-id'):
+    login_res = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_res.get_json()['data']['access_token']
+    headers = {'Authorization': f'Bearer {token}'}
+    res = client.put('/api/v1/settings', json={
+        'sso_enabled': enabled,
+        'sso_issuer': 'https://accounts.google.com',
+        'sso_client_id': client_id,
+    }, headers=headers)
+    assert res.status_code == 200
+
+
+def test_sso_rejects_when_disabled(client):
+    _enable_sso(client, enabled=False)
+    res = client.post('/api/v1/auth/sso/callback', json={'credential': 'dummy-token'})
+    assert res.status_code == 403
+
+
+def test_sso_rejects_raw_email_and_forged_jwt(client, monkeypatch):
+    import base64, json, urllib.error
+    _enable_sso(client, enabled=True)
+
+    # 1. Raw email without token must be rejected
+    raw_res = client.post('/api/v1/auth/sso/callback', json={'email': 'admin@seamolec.org'})
+    assert raw_res.status_code == 400
+
+    # 2. Forged/unsigned JWT claiming admin email must be rejected when provider rejects token
+    payload = base64.urlsafe_b64encode(json.dumps({'email': 'admin@seamolec.org'}).encode()).decode().rstrip('=')
+    forged_jwt = f"eyJhbGciOiJSUzI1NiJ9.{payload}.forgedsig"
+
+    def fake_urlopen(req, timeout=10):
+        raise urllib.error.HTTPError(req.full_url, 400, 'Bad Request', {}, None)
+
+    monkeypatch.setattr('urllib.request.urlopen', fake_urlopen)
+    forged_res = client.post('/api/v1/auth/sso/callback', json={'credential': forged_jwt})
+    assert forged_res.status_code == 401
+
+
+def test_sso_rejects_audience_mismatch_and_unverified_email(client, monkeypatch):
+    import json
+    _enable_sso(client, enabled=True, client_id='expected-client-id')
+
+    class FakeResp:
+        def __init__(self, body):
+            self._body = json.dumps(body).encode('utf-8')
+        def read(self):
+            return self._body
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+
+    # Audience mismatch
+    monkeypatch.setattr('urllib.request.urlopen', lambda req, timeout=10: FakeResp({
+        'aud': 'other-client-id',
+        'iss': 'https://accounts.google.com',
+        'email': 'admin@seamolec.org',
+        'email_verified': 'true',
+    }))
+    res_aud = client.post('/api/v1/auth/sso/callback', json={'credential': 'a.b.c'})
+    assert res_aud.status_code == 401
+
+    # Unverified email
+    monkeypatch.setattr('urllib.request.urlopen', lambda req, timeout=10: FakeResp({
+        'aud': 'expected-client-id',
+        'iss': 'https://accounts.google.com',
+        'email': 'admin@seamolec.org',
+        'email_verified': 'false',
+    }))
+    res_unverified = client.post('/api/v1/auth/sso/callback', json={'credential': 'a.b.c'})
+    assert res_unverified.status_code == 401
+
+
+def test_sso_success_with_verified_provider_response(client, monkeypatch):
+    import json
+    _enable_sso(client, enabled=True, client_id='expected-client-id')
+
+    # Fetch admin's actual email from /auth/me
+    login_res = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    admin_email = login_res.get_json()['data']['user']['email']
+
+    class FakeResp:
+        def __init__(self, body):
+            self._body = json.dumps(body).encode('utf-8')
+        def read(self):
+            return self._body
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr('urllib.request.urlopen', lambda req, timeout=10: FakeResp({
+        'aud': 'expected-client-id',
+        'iss': 'https://accounts.google.com',
+        'email': admin_email,
+        'email_verified': 'true',
+    }))
+
+    res = client.post('/api/v1/auth/sso/callback', json={'credential': 'valid.jwt.token'})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['success'] is True
+    assert 'access_token' in data['data']
+    assert data['data']['user']['email'] == admin_email
+
+
+def test_audit_log_records_login_logout_and_settings_update(client):
+    from backend.app.models.base import get_db_session
+    from backend.app.models.entities import AuditLog
+
+    # 1. Failed login
+    client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'WrongPassword!'})
+
+    # 2. Successful login
+    login_res = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    assert login_res.status_code == 200
+    auth_data = login_res.get_json()['data']
+    headers = {'Authorization': f"Bearer {auth_data['access_token']}"}
+
+    # 3. Update settings
+    set_res = client.put('/api/v1/settings', json={'institution_name': 'Instansi Audit'}, headers=headers)
+    assert set_res.status_code == 200
+
+    # 4. Logout
+    out_res = client.post('/api/v1/auth/logout', json={'refresh_token': auth_data['refresh_token']}, headers=headers)
+    assert out_res.status_code == 200
+
+    db = get_db_session()
+    try:
+        actions = {a[0] for a in db.query(AuditLog.action).all()}
+        assert 'LOGIN_FAILED' in actions
+        assert 'LOGIN_SUCCESS' in actions
+        assert 'SETTINGS_UPDATED' in actions
+        assert 'LOGOUT' in actions
+    finally:
+        db.close()
+
+

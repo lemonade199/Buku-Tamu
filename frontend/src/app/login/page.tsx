@@ -85,11 +85,10 @@ function LoginForm() {
       const hash = window.location.hash.startsWith('#') ? window.location.hash.substring(1) : '';
       const params = new URLSearchParams(hash || window.location.search);
       const token = params.get('access_token') || params.get('id_token') || params.get('credential');
-      const email = params.get('email');
 
-      if (token || email) {
+      if (token) {
         setSsoLoading(true);
-        loginWithSso({ credential: token || undefined, email: email || undefined })
+        loginWithSso({ credential: token })
           .catch((err: any) => {
             setErrorMessage(err.response?.data?.message || 'Gagal masuk menggunakan akun SSO.');
           })

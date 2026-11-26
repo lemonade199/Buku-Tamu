@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from backend.app.models.base import get_db_session
 from backend.app.models.entities import User, Role, Setting, AuditLog
 from backend.app.repositories.user_repository import UserRepository
-from backend.app.services.auth_service import AuthService
+from backend.app.services.auth_service import AuthService, verify_sso_token
 from backend.app.schemas.auth import LoginRequest, RefreshRequest
 from backend.app.utils.security import verify_password, hash_password
 from backend.app.utils.photo_storage import get_photo_path, save_user_avatar
@@ -129,6 +129,16 @@ def login():
         auth_service = AuthService(user_repo)
         result = auth_service.authenticate_user(req.username, req.password)
         _clear_login_attempts(client_ip)
+        db.add(AuditLog(
+            id_user=result['user']['id_user'],
+            action='LOGIN_SUCCESS',
+            entity='user',
+            entity_id=str(result['user']['id_user']),
+            description=f"Login berhasil (@{result['user']['username']}).",
+            ip_address=client_ip,
+            user_agent=(request.headers.get('User-Agent') or '')[:500],
+        ))
+        db.commit()
         return jsonify({
             'success': True,
             'message': 'Login berhasil.',
@@ -136,6 +146,19 @@ def login():
         }), 200
     except ValueError as e:
         _record_failed_attempt(client_ip)
+        try:
+            db.add(AuditLog(
+                id_user=None,
+                action='LOGIN_FAILED',
+                entity='user',
+                entity_id=None,
+                description=f"Percobaan login gagal untuk '{req.username}'.",
+                ip_address=client_ip,
+                user_agent=(request.headers.get('User-Agent') or '')[:500],
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
         return jsonify({
             'success': False,
             'message': str(e)
@@ -174,17 +197,31 @@ def refresh():
         db.close()
 
 @auth_bp.route('/logout', methods=['POST'])
+@jwt_required(optional=True)
 def logout():
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     refresh_token = data.get('refresh_token')
-    if refresh_token:
-        db = get_db_session()
-        try:
+    uid = _current_user_id()
+    db = get_db_session()
+    try:
+        if refresh_token:
             user_repo = UserRepository(db)
             auth_service = AuthService(user_repo)
-            auth_service.logout(refresh_token)
-        finally:
-            db.close()
+            token_uid = auth_service.logout(refresh_token)
+            if uid is None:
+                uid = token_uid
+        db.add(AuditLog(
+            id_user=uid,
+            action='LOGOUT',
+            entity='user',
+            entity_id=str(uid) if uid is not None else None,
+            description="Pengguna keluar dari sistem (logout).",
+            ip_address=request.remote_addr,
+            user_agent=(request.headers.get('User-Agent') or '')[:500],
+        ))
+        db.commit()
+    finally:
+        db.close()
 
     return jsonify({
         'success': True,
@@ -941,40 +978,54 @@ def get_sso_config():
 @auth_bp.route('/sso/callback', methods=['POST'])
 def sso_callback():
     data = request.get_json(silent=True) or {}
-    email = data.get('email')
-    token = data.get('credential') or data.get('id_token')
+    token = data.get('credential') or data.get('id_token') or data.get('access_token')
 
-    # If Google ID Token is provided, decode payload
-    if not email and token:
-        try:
-            import base64
-            parts = str(token).split('.')
-            if len(parts) >= 2:
-                payload_b64 = parts[1]
-                payload_b64 += '=' * (-len(payload_b64) % 4)
-                payload_json = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
-                email = payload_json.get('email')
-        except Exception:
-            pass
-
-    if not email:
+    if not token:
         return jsonify({
             'success': False,
-            'message': 'Data autentikasi SSO tidak lengkap (alamat email tidak ditemukan).'
+            'message': 'Token autentikasi SSO wajib disertakan.'
         }), 400
 
     db = get_db_session()
     try:
         setting = db.query(Setting).first()
-        if setting and not setting.sso_enabled:
+        if not setting or not setting.sso_enabled:
             return jsonify({
                 'success': False,
                 'message': 'Login SSO sedang dinonaktifkan oleh Administrator.'
             }), 403
 
+        if not setting.sso_client_id:
+            return jsonify({
+                'success': False,
+                'message': 'Konfigurasi Client ID SSO belum diatur oleh Administrator.'
+            }), 400
+
+        try:
+            email = verify_sso_token(
+                token=token,
+                issuer=setting.sso_issuer or 'https://accounts.google.com',
+                client_id=setting.sso_client_id,
+            )
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            }), 401
+
         user_repo = UserRepository(db)
         auth_service = AuthService(user_repo)
         result = auth_service.authenticate_sso_user(email)
+        db.add(AuditLog(
+            id_user=result['user']['id_user'],
+            action='LOGIN_SSO_SUCCESS',
+            entity='user',
+            entity_id=str(result['user']['id_user']),
+            description=f"Login SSO berhasil (@{result['user']['username']}).",
+            ip_address=request.remote_addr,
+            user_agent=(request.headers.get('User-Agent') or '')[:500],
+        ))
+        db.commit()
         return jsonify({
             'success': True,
             'message': 'Autentikasi SSO berhasil.',
@@ -984,7 +1035,7 @@ def sso_callback():
         return jsonify({
             'success': False,
             'message': str(e)
-        }), 400
+        }), 401
     except Exception as e:
         return jsonify({
             'success': False,

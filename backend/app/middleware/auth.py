@@ -41,10 +41,6 @@ def permission_required(*required_permissions):
                 if not user or not user.is_active or not user.role:
                     return jsonify({'success': False, 'message': 'Akses ditolak: Pengguna tidak valid atau nonaktif.'}), 403
 
-                # Admin always has full access
-                if user.role.code == 'ADMIN':
-                    return fn(*args, **kwargs)
-
                 perms = user.role.permissions if isinstance(user.role.permissions, list) else json.loads(user.role.permissions or '[]')
                 has_perm = "*" in perms or any(p in perms for p in required_permissions)
                 if not has_perm:

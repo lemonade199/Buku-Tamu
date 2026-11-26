@@ -4,7 +4,7 @@ from datetime import time
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import Setting, AppNotification
+from backend.app.models.entities import Setting, AppNotification, AuditLog
 from backend.app.middleware.auth import role_required
 from backend.app.utils.photo_storage import get_photo_path, save_institution_logo, save_user_avatar
 from backend.app.services.backup_service import BackupService
@@ -160,6 +160,19 @@ def update_settings():
         if 'auto_backup_schedule' in data:
             setting.auto_backup_schedule = data['auto_backup_schedule']
 
+        db.flush()
+        changed_keys = sorted(k for k in data.keys() if hasattr(setting, k))
+        user_id = int(get_jwt_identity()) if get_jwt_identity() is not None else None
+        db.add(AuditLog(
+            id_user=user_id,
+            action='SETTINGS_UPDATED',
+            entity='settings',
+            entity_id=str(setting.id_setting) if setting.id_setting else None,
+            description=f"Pengaturan sistem diperbarui ({', '.join(changed_keys) if changed_keys else 'umum'}).",
+            ip_address=request.remote_addr,
+            user_agent=(request.headers.get('User-Agent') or '')[:500],
+        ))
+
         db.commit()
         db.refresh(setting)
 
@@ -197,6 +210,17 @@ def upload_logo():
             setting = Setting()
             db.add(setting)
         setting.logo_path = filename
+        db.flush()
+        user_id = int(get_jwt_identity()) if get_jwt_identity() is not None else None
+        db.add(AuditLog(
+            id_user=user_id,
+            action='SETTINGS_LOGO_UPDATED',
+            entity='settings',
+            entity_id=str(setting.id_setting) if setting.id_setting else None,
+            description=f"Logo instansi diperbarui ({filename}).",
+            ip_address=request.remote_addr,
+            user_agent=(request.headers.get('User-Agent') or '')[:500],
+        ))
         db.commit()
 
         return jsonify({
@@ -215,7 +239,7 @@ def upload_logo():
         db.close()
 
 @setting_bp.route('/smtp/test', methods=['POST'])
-@jwt_required()
+@role_required('ADMIN')
 def test_smtp():
     db = get_db_session()
     try:

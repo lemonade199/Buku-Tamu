@@ -1,15 +1,15 @@
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required
 
 from backend.app.models.base import get_db_session
 from backend.app.models.entities import Setting
 from backend.app.repositories.visitor_repository import VisitorRepository
 from backend.app.repositories.pass_repository import PassRepository
+from backend.app.middleware.auth import permission_required
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/v1/dashboard')
 
 @dashboard_bp.route('/metrics', methods=['GET'])
-@jwt_required()
+@permission_required('dashboard.read')
 def get_dashboard_metrics():
     db = get_db_session()
     try:
