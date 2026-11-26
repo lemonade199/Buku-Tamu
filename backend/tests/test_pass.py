@@ -289,3 +289,47 @@ def test_update_visitor_endpoint(client):
     }, headers={'Authorization': f'Bearer {token}'})
     assert fail_reassign.status_code == 400
     assert 'PENDING' in fail_reassign.get_json()['message']
+
+
+def test_edit_in_use_pass_in_master_auto_checkouts_visitor(client):
+    import io
+    import base64
+    from PIL import Image
+
+    img = Image.new('RGB', (100, 100), color=(20, 40, 60))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    photo_b64 = f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+
+    login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
+    token = login_admin.get_json()['data']['access_token']
+    headers = {'Authorization': f'Bearer {token}'}
+
+    # Checkin & approve using pass 7
+    reg = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Edit Master Pass',
+        'institution': 'PT Master',
+        'id_pass': 7,
+        'photo_base64': photo_b64
+    })
+    assert reg.status_code == 201
+    vid = reg.get_json()['data']['id_visitor']
+    assert client.post(f'/api/v1/visitors/{vid}/approve', headers=headers).status_code == 200
+
+    # Deactivate pass 7 via PUT /api/v1/pass/7 (Master Data edit endpoint)
+    edit_res = client.put('/api/v1/pass/7', json={
+        'no_pass': '07',
+        'slot': 'Slot 7',
+        'kondisi': 'Baik',
+        'is_active': False
+    }, headers=headers)
+    assert edit_res.status_code == 200
+    edit_data = edit_res.get_json()
+    assert edit_data['data']['status'] == 'INACTIVE'
+    assert 'otomatis di-check-out' in edit_data['message'].lower()
+
+    # Verify active visitor was checked out automatically
+    detail = client.get(f'/api/v1/visitors/{vid}', headers=headers)
+    assert detail.status_code == 200
+    assert detail.get_json()['data']['check_out_at'] is not None
+    assert detail.get_json()['data']['is_active'] is False

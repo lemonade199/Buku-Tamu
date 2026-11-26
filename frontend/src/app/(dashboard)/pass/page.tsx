@@ -44,6 +44,8 @@ function MonitoringPassPage() {
   const [selectedReceptionist, setSelectedReceptionist] = useState('Semua resepsionis');
   const [receptionistFilterOpen, setReceptionistFilterOpen] = useState(false);
   const [receptionistOptions, setReceptionistOptions] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
 
   // Daftar resepsionis dari database: akun aktif berperan resepsionis, sama seperti filter di halaman Laporan.
   useEffect(() => {
@@ -63,7 +65,7 @@ function MonitoringPassPage() {
         success: boolean;
         counts: PassCounts;
         data: PassMonitoringItem[];
-      }>('/pass/monitoring');
+      }>('/pass/monitoring?limit=500');
 
       if (res.data.counts) {
         setCounts(res.data.counts);
@@ -134,6 +136,13 @@ function MonitoringPassPage() {
     item.date && item.date !== todayStr
       ? `${item.date.slice(8, 10)}/${item.date.slice(5, 7)} ${item.check_in_time}`
       : item.check_in_time;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedStatus, selectedReceptionist]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const paginatedItems = filteredItems.slice((page - 1) * pageSize, page * pageSize);
 
   if (!authLoading && !hasAccess) {
     return (
@@ -320,8 +329,8 @@ function MonitoringPassPage() {
                   <span>Memuat data monitoring kartu pass...</span>
                 </td>
               </tr>
-            ) : filteredItems.length > 0 ? (
-              filteredItems.map((r) => (
+            ) : paginatedItems.length > 0 ? (
+              paginatedItems.map((r) => (
                 <tr key={r.id_visitor} className="hover:bg-black/5 transition-colors">
                   <td className="py-3 px-3">
                     <span className="inline-block bg-[#4A000E] text-white font-extrabold text-xs px-3.5 py-0.5 rounded-full shadow-2xs min-w-[36px] text-center">
@@ -371,6 +380,35 @@ function MonitoringPassPage() {
           </tbody>
         </table>
       </div>
+
+      {filteredItems.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600 px-1">
+          <span>
+            Menampilkan {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredItems.length)} dari {filteredItems.length} entri
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3.5 py-1.5 bg-white border border-gray-300 rounded-full font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Sebelumnya
+            </button>
+            <span className="font-semibold text-gray-800 px-2 tabular-nums">
+              Halaman {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3.5 py-1.5 bg-white border border-gray-300 rounded-full font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
