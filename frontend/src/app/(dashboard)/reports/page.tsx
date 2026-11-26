@@ -32,11 +32,15 @@ export default function ReportsPage() {
   const [downloadingExport, setDownloadingExport] = useState<'excel' | 'pdf' | null>(null);
 
   const [receptionistOptions, setReceptionistOptions] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   useAutoDismiss(feedback, () => setFeedback(null));
 
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
+    setPage(1);
     setDateError('');
     if (endDate && val && endDate < val) {
       setEndDate(val);
@@ -50,31 +54,45 @@ export default function ReportsPage() {
     }
     setDateError('');
     setEndDate(val);
+    setPage(1);
   };
+
+  const buildReportParams = useCallback((includePagination: boolean) => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.append('search', searchTerm);
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    if (selectedReceptionist !== 'Semua resepsionis') {
+      params.append('approved_by', selectedReceptionist);
+    }
+    // Laporan hanya berisi kunjungan selesai: tamu disetujui dan kartu pass sudah dikembalikan.
+    params.append('status', 'COMPLETED');
+    if (includePagination) {
+      params.append('page', String(page));
+      params.append('limit', String(limit));
+    }
+    return params;
+  }, [searchTerm, startDate, endDate, selectedReceptionist, page]);
 
   const fetchVisitors = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (startDate) params.append('start_date', startDate);
-      if (endDate) params.append('end_date', endDate);
-      // Laporan hanya berisi kunjungan selesai: tamu disetujui dan kartu pass sudah dikembalikan.
-      params.append('status', 'COMPLETED');
-      params.append('limit', '50');
+      const params = buildReportParams(true);
 
       const res = await api.get<{
         success: boolean;
         data: VisitorItem[];
+        meta?: { page: number; limit: number; total: number };
       }>(`/visitors?${params.toString()}`);
 
       setVisitors(res.data.data || []);
+      setTotal(res.data.meta?.total ?? (res.data.data?.length || 0));
     } catch (err) {
       console.error('Gagal mengambil laporan kunjungan:', err);
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, startDate, endDate]);
+  }, [buildReportParams]);
 
   useEffect(() => {
     fetchVisitors();
@@ -93,19 +111,12 @@ export default function ReportsPage() {
     new Set([...receptionistOptions, ...visitors.map((v) => v.approved_by).filter((n): n is string => Boolean(n))])
   ).sort((a, b) => a.localeCompare(b, 'id'));
 
-  const filteredVisitors = visitors.filter((v) => {
-    if (selectedReceptionist === 'Semua resepsionis') return true;
-    return (v.approved_by || '').toLowerCase() === selectedReceptionist.toLowerCase();
-  });
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const handleExportExcel = async () => {
     setDownloadingExport('excel');
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (startDate) params.append('start_date', startDate);
-      if (endDate) params.append('end_date', endDate);
-      params.append('status', 'COMPLETED');
+      const params = buildReportParams(false);
 
       const res = await api.get(`/visitors/export/excel?${params.toString()}`, {
         responseType: 'blob',
@@ -134,11 +145,7 @@ export default function ReportsPage() {
   const handleExportPDF = async () => {
     setDownloadingExport('pdf');
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (startDate) params.append('start_date', startDate);
-      if (endDate) params.append('end_date', endDate);
-      params.append('status', 'COMPLETED');
+      const params = buildReportParams(false);
 
       const res = await api.get(`/visitors/export/pdf?${params.toString()}`, {
         responseType: 'blob',
@@ -296,6 +303,7 @@ export default function ReportsPage() {
                   type="button"
                   onClick={() => {
                     setSelectedReceptionist(r);
+                    setPage(1);
                     setReceptionistFilterOpen(false);
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 transition-colors cursor-pointer"
@@ -314,7 +322,10 @@ export default function ReportsPage() {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             placeholder="Cari nama / instansi / no. pass"
             aria-label="Cari nama, instansi, atau nomor pass tamu"
             className="w-full bg-white border border-gray-300 rounded-full pl-11 pr-4 py-2 text-xs text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A] shadow-xs font-medium"
@@ -376,8 +387,8 @@ export default function ReportsPage() {
                   Memuat data laporan...
                 </td>
               </tr>
-            ) : filteredVisitors.length > 0 ? (
-              filteredVisitors.map((v) => {
+            ) : visitors.length > 0 ? (
+              visitors.map((v) => {
                 const checkInDate = parseServerDate(v.check_in_at) ?? new Date();
                 const day = String(checkInDate.getDate()).padStart(2, '0');
                 const month = String(checkInDate.getMonth() + 1).padStart(2, '0');
@@ -453,6 +464,35 @@ export default function ReportsPage() {
           </tbody>
         </table>
       </div>
+
+      {total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600 px-1">
+          <span>
+            Menampilkan {(page - 1) * limit + 1}–{Math.min(page * limit, total)} dari {total} kunjungan
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="px-3.5 py-1.5 bg-white border border-gray-300 rounded-full font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Sebelumnya
+            </button>
+            <span className="font-semibold text-gray-800 px-2 tabular-nums">
+              Halaman {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+              className="px-3.5 py-1.5 bg-white border border-gray-300 rounded-full font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
+      )}
 
       {previewPhotoUrl && (
         <div

@@ -395,6 +395,16 @@ def test_timezone_wib_early_morning_and_date_boundaries(client):
     assert early_rec['date'] == now_wib.strftime('%Y-%m-%d')
     assert early_rec['check_in_time'] == '02.15'
 
+    # 5. Report date filter (WIB) must include the 02:15 WIB visitor when filtering by today_wib
+    today_str = now_wib.strftime('%Y-%m-%d')
+    rep_res = client.get(
+        f'/api/v1/visitors?start_date={today_str}&end_date={today_str}',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert rep_res.status_code == 200
+    rep_names = [v['fullname'] for v in rep_res.get_json()['data']]
+    assert 'Tamu Subuh WIB' in rep_names
+
 
 def test_report_date_filter_edge_cases(client):
     login_admin = client.post('/api/v1/auth/login', json={'username': 'admin', 'password': 'Admin123!'})
@@ -415,4 +425,34 @@ def test_report_date_filter_edge_cases(client):
     single_day_res = client.get('/api/v1/visitors?start_date=2026-11-24&end_date=2026-11-24', headers=auth_headers)
     assert single_day_res.status_code == 200
     assert single_day_res.get_json()['success'] is True
+
+    # 4. Filtering by approved_by (receptionist name) & pagination works consistently
+    petugas_login = client.post('/api/v1/auth/login', json={'username': 'petugas', 'password': 'Petugas123!'})
+    petugas_data = petugas_login.get_json()['data']
+    petugas_token = petugas_data['access_token']
+    petugas_name = petugas_data['user']['fullname']
+
+    reg = client.post('/api/v1/visitors/checkin', json={
+        'fullname': 'Tamu Filter Resepsionis',
+        'institution': 'PT Sinkron',
+        'no_pass': '11',
+        'photo_base64': SAMPLE_PHOTO
+    })
+    assert reg.status_code == 201
+    vid = reg.get_json()['data']['id_visitor']
+    assert client.post(f'/api/v1/visitors/{vid}/approve', headers={'Authorization': f'Bearer {petugas_token}'}).status_code == 200
+    assert client.post(f'/api/v1/visitors/{vid}/checkout', headers={'Authorization': f'Bearer {petugas_token}'}).status_code == 200
+
+    by_rec = client.get(f'/api/v1/visitors?status=COMPLETED&approved_by={petugas_name}', headers=auth_headers)
+    assert by_rec.status_code == 200
+    rec_data = by_rec.get_json()['data']
+    assert any(v['fullname'] == 'Tamu Filter Resepsionis' for v in rec_data)
+    assert all(v['approved_by'] == petugas_name for v in rec_data)
+
+    by_other = client.get('/api/v1/visitors?status=COMPLETED&approved_by=NamaTidakAda', headers=auth_headers)
+    assert by_other.status_code == 200
+    assert by_other.get_json()['data'] == []
+
+    exp_rec = client.get(f'/api/v1/visitors/export/excel?status=COMPLETED&approved_by={petugas_name}', headers=auth_headers)
+    assert exp_rec.status_code == 200
 

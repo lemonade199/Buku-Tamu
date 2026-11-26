@@ -5,15 +5,15 @@ from datetime import datetime, date, time
 from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pydantic import ValidationError
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from backend.app.models.base import get_db_session
-from backend.app.models.entities import Visitor, Pass, AuditLog
+from backend.app.models.entities import Visitor, Pass, AuditLog, User, Setting
 from backend.app.schemas.visitor import CheckinRequest, CheckoutRequest, RejectRegistrationRequest, VisitorUpdateRequest
 from backend.app.services.checkin_service import CheckinService
 from backend.app.services.checkout_service import CheckoutService
 from backend.app.middleware.auth import role_required, permission_required
-from backend.app.utils.datetime_utils import utc_now
+from backend.app.utils.datetime_utils import utc_now, wib_date_start_utc, wib_date_end_utc
 from backend.app.utils.photo_storage import get_photo_path
 from backend.app.utils.export_service import generate_excel, generate_pdf
 
@@ -199,65 +199,72 @@ def get_visitor_status_public(id_visitor: int):
     finally:
         db.close()
 
+def _parse_wib_date_range(start_date_str: str | None, end_date_str: str | None):
+    s_date = None
+    e_date = None
+    if start_date_str:
+        try:
+            s_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    if end_date_str:
+        try:
+            e_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    return s_date, e_date
+
+
+def _apply_visitor_filters(query, search: str, status: str, s_date, e_date, approved_by: str = ''):
+    if search:
+        query = query.filter(
+            or_(
+                Visitor.fullname.ilike(f"%{search}%"),
+                Visitor.institution.ilike(f"%{search}%"),
+                Visitor.representing.ilike(f"%{search}%")
+            )
+        )
+
+    if status == 'ACTIVE':
+        query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
+    elif status == 'COMPLETED':
+        query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
+    elif status in ('PENDING', 'REJECTED', 'APPROVED'):
+        query = query.filter(Visitor.status == status)
+
+    if approved_by:
+        query = query.filter(Visitor.approved_by.has(func.lower(User.fullname) == approved_by.lower()))
+
+    if s_date:
+        query = query.filter(Visitor.check_in_at >= wib_date_start_utc(s_date))
+    if e_date:
+        query = query.filter(Visitor.check_in_at <= wib_date_end_utc(e_date))
+
+    return query
+
+
 @visitor_bp.route('', methods=['GET'])
-@jwt_required()
+@permission_required('reports.read', 'visitors.read', 'visitors.create')
 def list_visitors():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
-    page = int(request.args.get('page', 1))
-    limit = int(request.args.get('limit', 20))
+    approved_by = request.args.get('approved_by', '').strip()
+    s_date, e_date = _parse_wib_date_range(
+        request.args.get('start_date'),
+        request.args.get('end_date'),
+    )
+    page = max(1, int(request.args.get('page', 1)))
+    limit = max(1, min(int(request.args.get('limit', 20)), 200))
+
+    if s_date and e_date and e_date < s_date:
+        return jsonify({
+            'success': False,
+            'message': 'Tanggal selesai tidak bisa kurang dari tanggal masuk/mulai.'
+        }), 422
 
     db = get_db_session()
     try:
-        query = db.query(Visitor)
-
-        if search:
-            query = query.filter(
-                or_(
-                    Visitor.fullname.ilike(f"%{search}%"),
-                    Visitor.institution.ilike(f"%{search}%"),
-                    Visitor.representing.ilike(f"%{search}%")
-                )
-            )
-
-        if status == 'ACTIVE':
-            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
-        elif status == 'COMPLETED':
-            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
-        elif status == 'PENDING':
-            query = query.filter(Visitor.status == 'PENDING')
-        elif status == 'REJECTED':
-            query = query.filter(Visitor.status == 'REJECTED')
-        elif status == 'APPROVED':
-            query = query.filter(Visitor.status == 'APPROVED')
-
-        s_date = None
-        e_date = None
-
-        if start_date_str:
-            try:
-                s_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-            except ValueError:
-                pass
-
-        if end_date_str:
-            try:
-                e_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-            except ValueError:
-                pass
-
-        if s_date and e_date and e_date < s_date:
-            return jsonify({
-                'success': False,
-                'message': 'Tanggal selesai tidak bisa kurang dari tanggal masuk/mulai.'
-            }), 422
-
-        if s_date:
-            query = query.filter(Visitor.check_in_at >= s_date)
-        if e_date:
-            query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
+        query = _apply_visitor_filters(db.query(Visitor), search, status, s_date, e_date, approved_by)
 
         total = query.count()
         visitors = query.order_by(Visitor.check_in_at.desc()).offset((page - 1) * limit).limit(limit).all()
@@ -279,50 +286,20 @@ def list_visitors():
 def export_visitors_excel():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
+    approved_by = request.args.get('approved_by', '').strip()
+    s_date, e_date = _parse_wib_date_range(
+        request.args.get('start_date'),
+        request.args.get('end_date'),
+    )
 
     db = get_db_session()
     try:
-        query = db.query(Visitor)
-
-        if search:
-            query = query.filter(
-                or_(
-                    Visitor.fullname.ilike(f"%{search}%"),
-                    Visitor.institution.ilike(f"%{search}%"),
-                    Visitor.representing.ilike(f"%{search}%")
-                )
-            )
-
-        if status == 'ACTIVE':
-            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
-        elif status == 'COMPLETED':
-            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
-        elif status == 'PENDING':
-            query = query.filter(Visitor.status == 'PENDING')
-        elif status == 'REJECTED':
-            query = query.filter(Visitor.status == 'REJECTED')
-        elif status == 'APPROVED':
-            query = query.filter(Visitor.status == 'APPROVED')
-
-        if start_date_str:
-            try:
-                s_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-                query = query.filter(Visitor.check_in_at >= s_date)
-            except ValueError:
-                pass
-
-        if end_date_str:
-            try:
-                e_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-                query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
-            except ValueError:
-                pass
-
+        query = _apply_visitor_filters(db.query(Visitor), search, status, s_date, e_date, approved_by)
         visitors = query.order_by(Visitor.check_in_at.desc()).all()
         visitor_dicts = [v.to_dict() for v in visitors]
-        buf = generate_excel(visitor_dicts)
+        setting = db.query(Setting).first()
+        institution_name = setting.institution_name if setting and setting.institution_name else "SEAMOLEC"
+        buf = generate_excel(visitor_dicts, institution_name=institution_name)
         filename = f"laporan_kunjungan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         return send_file(
             buf,
@@ -338,50 +315,20 @@ def export_visitors_excel():
 def export_visitors_pdf():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip().upper()
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
+    approved_by = request.args.get('approved_by', '').strip()
+    s_date, e_date = _parse_wib_date_range(
+        request.args.get('start_date'),
+        request.args.get('end_date'),
+    )
 
     db = get_db_session()
     try:
-        query = db.query(Visitor)
-
-        if search:
-            query = query.filter(
-                or_(
-                    Visitor.fullname.ilike(f"%{search}%"),
-                    Visitor.institution.ilike(f"%{search}%"),
-                    Visitor.representing.ilike(f"%{search}%")
-                )
-            )
-
-        if status == 'ACTIVE':
-            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.is_(None))
-        elif status == 'COMPLETED':
-            query = query.filter(Visitor.status == 'APPROVED', Visitor.check_out_at.isnot(None))
-        elif status == 'PENDING':
-            query = query.filter(Visitor.status == 'PENDING')
-        elif status == 'REJECTED':
-            query = query.filter(Visitor.status == 'REJECTED')
-        elif status == 'APPROVED':
-            query = query.filter(Visitor.status == 'APPROVED')
-
-        if start_date_str:
-            try:
-                s_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-                query = query.filter(Visitor.check_in_at >= s_date)
-            except ValueError:
-                pass
-
-        if end_date_str:
-            try:
-                e_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-                query = query.filter(Visitor.check_in_at <= datetime.combine(e_date.date(), time.max))
-            except ValueError:
-                pass
-
+        query = _apply_visitor_filters(db.query(Visitor), search, status, s_date, e_date, approved_by)
         visitors = query.order_by(Visitor.check_in_at.desc()).all()
         visitor_dicts = [v.to_dict() for v in visitors]
-        buf = generate_pdf(visitor_dicts)
+        setting = db.query(Setting).first()
+        institution_name = setting.institution_name if setting and setting.institution_name else "SEAMOLEC"
+        buf = generate_pdf(visitor_dicts, institution_name=institution_name)
         filename = f"laporan_kunjungan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         return send_file(
             buf,
@@ -393,7 +340,7 @@ def export_visitors_pdf():
         db.close()
 
 @visitor_bp.route('/active', methods=['GET'])
-@jwt_required()
+@permission_required('visitors.checkout', 'visitors.read', 'dashboard.read')
 def list_active_visitors():
     db = get_db_session()
     try:
@@ -411,7 +358,7 @@ def list_active_visitors():
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>', methods=['GET'])
-@jwt_required()
+@permission_required('visitors.read', 'reports.read', 'visitors.checkout', 'pass.read')
 def get_visitor_detail(id_visitor: int):
     db = get_db_session()
     try:
@@ -423,7 +370,7 @@ def get_visitor_detail(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>', methods=['PUT'])
-@permission_required('visitors.update', 'visitors.manage', 'visitors.create')
+@permission_required('visitors.update', 'visitors.manage', 'visitors.create', 'master.manage')
 def update_visitor(id_visitor: int):
     data = request.get_json(silent=True) or {}
     try:
@@ -525,7 +472,7 @@ def update_visitor(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/photo', methods=['GET'])
-@jwt_required()
+@permission_required('visitors.read', 'visitors.create', 'visitors.checkout', 'reports.read', 'dashboard.read', 'pass.read')
 def get_visitor_photo(id_visitor: int):
     db = get_db_session()
     try:
@@ -542,7 +489,7 @@ def get_visitor_photo(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/<int:id_visitor>/checkout', methods=['POST'])
-@jwt_required()
+@permission_required('visitors.checkout')
 def checkout_visitor_by_id(id_visitor: int):
     identity = get_jwt_identity()
     user_id = int(identity) if identity is not None else None
@@ -574,7 +521,7 @@ def checkout_visitor_by_id(id_visitor: int):
         db.close()
 
 @visitor_bp.route('/checkout', methods=['POST'])
-@jwt_required()
+@permission_required('visitors.checkout')
 def checkout_visitor_general():
     data = request.get_json(silent=True) or {}
     try:

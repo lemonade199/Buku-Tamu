@@ -14,14 +14,21 @@ def to_wib(dt: datetime | None) -> datetime | None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(WIB_TZ).replace(tzinfo=None)
 
+def wib_date_start_utc(d) -> datetime:
+    """Converts a calendar date in WIB (00:00:00 WIB) to naive UTC datetime."""
+    start_wib = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=WIB_TZ)
+    return start_wib.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def wib_date_end_utc(d) -> datetime:
+    """Converts a calendar date in WIB (23:59:59.999999 WIB) to naive UTC datetime."""
+    end_wib = datetime(d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=WIB_TZ)
+    return end_wib.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def get_today_range_utc() -> tuple[datetime, datetime]:
     """Returns the start and end of the current calendar day in WIB (Asia/Jakarta),
     converted back to UTC naive datetimes for accurate database range filtering.
     """
-    now_wib = datetime.now(WIB_TZ)
-    start_wib = datetime(now_wib.year, now_wib.month, now_wib.day, 0, 0, 0, tzinfo=WIB_TZ)
-    end_wib = datetime(now_wib.year, now_wib.month, now_wib.day, 23, 59, 59, 999999, tzinfo=WIB_TZ)
-    
-    start_utc = start_wib.astimezone(timezone.utc).replace(tzinfo=None)
-    end_utc = end_wib.astimezone(timezone.utc).replace(tzinfo=None)
-    return start_utc, end_utc
+    today_wib = datetime.now(WIB_TZ).date()
+    return wib_date_start_utc(today_wib), wib_date_end_utc(today_wib)

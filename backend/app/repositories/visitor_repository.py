@@ -102,21 +102,24 @@ class VisitorRepository:
         ).scalar() or 0
 
     def get_monthly_stats(self) -> list:
-        now = utc_now()
-        year = now.year
+        now_wib = datetime.now(WIB_TZ)
+        year = now_wib.year
         months_label = ['Jan', 'Feb', 'Mart', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
         result = []
         for m in range(1, 13):
-            start_m = datetime(year, m, 1)
+            start_wib = datetime(year, m, 1, 0, 0, 0, tzinfo=WIB_TZ)
             if m == 12:
-                end_m = datetime(year + 1, 1, 1)
+                end_wib = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=WIB_TZ)
             else:
-                end_m = datetime(year, m + 1, 1)
+                end_wib = datetime(year, m + 1, 1, 0, 0, 0, tzinfo=WIB_TZ)
+
+            start_utc = start_wib.astimezone(timezone.utc).replace(tzinfo=None)
+            end_utc = end_wib.astimezone(timezone.utc).replace(tzinfo=None)
 
             count = self.db.query(func.count(Visitor.id_visitor)).filter(
                 Visitor.status == 'APPROVED',
-                Visitor.check_in_at >= start_m,
-                Visitor.check_in_at < end_m
+                Visitor.check_in_at >= start_utc,
+                Visitor.check_in_at < end_utc
             ).scalar() or 0
 
             result.append({
