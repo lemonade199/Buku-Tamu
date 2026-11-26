@@ -6,6 +6,7 @@ import { Questrial } from 'next/font/google';
 import { Clock, Menu, Bell, Check, UserCheck, AlertTriangle, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api, { getUserAvatarUrl, resolveServerUrl } from '@/lib/api';
+import { formatJam, parseServerDate } from '@/lib/datetime';
 
 // Sama dengan halaman tamu dan login supaya identitas SEAMOLEC konsisten.
 const wordmarkFont = Questrial({ weight: '400', subsets: ['latin'], display: 'swap' });
@@ -210,16 +211,16 @@ export default function Topbar({ onOpenMenu }: TopbarProps) {
                     </span>
                   )}
                 </div>
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllRead}
-                    className="text-[11px] text-[#8A001A] hover:underline flex items-center space-x-1 font-medium"
-                  >
-                    <Check className="w-3 h-3" />
-                    <span>Tandai semua dibaca</span>
-                  </button>
-                )}
+                {/* Selalu tampil; nonaktif kalau semua sudah dibaca, supaya posisinya mudah ditemukan. */}
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  disabled={unreadCount === 0}
+                  className="text-[11px] text-[#8A001A] flex items-center gap-1 font-semibold px-2 py-1 rounded-full hover:bg-[#8A001A]/10 active:bg-[#8A001A]/15 cursor-pointer disabled:text-gray-400 disabled:hover:bg-transparent disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+                >
+                  <Check className="w-3 h-3" aria-hidden="true" />
+                  <span>{unreadCount === 0 ? 'Semua sudah dibaca' : 'Tandai semua dibaca'}</span>
+                </button>
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
@@ -269,10 +270,8 @@ export default function Topbar({ onOpenMenu }: TopbarProps) {
                           {notif.message}
                         </p>
                         <span className="text-[10px] text-gray-400 mt-1 block">
-                          {new Date(notif.created_at).toLocaleTimeString('id-ID', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })} · {new Date(notif.created_at).toLocaleDateString('id-ID', {
+                          {/* Waktu dari server dalam UTC; parseServerDate mengubahnya ke jam lokal (WIB). */}
+                          {formatJam(notif.created_at)} · {parseServerDate(notif.created_at)?.toLocaleDateString('id-ID', {
                             day: 'numeric',
                             month: 'short',
                           })}
