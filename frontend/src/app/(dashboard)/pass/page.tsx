@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import { Search, Calendar, ChevronDown, RefreshCw, ShieldAlert, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Search, ChevronDown, RefreshCw, ShieldAlert, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import PassRack from '@/components/PassRack';
@@ -37,8 +37,6 @@ function MonitoringPassPage() {
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState('Hari ini');
-  const [dateFilterOpen, setDateFilterOpen] = useState(false);
 
   const [selectedStatus, setSelectedStatus] = useState('Semua status');
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
@@ -101,13 +99,16 @@ function MonitoringPassPage() {
   // Nama yang benar-benar tercatat menyerahkan atau menerima kartu ikut dimasukkan, supaya filter selalu cocok dengan tabel.
   const receptionistChoices = Array.from(
     new Set(
-      [...receptionistOptions, ...items.flatMap((i) => [i.handed_over_by, i.received_by])].filter(
+      [...receptionistOptions, ...items.map((i) => i.handed_over_by)].filter(
         (n): n is string => Boolean(n) && n !== '-'
       )
     )
   ).sort((a, b) => a.localeCompare(b, 'id'));
 
-  const filteredItems = items.filter((item) => {
+  // Monitoring hanya untuk kartu yang sedang dipegang tamu. Kunjungan selesai sudah ada di halaman Laporan.
+  const activeItems = items.filter((item) => item.status !== 'Selesai');
+
+  const filteredItems = activeItems.filter((item) => {
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch =
       !term ||
@@ -120,37 +121,19 @@ function MonitoringPassPage() {
 
     const matchesReceptionist =
       selectedReceptionist === 'Semua resepsionis' ||
-      item.handed_over_by.toLowerCase() === selectedReceptionist.toLowerCase() ||
-      item.received_by.toLowerCase() === selectedReceptionist.toLowerCase();
+      item.handed_over_by.toLowerCase() === selectedReceptionist.toLowerCase();
 
-    // Logika filter tanggal (Hari ini, Minggu ini, Bulan ini, Semua)
-    let matchesDate = true;
-    if (selectedDate !== 'Semua') {
-      if (!item.date) {
-        matchesDate = false;
-      } else {
-        const now = new Date();
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-
-        if (selectedDate === 'Hari ini') {
-          matchesDate = item.date === todayStr;
-        } else if (selectedDate === 'Minggu ini') {
-          const day = now.getDay();
-          const diffToMonday = (day + 6) % 7;
-          const monday = new Date(now);
-          monday.setDate(now.getDate() - diffToMonday);
-          const startOfWeekStr = `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`;
-          matchesDate = item.date >= startOfWeekStr && item.date <= todayStr;
-        } else if (selectedDate === 'Bulan ini') {
-          const monthPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-          matchesDate = item.date.startsWith(monthPrefix);
-        }
-      }
-    }
-
-    return matchesSearch && matchesStatus && matchesReceptionist && matchesDate;
+    return matchesSearch && matchesStatus && matchesReceptionist;
   });
+
+  // Tamu yang masuk sebelum hari ini diberi tanggal di depan jamnya, supaya kartu yang lupa dikembalikan mudah terlihat.
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const checkInLabel = (item: PassMonitoringItem) =>
+    item.date && item.date !== todayStr
+      ? `${item.date.slice(8, 10)}/${item.date.slice(5, 7)} ${item.check_in_time}`
+      : item.check_in_time;
 
   if (!authLoading && !hasAccess) {
     return (
@@ -261,36 +244,6 @@ function MonitoringPassPage() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setDateFilterOpen(!dateFilterOpen)}
-            className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
-          >
-            <Calendar className="w-3.5 h-3.5 text-gray-700" />
-            <span>{selectedDate}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-700 ml-1" />
-          </button>
-
-          {dateFilterOpen && (
-            <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-40 text-xs">
-              {['Hari ini', 'Minggu ini', 'Bulan ini', 'Semua'].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(d);
-                    setDateFilterOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-800 cursor-pointer"
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="relative">
-          <button
-            type="button"
             onClick={() => setStatusFilterOpen(!statusFilterOpen)}
             className="inline-flex items-center space-x-2 bg-white border border-gray-300 rounded-full px-4 py-1.5 text-xs font-semibold text-gray-800 shadow-xs hover:bg-gray-50 transition-colors cursor-pointer"
           >
@@ -300,7 +253,7 @@ function MonitoringPassPage() {
 
           {statusFilterOpen && (
             <div className="absolute left-0 mt-2 py-1 bg-white border border-gray-300 rounded-2xl shadow-xl z-20 w-40 text-xs">
-              {['Semua status', 'Menunggu', 'Dipakai', 'Selesai'].map((s) => (
+              {['Semua status', 'Menunggu', 'Dipakai'].map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -355,16 +308,14 @@ function MonitoringPassPage() {
               <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Tamu</th>
               <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Instansi</th>
               <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Jam masuk</th>
-              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Jam keluar</th>
               <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Diserahkan oleh</th>
-              <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600">Diterima oleh</th>
               <th scope="col" className="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-300/80 text-xs text-gray-800">
             {loading && items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-gray-500 font-medium">
+                <td colSpan={6} className="py-12 text-center text-gray-500 font-medium">
                   <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   <span>Memuat data monitoring kartu pass...</span>
                 </td>
@@ -386,34 +337,23 @@ function MonitoringPassPage() {
                     {r.institution}
                   </td>
 
-                  <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
-                    {r.check_in_time}
-                  </td>
-
-                  <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap">
-                    {r.check_out_time}
+                  <td className="py-3 px-3 font-medium text-gray-800 whitespace-nowrap tabular-nums">
+                    {checkInLabel(r)}
                   </td>
 
                   <td className="py-3 px-3 text-gray-800 font-medium whitespace-nowrap">
                     {r.handed_over_by}
                   </td>
 
-                  <td className="py-3 px-3 text-gray-800 font-medium whitespace-nowrap">
-                    {r.received_by}
-                  </td>
 
                   <td className="py-3 px-3 text-center whitespace-nowrap">
                     {r.status === 'Menunggu' ? (
                       <span className="inline-block px-4 py-0.5 bg-[#D97706] text-white text-[11px] font-bold rounded-full min-w-[80px] text-center shadow-2xs">
                         Menunggu
                       </span>
-                    ) : r.status === 'Dipakai' ? (
+                    ) : (
                       <span className="inline-block px-4 py-0.5 bg-[#6B0014] text-white text-[11px] font-bold rounded-full min-w-[80px] text-center shadow-2xs">
                         Dipakai
-                      </span>
-                    ) : (
-                      <span className="inline-block px-4 py-0.5 bg-[#5B6367] text-white text-[11px] font-bold rounded-full min-w-[80px] text-center shadow-2xs">
-                        Selesai
                       </span>
                     )}
                   </td>
@@ -421,8 +361,10 @@ function MonitoringPassPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-gray-500 font-medium">
-                  Tidak ada kartu pass yang cocok dengan filter pencarian.
+                <td colSpan={6} className="py-12 text-center text-gray-500 font-medium">
+                  {activeItems.length === 0
+                    ? 'Tidak ada kartu yang sedang dipegang tamu.'
+                    : 'Tidak ada kartu pass yang cocok dengan filter pencarian.'}
                 </td>
               </tr>
             )}
