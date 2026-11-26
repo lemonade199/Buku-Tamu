@@ -521,6 +521,7 @@ export default function KioskCheckinPage() {
                     <input
                       id="guest-institution"
                       type="text"
+                      required
                       autoComplete="organization"
                       value={institution}
                       onChange={(e) => setInstitution(e.target.value)}
@@ -536,6 +537,7 @@ export default function KioskCheckinPage() {
                     <input
                       id="guest-purpose"
                       type="text"
+                      required
                       value={purpose}
                       onChange={(e) => setPurpose(e.target.value)}
                       placeholder="Tujuan kunjungan Anda"

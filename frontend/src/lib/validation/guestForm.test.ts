@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { guestCheckinSchema } from './guestForm';
 
 const photo = `data:image/jpeg;base64,${'A'.repeat(200)}`;
+const valid = { fullname: 'Nuri', institution: 'SMKN 7 Bandung', purpose: 'Kunjungan industri', photo_base64: photo };
 
 function firstError(input: Record<string, unknown>) {
   const result = guestCheckinSchema.safeParse(input);
@@ -13,35 +14,38 @@ describe('guestCheckinSchema', () => {
     const result = guestCheckinSchema.safeParse({
       fullname: '  Nuri  ',
       institution: ' SMKN 7 Bandung ',
-      purpose: '',
+      purpose: ' Kunjungan industri ',
       photo_base64: photo,
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.fullname).toBe('Nuri');
       expect(result.data.institution).toBe('SMKN 7 Bandung');
-      // Isian kosong tidak dikirim ke backend.
-      expect(result.data.purpose).toBeUndefined();
+      expect(result.data.purpose).toBe('Kunjungan industri');
     }
   });
 
-  it('nama kosong ditolak dengan pesan yang sama seperti sebelumnya', () => {
-    expect(firstError({ fullname: '   ', institution: '', purpose: '', photo_base64: photo })).toBe('Nama Tamu wajib diisi.');
+  it('nama kosong ditolak', () => {
+    expect(firstError({ ...valid, fullname: '   ' })).toBe('Nama Tamu wajib diisi.');
   });
 
   it('nama satu huruf ditolak sebelum sampai ke backend', () => {
-    expect(firstError({ fullname: 'A', institution: '', purpose: '', photo_base64: photo })).toBe('Nama Tamu minimal 2 huruf.');
+    expect(firstError({ ...valid, fullname: 'A' })).toBe('Nama Tamu minimal 2 huruf.');
+  });
+
+  it('instansi wajib diisi', () => {
+    expect(firstError({ ...valid, institution: '  ' })).toBe('Instansi wajib diisi.');
+  });
+
+  it('keperluan wajib diisi', () => {
+    expect(firstError({ ...valid, purpose: '' })).toBe('Keperluan Kunjungan wajib diisi.');
   });
 
   it('foto wajib ada', () => {
-    expect(firstError({ fullname: 'Nuri', institution: '', purpose: '', photo_base64: undefined })).toBe(
-      'Foto pengunjung wajib diambil sebelum mendaftar.'
-    );
+    expect(firstError({ ...valid, photo_base64: undefined })).toBe('Foto pengunjung wajib diambil sebelum mendaftar.');
   });
 
   it('batas panjang mengikuti backend', () => {
-    expect(firstError({ fullname: 'Nuri', institution: 'x'.repeat(151), purpose: '', photo_base64: photo })).toBe(
-      'Asal instansi maksimal 150 karakter.'
-    );
+    expect(firstError({ ...valid, institution: 'x'.repeat(151) })).toBe('Instansi maksimal 150 karakter.');
   });
 });
