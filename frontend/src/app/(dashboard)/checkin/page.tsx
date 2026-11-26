@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import api, { getVisitorPhotoUrl } from '@/lib/api';
 import { formatJam } from '@/lib/datetime';
 import { VisitorItem } from '@/types';
-import { Search, User, CheckCircle2, AlertCircle, X, RefreshCw } from 'lucide-react';
+import { Search, User, CheckCircle2, AlertCircle, X, RefreshCw, Pencil } from 'lucide-react';
 import { useAutoDismiss } from '@/hooks/useAutoDismiss';
 
 export default function ReceptionGuestIntakePage() {
@@ -28,6 +28,20 @@ export default function ReceptionGuestIntakePage() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   useAutoDismiss(feedback, () => setFeedback(null));
   const [approvingId, setApprovingId] = useState<number | null>(null);
+
+  // State untuk Edit data pengunjung (PUT /api/v1/visitors/<id>)
+  const [editingVisitor, setEditingVisitor] = useState<VisitorItem | null>(null);
+  const [editFullname, setEditFullname] = useState('');
+  const [editInstitution, setEditInstitution] = useState('');
+  const [editPurpose, setEditPurpose] = useState('');
+  const [editPassId, setEditPassId] = useState<number>(0);
+  const [availablePasses, setAvailablePasses] = useState<{ id_pass: number; no_pass: string; slot?: string }[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // State untuk Tolak permohonan (POST /api/v1/visitors/<id>/reject)
+  const [rejectingVisitor, setRejectingVisitor] = useState<VisitorItem | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [submittingReject, setSubmittingReject] = useState(false);
 
   const fetchPendingVisitors = useCallback(async () => {
     try {
@@ -79,6 +93,73 @@ export default function ReceptionGuestIntakePage() {
       setFeedback({ type: 'error', text: msg });
     } finally {
       setApprovingId(null);
+    }
+  };
+
+  const openEditModal = async (v: VisitorItem) => {
+    setEditingVisitor(v);
+    setEditFullname(v.fullname || '');
+    setEditInstitution(v.institution || '');
+    setEditPurpose(v.purpose || '');
+    setEditPassId(v.id_pass);
+    try {
+      const res = await api.get<{ success: boolean; data: { id_pass: number; no_pass: string; slot?: string }[] }>('/pass/available');
+      setAvailablePasses(res.data.data || []);
+    } catch {
+      setAvailablePasses([]);
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVisitor || !editFullname.trim()) return;
+    setSavingEdit(true);
+    setFeedback(null);
+    try {
+      const payload: Record<string, any> = {
+        fullname: editFullname.trim(),
+        institution: editInstitution.trim(),
+        purpose: editPurpose.trim(),
+      };
+      if (editPassId && editPassId !== editingVisitor.id_pass) {
+        payload.id_pass = editPassId;
+      }
+      const res = await api.put(`/visitors/${editingVisitor.id_visitor}`, payload);
+      setFeedback({
+        type: 'success',
+        text: res.data.message || `Data pengunjung '${editFullname.trim()}' berhasil diperbarui.`,
+      });
+      setEditingVisitor(null);
+      fetchPendingVisitors();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal memperbarui data pengunjung.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmReject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectingVisitor || !rejectReason.trim()) return;
+    setSubmittingReject(true);
+    setFeedback(null);
+    try {
+      const res = await api.post(`/visitors/${rejectingVisitor.id_visitor}/reject`, {
+        reason: rejectReason.trim(),
+      });
+      setFeedback({
+        type: 'success',
+        text: res.data.message || `Permohonan tamu ${rejectingVisitor.fullname} berhasil ditolak.`,
+      });
+      setRejectingVisitor(null);
+      setRejectReason('');
+      fetchPendingVisitors();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menolak permohonan pengunjung.';
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setSubmittingReject(false);
     }
   };
 
@@ -163,7 +244,7 @@ export default function ReceptionGuestIntakePage() {
             <col />
             <col className="w-[96px]" />
             <col className="w-[104px]" />
-            <col className="w-[160px]" />
+            <col className="w-[260px]" />
           </colgroup>
           <thead>
             <tr className="border-b border-gray-200 bg-[#FAF7F0]">
@@ -230,14 +311,35 @@ export default function ReceptionGuestIntakePage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-700 text-center tabular-nums">{timeStr}</td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmApprove(v)}
-                        disabled={approvingId === v.id_visitor}
-                        className="px-4 py-1.5 bg-[#8A001A] hover:bg-[#700015] active:bg-[#5A0011] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
-                      >
-                        {approvingId === v.id_visitor ? 'Menyerahkan...' : 'Serahkan kartu'}
-                      </button>
+                      <div className="inline-flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmApprove(v)}
+                          disabled={approvingId === v.id_visitor}
+                          className="px-3 py-1.5 bg-[#8A001A] hover:bg-[#700015] active:bg-[#5A0011] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#8A001A]"
+                        >
+                          {approvingId === v.id_visitor ? 'Menyerahkan...' : 'Serahkan'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(v)}
+                          title="Edit data pengunjung"
+                          aria-label={`Edit data ${v.fullname}`}
+                          className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A001A]"
+                        >
+                          <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRejectingVisitor(v);
+                            setRejectReason('');
+                          }}
+                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                        >
+                          Tolak
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -246,6 +348,154 @@ export default function ReceptionGuestIntakePage() {
           </tbody>
         </table>
       </div>
+
+      {editingVisitor && (
+        <div
+          onClick={() => setEditingVisitor(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        >
+          <form
+            onSubmit={handleSaveEdit}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-md w-full p-6 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="text-sm font-bold text-gray-900">Edit Data Pengunjung</h2>
+              <button
+                type="button"
+                onClick={() => setEditingVisitor(null)}
+                className="p-1 text-gray-400 hover:text-gray-700 rounded-full cursor-pointer"
+                aria-label="Tutup modal edit"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Nama Lengkap *</label>
+                <input
+                  type="text"
+                  required
+                  minLength={2}
+                  maxLength={150}
+                  value={editFullname}
+                  onChange={(e) => setEditFullname(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Instansi</label>
+                <input
+                  type="text"
+                  maxLength={150}
+                  value={editInstitution}
+                  onChange={(e) => setEditInstitution(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Keperluan</label>
+                <textarea
+                  rows={2}
+                  maxLength={1000}
+                  value={editPurpose}
+                  onChange={(e) => setEditPurpose(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Kartu Pass</label>
+                <select
+                  value={editPassId}
+                  onChange={(e) => setEditPassId(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#8A001A]/30 focus:border-[#8A001A]"
+                >
+                  <option value={editingVisitor.id_pass}>
+                    Pass #{(editingVisitor.no_pass || String(editingVisitor.id_pass)).padStart(2, '0')} (Saat ini)
+                  </option>
+                  {availablePasses.map((p) => (
+                    <option key={p.id_pass} value={p.id_pass}>
+                      Pass #{p.no_pass.padStart(2, '0')} {p.slot ? `(${p.slot})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingVisitor(null)}
+                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="px-4 py-2 text-xs font-bold text-white bg-[#8A001A] hover:bg-[#700015] disabled:opacity-50 rounded-xl cursor-pointer"
+              >
+                {savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {rejectingVisitor && (
+        <div
+          onClick={() => setRejectingVisitor(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+        >
+          <form
+            onSubmit={handleConfirmReject}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-md w-full p-6 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="text-sm font-bold text-gray-900">Tolak Permohonan Tamu</h2>
+              <button
+                type="button"
+                onClick={() => setRejectingVisitor(null)}
+                className="p-1 text-gray-400 hover:text-gray-700 rounded-full cursor-pointer"
+                aria-label="Tutup modal tolak"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-600">
+              Tolak registrasi atas nama <strong className="text-gray-900">{rejectingVisitor.fullname}</strong>? Kartu pass akan dikembalikan ke status tersedia.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Alasan Penolakan *</label>
+              <textarea
+                required
+                rows={3}
+                maxLength={500}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Contoh: Data identitas tidak sesuai atau pejabat yang dituju sedang tidak di tempat."
+                className="w-full text-xs border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRejectingVisitor(null)}
+                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={submittingReject || !rejectReason.trim()}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 disabled:opacity-50 rounded-xl cursor-pointer"
+              >
+                {submittingReject ? 'Memproses...' : 'Tolak Permohonan'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

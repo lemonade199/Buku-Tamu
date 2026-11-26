@@ -234,6 +234,27 @@ export default function MasterDataPage() {
     }
   };
 
+  const [deletingPass, setDeletingPass] = useState<PassItem | null>(null);
+  const [deletingPassLoading, setDeletingPassLoading] = useState(false);
+
+  const handleDeletePass = async () => {
+    if (!deletingPass) return;
+    setDeletingPassLoading(true);
+    setFeedback(null);
+    try {
+      const res = await api.delete(`/pass/${deletingPass.id_pass}`);
+      setFeedback({ type: 'success', text: res.data.message || 'Kartu pass berhasil dihapus.' });
+      setDeletingPass(null);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Gagal menghapus kartu pass.';
+      setFeedback({ type: 'error', text: msg });
+      setDeletingPass(null);
+    } finally {
+      setDeletingPassLoading(false);
+    }
+  };
+
   const handleAddPass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addNomor.trim()) return;
@@ -573,19 +594,21 @@ export default function MasterDataPage() {
           <div className="max-w-3xl overflow-x-auto bg-white rounded-2xl border border-[#E8DCCB] shadow-sm">
             <table className="w-full table-fixed text-center border-collapse">
               <colgroup>
-                <col className="w-1/2" />
-                <col className="w-1/2" />
+                <col className="w-1/3" />
+                <col className="w-1/3" />
+                <col className="w-1/3" />
               </colgroup>
               <thead>
                 <tr className="border-b border-gray-200 bg-[#FAF7F0]">
                   <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">No. pass</th>
                   <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Slot KTP</th>
+                  <th scope="col" className="px-4 py-3 text-xs font-semibold text-gray-600 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs text-gray-800">
                 {loading && passes.length === 0 ? (
                   <tr>
-                    <td colSpan={2} className="py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={3} className="py-12 text-center text-gray-500 font-medium">
                       <div className="w-6 h-6 border-2 border-[#8A001A] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       <span>Memuat data master pass...</span>
                     </td>
@@ -605,12 +628,30 @@ export default function MasterDataPage() {
                         <td className="px-4 py-2.5 font-medium text-gray-900 text-center truncate" title={slotDisplay}>
                           {slotDisplay}
                         </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <div className="inline-flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(p)}
+                              className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-full transition-colors cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingPass(p)}
+                              className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-full transition-colors cursor-pointer"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={2} className="py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={3} className="py-12 text-center text-gray-500 font-medium">
                       Tidak ada data kartu pass yang cocok.
                     </td>
                   </tr>
@@ -618,6 +659,50 @@ export default function MasterDataPage() {
               </tbody>
             </table>
           </div>
+
+          {deletingPass && (
+            <div
+              onClick={() => setDeletingPass(null)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-sm w-full p-6 space-y-4 text-left"
+              >
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <h3 className="text-sm font-bold text-gray-900">Hapus Kartu Pass</h3>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingPass(null)}
+                    className="p-1 text-gray-400 hover:text-gray-700 rounded-full cursor-pointer"
+                    aria-label="Tutup konfirmasi hapus pass"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Yakin ingin menghapus permanen kartu pass <strong className="text-gray-900">#{deletingPass.no_pass.padStart(2, '0')}</strong>? Kartu yang sedang dipakai atau memiliki riwayat kunjungan tidak dapat dihapus.
+                </p>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingPass(null)}
+                    className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeletePass}
+                    disabled={deletingPassLoading}
+                    className="px-4 py-2 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 disabled:opacity-50 rounded-xl cursor-pointer"
+                  >
+                    {deletingPassLoading ? 'Menghapus...' : 'Hapus Permanen'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">

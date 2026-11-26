@@ -126,7 +126,12 @@ export default function Topbar({ onOpenMenu }: TopbarProps) {
     }
   };
 
-  const roleLabel = user?.role_code === 'ADMIN' ? 'Admin' : 'Resepsionis';
+  const roleLabel =
+    user?.role_code === 'ADMIN'
+      ? (user?.role_name || 'Admin')
+      : user?.role_code === 'PETUGAS' && (!user?.role_name || user.role_name.toLowerCase() === 'petugas')
+      ? 'Resepsionis'
+      : (user?.role_name || 'Resepsionis');
   const userName = user?.fullname || 'Pengguna';
   const initial = userName.trim().charAt(0).toUpperCase() || '?';
 
